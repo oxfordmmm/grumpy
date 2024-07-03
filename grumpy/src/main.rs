@@ -4,21 +4,25 @@ use std::fs::File;
 use std::string::String;
 use std::vec::Vec;
 
+use gb_io::seq::Reference;
 use string_cache::Atom;
 
 use gb_io::reader::SeqReader;
 use gb_io::seq::Location::Complement;
 use gb_io::seq::Location::Range;
 
+#[derive(Clone)]
 struct GeneDef{
     name: String,
     coding: bool,
     rev_comp: bool,
     start: i64,
     end: i64,
-    promoter_start: i64
+    promoter_start: i64,
+    promoter_size: i64
 }
 
+#[derive(Clone)]
 struct Genome{
     name: String,
     nucleotide_sequence: String,
@@ -26,10 +30,12 @@ struct Genome{
     genome_positions: Vec<GenomePosition>
 }
 
+#[derive(Clone, Debug)]
 struct Evidence{
 
 }
 
+#[derive(Clone, Debug)]
 struct Alt{
     base: String,
     cov: Option<i32>,
@@ -37,9 +43,13 @@ struct Alt{
     evidence: Evidence
 }
 
+#[derive(Clone, Debug)] 
 struct GenomePosition{
     reference: char,
-    alts: Vec<Alt>
+    alts: Vec<Alt>,
+    genome_idx: i64, // 1-indexed genome index
+    genes: Vec<String>,
+    is_deleted: bool
 }
 
 impl Genome{
@@ -62,7 +72,7 @@ impl Genome{
                 let mut coding: bool = false;
                 let mut rev_comp: bool = false;
                 if feature.kind == Atom::from("CDS") || feature.kind == Atom::from("rRNA"){
-                    if feature.kind == Atom::from("rRNA"){
+                    if feature.kind != Atom::from("rRNA"){
                         coding = true;
                     }
                     match feature.location {
@@ -70,8 +80,8 @@ impl Genome{
                             rev_comp = true;
                             match *x {
                                 Range(s, e) => {
-                                    start = s.0;
-                                    end = e.0;
+                                    start = e.0;
+                                    end = s.0;
                                 },
                                 _ => continue
                             }
@@ -100,17 +110,23 @@ impl Genome{
                         coding,
                         start,
                         end,
-                        promoter_start: -1
+                        promoter_start: -1,
+                        promoter_size: 0
                     });
                 }
             }
         }
         let mut genome_positions = Vec::new();
+        let mut genome_idx = 0;
         for c in _nucleotide_sequence.chars(){
+            genome_idx += 1;
             genome_positions.push(
                 GenomePosition{
                     reference: c,
-                    alts: Vec::new()
+                    genome_idx,
+                    alts: Vec::new(),
+                    genes: Vec::new(),
+                    is_deleted: false
                 }
             );
         }
@@ -122,21 +138,82 @@ impl Genome{
         }
     }
 
-    pub fn at_genome_index(&self, index: i64) -> Result<GenomePosition, String>{
-        return self.genome_positions.get(index)
+    pub fn assign_promoters(&mut self) -> (){
+        /* 
+        Assigns promoters to genes iteratively. 
+        Expand out to a given distance from the start of each gene without overlapping with other genes.
+        */
+        let max_promoter_length = 100;
+        for gene in self.gene_definitions.iter_mut(){
+            // First pass to add gene names to all positions they exist in
+            let mut start_idx = gene.start;
+            let mut end_idx = gene.end;
+            if gene.rev_comp{
+                start_idx = gene.end;
+                end_idx = gene.start;
+            }
+            for i in start_idx..end_idx{
+                self.genome_positions[i as usize].genes.push(gene.name.clone());
+            }
+        }
+        for gene in self.gene_definitions.iter_mut(){
+            // Check for overlapping genes, assigning promoters to non-overlapping genes
+            if self.genome_positions[gene.start as usize].genes.len() > 1{
+                continue;
+            }
+            else{
+                gene.promoter_start = gene.start;
+            }
+        }
 
+        let mut complete = false;
+        while !complete{
+            let mut this_complete = true;
+            for gene in self.gene_definitions.iter_mut(){
+                let mut expanding = -1;
+                if gene.rev_comp{
+                    // This pushes `gene.promoter_start += expanding` the right way for rev_comp
+                    expanding = 1;
+                }
+
+                if gene.promoter_start == -1 || gene.promoter_start == 0 || gene.promoter_size == max_promoter_length{
+                    continue;
+                }
+                if self.genome_positions[(gene.promoter_start + expanding) as usize].genes.len() > 0{
+                    // Pre-existing gene at this position so ignore expanding!
+                    // println!("Gene {} would overlap with gene {}", gene.name, self.genome_positions[gene.promoter_start as usize].genes[0]);
+                    continue;
+                }
+                else{
+                    // No gene in the new position so expand
+                    gene.promoter_start += expanding;
+                    gene.promoter_size += 1;
+                    self.genome_positions[gene.promoter_start as usize].genes.push(gene.name.clone());
+                    this_complete = false;
+                }
+            }
+            complete = this_complete;
+        }
+
+    }
+
+    pub fn at_genome_index(&self, index: i64) -> GenomePosition{
+        return self.genome_positions[index as usize].clone();
     }
 }
 
 fn main() {
-    let reference = Genome::new("reference/NC_000962.3.gbk");
+    let mut reference = Genome::new("reference/NC_000962.3.gbk");
+    reference.assign_promoters();
     for gene in reference.gene_definitions{
-        if gene.name == "rpoB"{
+        if gene.name == "rpoB" || gene.name == "katG"{
             println!("Name {}", gene.name);
             println!("Is reverse complement {}", gene.rev_comp);
             println!("Is coding {}", gene.coding);
             println!("Start pos {}", gene.start);
             println!("End pos {}", gene.end);
+            println!("Promoter start pos {}", gene.promoter_start);
+            println!("Promoter size {}", gene.promoter_size);
             println!("");
         }
     }
