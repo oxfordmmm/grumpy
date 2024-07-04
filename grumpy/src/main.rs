@@ -10,6 +10,7 @@ use string_cache::Atom;
 use gb_io::reader::SeqReader;
 use gb_io::seq::Location::Complement;
 use gb_io::seq::Location::Range;
+use gb_io::seq::Location::Join;
 
 #[derive(Clone)]
 struct GeneDef{
@@ -19,7 +20,8 @@ struct GeneDef{
     start: i64,
     end: i64,
     promoter_start: i64,
-    promoter_size: i64
+    promoter_size: i64,
+    ribosomal_shifts: Vec<i64>
 }
 
 #[derive(Clone)]
@@ -58,6 +60,7 @@ impl Genome{
         let mut _gene_definitions = Vec::new();
         let mut _nucleotide_sequence: String = "".to_string();
         let mut genome_name: String = "".to_string();
+        let mut gene_names: Vec<String> = Vec::new();
         for seq in SeqReader::new(file) {
             let seq = seq.unwrap();
             _nucleotide_sequence = match String::from_utf8(seq.seq) {
@@ -71,6 +74,7 @@ impl Genome{
                 let end: i64;
                 let mut coding: bool = false;
                 let mut rev_comp: bool = false;
+                let mut ribosomal_shifts: Vec<i64> = Vec::new();
                 if feature.kind == Atom::from("CDS") || feature.kind == Atom::from("rRNA"){
                     if feature.kind != Atom::from("rRNA"){
                         coding = true;
@@ -90,20 +94,53 @@ impl Genome{
                             start = s.0;
                             end = e.0
                         },
+                        Join(ranges) => {
+                            // Checking for PRFS
+                            let mut start_pos: i64 = 0;
+                            let mut end_pos = 0;
+                            let mut first = true;
+                            for range in ranges{
+                                match range {
+                                    Range(s, e) => {
+                                        if first{
+                                            start_pos = s.0;
+                                            first = false;
+                                        }
+                                        else{
+                                            ribosomal_shifts.push(s.0);
+                                        }
+                                        end_pos = e.0;
+                                    },
+                                    _ => continue
+                                }
+                            }
+                            start = start_pos;
+                            end = end_pos;
+                        },
                         _ => continue
                     }
                     for qual in feature.qualifiers{
-                        let val = qual.1.unwrap();
-                        if qual.0 == Atom::from("gene"){
-                            // Use gene name if it exists
-                            name = val.clone();
-                        }
-    
-                        if name == "" && qual.0 == Atom::from("locus_tag"){
-                            // Else default to locus tag
-                            name = val.clone();
+                        match qual.1 {
+                            Some(val) => {
+                                if qual.0 == Atom::from("gene"){
+                                    // Use gene name if it exists
+                                    name = val.clone();
+                                }
+                                if name == "" && qual.0 == Atom::from("locus_tag"){
+                                    // Else default to locus tag
+                                    name = val.clone();
+                                }
+                            },
+                            None => continue
                         }
                     }
+                    while gene_names.contains(&name){
+                        // Duplicate gene names can exist :(
+                        // Repeatedly add _2 to the end of the name until it is unique
+                        // not ideal but exact mirror of gumpy
+                        name += "_2";
+                    }
+                    gene_names.push(name.clone());
                     _gene_definitions.push(GeneDef{
                         name,
                         rev_comp,
@@ -111,7 +148,8 @@ impl Genome{
                         start,
                         end,
                         promoter_start: -1,
-                        promoter_size: 0
+                        promoter_size: 0,
+                        ribosomal_shifts
                     });
                 }
             }
@@ -198,15 +236,16 @@ impl Genome{
     }
 
     pub fn at_genome_index(&self, index: i64) -> GenomePosition{
-        return self.genome_positions[index as usize].clone();
+        // 1-indexed genome index
+        return self.genome_positions[(index + 1) as usize].clone();
     }
 }
 
 fn main() {
-    let mut reference = Genome::new("reference/NC_000962.3.gbk");
+    let mut reference = Genome::new("reference/MN908947.3.gb");
     reference.assign_promoters();
     for gene in reference.gene_definitions{
-        if gene.name == "rpoB" || gene.name == "katG"{
+        if gene.name == "rpoB" || gene.name == "katG" || gene.name == "orf1ab" {
             println!("Name {}", gene.name);
             println!("Is reverse complement {}", gene.rev_comp);
             println!("Is coding {}", gene.coding);
@@ -214,6 +253,7 @@ fn main() {
             println!("End pos {}", gene.end);
             println!("Promoter start pos {}", gene.promoter_start);
             println!("Promoter size {}", gene.promoter_size);
+            println!("Ribosomal shifts {:?}", gene.ribosomal_shifts);
             println!("");
         }
     }
