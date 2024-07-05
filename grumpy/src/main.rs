@@ -33,12 +33,29 @@ struct Genome{
 }
 
 #[derive(Clone, Debug)]
+struct Gene{
+    name: String,
+    coding: bool,
+    rev_comp: bool,
+    nucleotide_sequence: String,
+    nucleotide_index: Vec<i64>,
+    nucleotide_number: Vec<i64>,
+    gene_position: Vec<i64>,
+    amino_acid_sequence: String,
+    ribosomal_shifts: Vec<i64>,
+    codons: Vec<String>
+}
+
+#[derive(Clone, Debug)]
 struct Evidence{
 
 }
 
 #[derive(Clone, Debug)]
 struct Alt{
+    // If alt_type is "SNP" then base is the new base
+    // If alt_type is "ins" or "del" then base is the inserted or deleted bases
+    alt_type: String,
     base: String,
     cov: Option<i32>,
     frs: Option<f32>,
@@ -64,7 +81,7 @@ impl Genome{
         for seq in SeqReader::new(file) {
             let seq = seq.unwrap();
             _nucleotide_sequence = match String::from_utf8(seq.seq) {
-                Ok(s) => s.to_uppercase(),
+                Ok(s) => s.to_lowercase(),
                 Err(e) => panic!("Problem reading sequence data: {:?}", e)
             };
             genome_name = seq.name.unwrap();
@@ -181,7 +198,7 @@ impl Genome{
         Assigns promoters to genes iteratively. 
         Expand out to a given distance from the start of each gene without overlapping with other genes.
         */
-        let max_promoter_length = 100;
+        let max_promoter_length = 100 - 1;
         for gene in self.gene_definitions.iter_mut(){
             // First pass to add gene names to all positions they exist in
             let mut start_idx = gene.start;
@@ -232,6 +249,52 @@ impl Genome{
             }
             complete = this_complete;
         }
+    }
+
+    pub fn build_gene(&self, gene_name: String) -> Gene{
+        let mut valid = false;
+        let mut maybe_gene_def: Option<GeneDef> = None;
+        for gene in self.gene_definitions.iter(){
+            if gene.name == gene_name{
+                valid = true;
+                maybe_gene_def = Some(gene.clone());
+                break;
+            }
+        }
+        if !valid {
+            panic!("Gene {} not found in genome {}", gene_name, self.name);
+        }
+
+        let gene_def = maybe_gene_def.unwrap();
+        let mut nucleotide_sequence = "".to_string();
+        let mut nucleotide_index = Vec::new();
+        if gene_def.rev_comp{
+            let mut last_idx = gene_def.promoter_start;
+            if gene_def.promoter_start == -1{
+                last_idx = gene_def.start;
+            }
+            for i in gene_def.end..last_idx+1{
+                nucleotide_sequence.push(self.genome_positions[i as usize].reference);
+                nucleotide_index.push(self.genome_positions[i as usize].genome_idx);
+            }
+        }
+        else{
+            let mut first_idx = gene_def.promoter_start;
+            if gene_def.promoter_start == -1{
+                first_idx = gene_def.start;
+            }
+            for i in first_idx..gene_def.end+1{
+                nucleotide_sequence.push(self.genome_positions[i as usize].reference);
+                nucleotide_index.push(self.genome_positions[i as usize].genome_idx);
+            }
+        
+        }
+
+        return Gene::new(
+            gene_def,
+            nucleotide_sequence,
+            nucleotide_index,
+        );
 
     }
 
@@ -241,11 +304,142 @@ impl Genome{
     }
 }
 
+impl Gene {
+    pub fn new(gene_def: GeneDef, nc_sequence: String, nc_index: Vec<i64>) -> Self {
+        let mut nucleotide_sequence = nc_sequence.clone();
+        let mut nucleotide_index = nc_index.clone();
+        let mut nucleotide_number = Vec::new();
+        let mut amino_acid_sequence = "".to_string();
+        let mut gene_position: Vec<i64> = Vec::new();
+        let mut codons = Vec::new();
+
+        for pos in gene_def.ribosomal_shifts.iter(){
+            // Figure out the index of the vectors to insert the ribosomal shift
+            let mut idx: i64 = -1;
+            for i in 0..nucleotide_index.len(){
+                if nucleotide_index[i] == *pos{
+                    idx = i as i64;
+                    break;
+                }
+            }
+            if idx == -1{
+                panic!("Ribosomal shift position {} not found in gene {}", pos, gene_def.name);
+            }
+            // Duplicate those indices
+            nucleotide_sequence.insert(idx as usize, nucleotide_sequence.chars().nth(idx as usize).unwrap());
+            nucleotide_index.insert(idx as usize, nucleotide_index[idx as usize]);
+        }
+
+        if gene_def.rev_comp{
+            // Reverse complement the sequence
+            nucleotide_sequence = nc_sequence.chars().rev().map(|x| complement_base(x)).collect::<String>();
+            nucleotide_index = Vec::new();
+            for i in nc_index.iter().rev(){
+                nucleotide_index.push(*i);
+            }
+        }
+
+        // Figure out the nucelotide number for each position
+        // Promoter first
+        if gene_def.promoter_start != -1{
+            for i in (-1*(gene_def.promoter_size + 1))..0{
+                nucleotide_number.push(i);
+                gene_position.push(i);
+            }
+        }
+        let prom_end = nucleotide_number.len();
+        // Now non-promoter
+        for i in 1..(gene_def.start - gene_def.end).abs() + 1{
+            nucleotide_number.push(i);
+        }
+
+        if gene_def.coding{
+            // Now figure out the amino acid sequence from the nucleotide sequence
+            let mut codon = "".to_string();
+            let mut codon_idx = 0;
+            for i in prom_end..nucleotide_sequence.len(){
+                codon.push(nucleotide_sequence.chars().nth(i).unwrap());
+                if codon.len() == 3{
+                    // Codon is complete
+                    amino_acid_sequence.push(codon_to_aa(codon.clone()));
+                    codons.push(codon.clone());
+                    codon = "".to_string();
+                    codon_idx += 1;
+                    gene_position.push(codon_idx);
+                }
+
+            }
+        }
+
+        return Gene{
+            name: gene_def.name.to_string(),
+            coding: gene_def.coding,
+            rev_comp: gene_def.rev_comp,
+            nucleotide_sequence: nucleotide_sequence.to_string(),
+            nucleotide_index,
+            gene_position,
+            nucleotide_number,
+            amino_acid_sequence,
+            ribosomal_shifts: gene_def.ribosomal_shifts,
+            codons
+        }
+    }
+}
+
+fn codon_to_aa(codon: String) -> char{
+    if codon.contains("x"){
+        return 'X';
+    }
+    if codon.contains("z"){
+        return 'Z';
+    }
+    match codon.as_str(){
+        "ttt" | "ttc" => 'F',
+        "tta" | "ttg" | "ctt" | "ctc" | "cta" | "ctg" => 'L',
+        "ttx" | "tcx" | "tax" | "tgx" | "txt" | "txc" | "txa" | "txg" | "txx" | "txz" | "txo" | "tzx" | "tox" | "ctx" | "ccx" | "cax" | "cgx" | "cxt" | "cxc" | "cxa" | "cxg" | "cxx" | "cxz" | "cxo" | "czx" | "cox" | "atx" | "acx" | "aax" | "agx" | "axt" | "axc" | "axa" | "axg" | "axx" | "axz" | "axo" | "azx" | "aox" | "gtx" | "gcx" | "gax" | "ggx" | "gxt" | "gxc" | "gxa" | "gxg" | "gxx" | "gxz" | "gxo" | "gzx" | "gox" | "xtt" | "xtc" | "xta" | "xtg" | "xtx" | "xtz" | "xto" | "xct" | "xcc" | "xca" | "xcg" | "xcx" | "xcz" | "xco" | "xat" | "xac" | "xaa" | "xag" | "xax" | "xaz" | "xao" | "xgt" | "xgc" | "xga" | "xgg" | "xgx" | "xgz" | "xgo" | "xxt" | "xxc" | "xxa" | "xxg" | "xxx" | "xxz" | "xxo" | "xzt" | "xzc" | "xza" | "xzg" | "xzx" | "xzz" | "xzo" | "xot" | "xoc" | "xoa" | "xog" | "xox" | "xoz" | "xoo" | "ztx" | "zcx" | "zax" | "zgx" | "zxt" | "zxc" | "zxa" | "zxg" | "zxx" | "zxz" | "zxo" | "zzx" | "zox" | "otx" | "ocx" | "oax" | "ogx" | "oxt" | "oxc" | "oxa" | "oxg" | "oxx" | "oxz" | "oxo" | "ozx" | "oox" => 'X',
+        "ttz" | "tcz" | "taz" | "tgz" | "tzt" | "tzc" | "tza" | "tzg" | "tzz" | "ctz" | "ccz" | "caz" | "cgz" | "czt" | "czc" | "cza" | "czg" | "czz" | "atz" | "acz" | "aaz" | "agz" | "azt" | "azc" | "aza" | "azg" | "azz" | "gtz" | "gcz" | "gaz" | "ggz" | "gzt" | "gzc" | "gza" | "gzg" | "gzz" | "ztt" | "ztc" | "zta" | "ztg" | "ztz" | "zct" | "zcc" | "zca" | "zcg" | "zcz" | "zat" | "zac" | "zaa" | "zag" | "zaz" | "zgt" | "zgc" | "zga" | "zgg" | "zgz" | "zzt" | "zzc" | "zza" | "zzg" | "zzz" => 'Z',
+        "tto" | "tco" | "tao" | "tgo" | "tzo" | "tot" | "toc" | "toa" | "tog" | "toz" | "too" | "cto" | "cco" | "cao" | "cgo" | "czo" | "cot" | "coc" | "coa" | "cog" | "coz" | "coo" | "ato" | "aco" | "aao" | "ago" | "azo" | "aot" | "aoc" | "aoa" | "aog" | "aoz" | "aoo" | "gto" | "gco" | "gao" | "ggo" | "gzo" | "got" | "goc" | "goa" | "gog" | "goz" | "goo" | "zto" | "zco" | "zao" | "zgo" | "zzo" | "zot" | "zoc" | "zoa" | "zog" | "zoz" | "zoo" | "ott" | "otc" | "ota" | "otg" | "otz" | "oto" | "oct" | "occ" | "oca" | "ocg" | "ocz" | "oco" | "oat" | "oac" | "oaa" | "oag" | "oaz" | "oao" | "ogt" | "ogc" | "oga" | "ogg" | "ogz" | "ogo" | "ozt" | "ozc" | "oza" | "ozg" | "ozz" | "ozo" | "oot" | "ooc" | "ooa" | "oog" | "ooz" | "ooo" => 'O',
+        "tct" | "tcc" | "tca" | "tcg" | "agt" | "agc" => 'S',
+        "tat" | "tac" => 'Y',
+        "taa" | "tag" | "tga" => '!',
+        "tgt" | "tgc" => 'C',
+        "tgg" => 'W',
+        "cct" | "ccc" | "cca" | "ccg" => 'P',
+        "cat" | "cac" => 'H',
+        "caa" | "cag" => 'Q',
+        "cgt" | "cgc" | "cga" | "cgg" | "aga" | "agg" => 'R',
+        "att" | "atc" | "ata" => 'I',
+        "atg" => 'M',
+        "act" | "acc" | "aca" | "acg" => 'T',
+        "aat" | "aac" => 'N',
+        "aaa" | "aag" => 'K',
+        "gtt" | "gtc" | "gta" | "gtg" => 'V',
+        "gct" | "gcc" | "gca" | "gcg" => 'A',
+        "gat" | "gac" => 'D',
+        "gaa" | "gag" => 'E',
+        "ggt" | "ggc" | "gga" | "ggg" => 'G',
+        _ => panic!("Invalid codon {}", codon)
+    }
+}
+
+fn complement_base(base: char) -> char{
+    match base {
+        'a' => 't',
+        't' => 'a',
+        'c' => 'g',
+        'g' => 'c',
+        // Het and null don't get complements
+        'z' => 'z',
+        'x' => 'x',
+        _ => base
+    }
+}
+
 fn main() {
-    let mut reference = Genome::new("reference/MN908947.3.gb");
+    let mut reference = Genome::new("reference/NC_000962.3.gbk");
     reference.assign_promoters();
-    for gene in reference.gene_definitions{
-        if gene.name == "rpoB" || gene.name == "katG" || gene.name == "orf1ab" {
+    for gene in reference.gene_definitions.iter(){
+        if gene.name == "rpoB" || gene.name == "katG" {
             println!("Name {}", gene.name);
             println!("Is reverse complement {}", gene.rev_comp);
             println!("Is coding {}", gene.coding);
@@ -257,4 +451,17 @@ fn main() {
             println!("");
         }
     }
+    let katG = reference.build_gene("katG".to_string());
+    println!("{:?}", katG);
+    println!("{:?}", katG.nucleotide_sequence.len());
+    println!("{:?}", katG.nucleotide_index.len());
+    println!("{:?}", katG.nucleotide_number.len());
+
+    let rpoB = reference.build_gene("rpoB".to_string());
+    println!("{:?}", rpoB);
+    println!("{:?}", rpoB.nucleotide_sequence.len());
+    println!("{:?}", rpoB.nucleotide_index.len());
+    println!("{:?}", rpoB.nucleotide_number.len());
+
+
 }
