@@ -16,7 +16,7 @@ use gb_io::seq::Location::Join;
 struct GeneDef{
     name: String,
     coding: bool,
-    rev_comp: bool,
+    reverse_complement: bool,
     start: i64,
     end: i64,
     promoter_start: i64,
@@ -36,12 +36,13 @@ struct Genome{
 struct Gene{
     name: String,
     coding: bool,
-    rev_comp: bool,
+    reverse_complement: bool,
     nucleotide_sequence: String,
     nucleotide_index: Vec<i64>,
     nucleotide_number: Vec<i64>,
     gene_position: Vec<i64>,
     amino_acid_sequence: String,
+    amino_acid_number: Vec<i64>,
     ribosomal_shifts: Vec<i64>,
     codons: Vec<String>
 }
@@ -90,7 +91,7 @@ impl Genome{
                 let start: i64;
                 let end: i64;
                 let mut coding: bool = false;
-                let mut rev_comp: bool = false;
+                let mut reverse_complement: bool = false;
                 let mut ribosomal_shifts: Vec<i64> = Vec::new();
                 if feature.kind == Atom::from("CDS") || feature.kind == Atom::from("rRNA"){
                     if feature.kind != Atom::from("rRNA"){
@@ -98,7 +99,7 @@ impl Genome{
                     }
                     match feature.location {
                         Complement(x) => {
-                            rev_comp = true;
+                            reverse_complement = true;
                             match *x {
                                 Range(s, e) => {
                                     start = e.0;
@@ -160,7 +161,7 @@ impl Genome{
                     gene_names.push(name.clone());
                     _gene_definitions.push(GeneDef{
                         name,
-                        rev_comp,
+                        reverse_complement,
                         coding,
                         start,
                         end,
@@ -203,7 +204,7 @@ impl Genome{
             // First pass to add gene names to all positions they exist in
             let mut start_idx = gene.start;
             let mut end_idx = gene.end;
-            if gene.rev_comp{
+            if gene.reverse_complement{
                 start_idx = gene.end;
                 end_idx = gene.start;
             }
@@ -226,8 +227,8 @@ impl Genome{
             let mut this_complete = true;
             for gene in self.gene_definitions.iter_mut(){
                 let mut expanding = -1;
-                if gene.rev_comp{
-                    // This pushes `gene.promoter_start += expanding` the right way for rev_comp
+                if gene.reverse_complement{
+                    // This pushes `gene.promoter_start += expanding` the right way for reverse_complement
                     expanding = 1;
                 }
 
@@ -268,7 +269,7 @@ impl Genome{
         let gene_def = maybe_gene_def.unwrap();
         let mut nucleotide_sequence = "".to_string();
         let mut nucleotide_index = Vec::new();
-        if gene_def.rev_comp{
+        if gene_def.reverse_complement{
             let mut last_idx = gene_def.promoter_start;
             if gene_def.promoter_start == -1{
                 last_idx = gene_def.start;
@@ -279,11 +280,11 @@ impl Genome{
             }
         }
         else{
-            let mut first_idx = gene_def.promoter_start;
+            let mut first_idx = gene_def.promoter_start - 1;
             if gene_def.promoter_start == -1{
                 first_idx = gene_def.start;
             }
-            for i in first_idx..gene_def.end+1{
+            for i in first_idx..gene_def.end{
                 nucleotide_sequence.push(self.genome_positions[i as usize].reference);
                 nucleotide_index.push(self.genome_positions[i as usize].genome_idx);
             }
@@ -310,6 +311,7 @@ impl Gene {
         let mut nucleotide_index = nc_index.clone();
         let mut nucleotide_number = Vec::new();
         let mut amino_acid_sequence = "".to_string();
+        let mut amino_acid_number = Vec::new();
         let mut gene_position: Vec<i64> = Vec::new();
         let mut codons = Vec::new();
 
@@ -330,7 +332,7 @@ impl Gene {
             nucleotide_index.insert(idx as usize, nucleotide_index[idx as usize]);
         }
 
-        if gene_def.rev_comp{
+        if gene_def.reverse_complement{
             // Reverse complement the sequence
             nucleotide_sequence = nc_sequence.chars().rev().map(|x| complement_base(x)).collect::<String>();
             nucleotide_index = Vec::new();
@@ -349,8 +351,12 @@ impl Gene {
         }
         let prom_end = nucleotide_number.len();
         // Now non-promoter
-        for i in 1..(gene_def.start - gene_def.end).abs() + 1{
+        for i in 1..(gene_def.start - gene_def.end).abs() + gene_def.ribosomal_shifts.len() as i64 + 1{
             nucleotide_number.push(i);
+            if !gene_def.coding{
+                // No adjustment needed for non-coding as gene pos == nucleotide num
+                gene_position.push(i);
+            }
         }
 
         if gene_def.coding{
@@ -366,20 +372,24 @@ impl Gene {
                     codon = "".to_string();
                     codon_idx += 1;
                     gene_position.push(codon_idx);
+                    amino_acid_number.push(codon_idx);
                 }
-
+            }
+            if codon.len() > 0{
+                panic!("Incomplete codon at end of gene {}", gene_def.name);
             }
         }
 
         return Gene{
             name: gene_def.name.to_string(),
             coding: gene_def.coding,
-            rev_comp: gene_def.rev_comp,
+            reverse_complement: gene_def.reverse_complement,
             nucleotide_sequence: nucleotide_sequence.to_string(),
             nucleotide_index,
             gene_position,
             nucleotide_number,
             amino_acid_sequence,
+            amino_acid_number,
             ribosomal_shifts: gene_def.ribosomal_shifts,
             codons
         }
@@ -396,9 +406,6 @@ fn codon_to_aa(codon: String) -> char{
     match codon.as_str(){
         "ttt" | "ttc" => 'F',
         "tta" | "ttg" | "ctt" | "ctc" | "cta" | "ctg" => 'L',
-        "ttx" | "tcx" | "tax" | "tgx" | "txt" | "txc" | "txa" | "txg" | "txx" | "txz" | "txo" | "tzx" | "tox" | "ctx" | "ccx" | "cax" | "cgx" | "cxt" | "cxc" | "cxa" | "cxg" | "cxx" | "cxz" | "cxo" | "czx" | "cox" | "atx" | "acx" | "aax" | "agx" | "axt" | "axc" | "axa" | "axg" | "axx" | "axz" | "axo" | "azx" | "aox" | "gtx" | "gcx" | "gax" | "ggx" | "gxt" | "gxc" | "gxa" | "gxg" | "gxx" | "gxz" | "gxo" | "gzx" | "gox" | "xtt" | "xtc" | "xta" | "xtg" | "xtx" | "xtz" | "xto" | "xct" | "xcc" | "xca" | "xcg" | "xcx" | "xcz" | "xco" | "xat" | "xac" | "xaa" | "xag" | "xax" | "xaz" | "xao" | "xgt" | "xgc" | "xga" | "xgg" | "xgx" | "xgz" | "xgo" | "xxt" | "xxc" | "xxa" | "xxg" | "xxx" | "xxz" | "xxo" | "xzt" | "xzc" | "xza" | "xzg" | "xzx" | "xzz" | "xzo" | "xot" | "xoc" | "xoa" | "xog" | "xox" | "xoz" | "xoo" | "ztx" | "zcx" | "zax" | "zgx" | "zxt" | "zxc" | "zxa" | "zxg" | "zxx" | "zxz" | "zxo" | "zzx" | "zox" | "otx" | "ocx" | "oax" | "ogx" | "oxt" | "oxc" | "oxa" | "oxg" | "oxx" | "oxz" | "oxo" | "ozx" | "oox" => 'X',
-        "ttz" | "tcz" | "taz" | "tgz" | "tzt" | "tzc" | "tza" | "tzg" | "tzz" | "ctz" | "ccz" | "caz" | "cgz" | "czt" | "czc" | "cza" | "czg" | "czz" | "atz" | "acz" | "aaz" | "agz" | "azt" | "azc" | "aza" | "azg" | "azz" | "gtz" | "gcz" | "gaz" | "ggz" | "gzt" | "gzc" | "gza" | "gzg" | "gzz" | "ztt" | "ztc" | "zta" | "ztg" | "ztz" | "zct" | "zcc" | "zca" | "zcg" | "zcz" | "zat" | "zac" | "zaa" | "zag" | "zaz" | "zgt" | "zgc" | "zga" | "zgg" | "zgz" | "zzt" | "zzc" | "zza" | "zzg" | "zzz" => 'Z',
-        "tto" | "tco" | "tao" | "tgo" | "tzo" | "tot" | "toc" | "toa" | "tog" | "toz" | "too" | "cto" | "cco" | "cao" | "cgo" | "czo" | "cot" | "coc" | "coa" | "cog" | "coz" | "coo" | "ato" | "aco" | "aao" | "ago" | "azo" | "aot" | "aoc" | "aoa" | "aog" | "aoz" | "aoo" | "gto" | "gco" | "gao" | "ggo" | "gzo" | "got" | "goc" | "goa" | "gog" | "goz" | "goo" | "zto" | "zco" | "zao" | "zgo" | "zzo" | "zot" | "zoc" | "zoa" | "zog" | "zoz" | "zoo" | "ott" | "otc" | "ota" | "otg" | "otz" | "oto" | "oct" | "occ" | "oca" | "ocg" | "ocz" | "oco" | "oat" | "oac" | "oaa" | "oag" | "oaz" | "oao" | "ogt" | "ogc" | "oga" | "ogg" | "ogz" | "ogo" | "ozt" | "ozc" | "oza" | "ozg" | "ozz" | "ozo" | "oot" | "ooc" | "ooa" | "oog" | "ooz" | "ooo" => 'O',
         "tct" | "tcc" | "tca" | "tcg" | "agt" | "agc" => 'S',
         "tat" | "tac" => 'Y',
         "taa" | "tag" | "tga" => '!',
@@ -436,12 +443,13 @@ fn complement_base(base: char) -> char{
 }
 
 fn main() {
-    let mut reference = Genome::new("reference/NC_000962.3.gbk");
+    let mut reference = Genome::new("reference/MN908947.3.gb");
     reference.assign_promoters();
     for gene in reference.gene_definitions.iter(){
+        // if gene.promoter_start == -1{
         if gene.name == "rpoB" || gene.name == "katG" {
             println!("Name {}", gene.name);
-            println!("Is reverse complement {}", gene.rev_comp);
+            println!("Is reverse complement {}", gene.reverse_complement);
             println!("Is coding {}", gene.coding);
             println!("Start pos {}", gene.start);
             println!("End pos {}", gene.end);
@@ -451,17 +459,35 @@ fn main() {
             println!("");
         }
     }
-    let katG = reference.build_gene("katG".to_string());
-    println!("{:?}", katG);
-    println!("{:?}", katG.nucleotide_sequence.len());
-    println!("{:?}", katG.nucleotide_index.len());
-    println!("{:?}", katG.nucleotide_number.len());
+    let orf1ab = reference.build_gene("orf1ab".to_string());
+    println!("{:?}", orf1ab);
+    println!("{:?}", orf1ab.nucleotide_sequence.len());
+    println!("{:?}", orf1ab.nucleotide_index.len());
+    println!("{:?}", orf1ab.nucleotide_number.len());
 
-    let rpoB = reference.build_gene("rpoB".to_string());
-    println!("{:?}", rpoB);
-    println!("{:?}", rpoB.nucleotide_sequence.len());
-    println!("{:?}", rpoB.nucleotide_index.len());
-    println!("{:?}", rpoB.nucleotide_number.len());
+    // let katG = reference.build_gene("katG".to_string());
+    // println!("{:?}", katG);
+    // println!("{:?}", katG.nucleotide_sequence.len());
+    // println!("{:?}", katG.nucleotide_index.len());
+    // println!("{:?}", katG.nucleotide_number.len());
+
+    // let rpoB = reference.build_gene("rpoB".to_string());
+    // println!("{:?}", rpoB);
+    // println!("{:?}", rpoB.nucleotide_sequence.len());
+    // println!("{:?}", rpoB.nucleotide_index.len());
+    // println!("{:?}", rpoB.nucleotide_number.len());
+
+    // let rrs = reference.build_gene("rrs".to_string());
+    // println!("{:?}", rrs);
+    // println!("{:?}", rrs.nucleotide_sequence.len());
+    // println!("{:?}", rrs.nucleotide_index.len());
+    // println!("{:?}", rrs.nucleotide_number.len());
+
+    // let embC = reference.build_gene("embC".to_string());
+    // println!("{:?}", embC);
+    // println!("{:?}", embC.nucleotide_sequence.len());
+    // println!("{:?}", embC.nucleotide_index.len());
+    // println!("{:?}", embC.nucleotide_number.len());
 
 
 }
