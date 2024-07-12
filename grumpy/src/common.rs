@@ -10,6 +10,12 @@ pub enum AltType{
     DEL
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MinorType{
+    COV,
+    FRS
+}
+
 #[derive(Clone, Debug)]
 pub struct VCFRow{
     pub position: i64,
@@ -29,6 +35,7 @@ pub struct Evidence{
     pub reference: String,
     pub alt: String,
     pub genome_index: i64, // 1-based genome index this refers to
+    pub is_minor: bool,
     pub vcf_row: VCFRow,
 }
 

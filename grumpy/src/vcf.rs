@@ -127,8 +127,8 @@ impl VCFFile{
                     });
 
                     let (record_calls, record_minor_calls) = VCFFile::parse_record_for_calls(records[records.len()-1].clone());
-                    println!("Calls {:?}", record_calls);
-                    println!("Minor calls {:?}\n", record_minor_calls);
+                    // println!("Calls {:?}", record_calls);
+                    // println!("Minor calls {:?}\n", record_minor_calls);
 
                     if ignore_filter || passed {
                         for call in record_calls{
@@ -226,7 +226,8 @@ impl VCFFile{
                     vcf_row: record.clone(),
                     reference: ref_allele.chars().nth(offset).unwrap().to_string(),
                     alt: base,
-                    genome_index: record.position + offset as i64
+                    genome_index: record.position + offset as i64,
+                    is_minor: false
                 });
             }
             // println!("Parsed calls {:?}\n", c);
@@ -240,7 +241,8 @@ impl VCFFile{
                 vcf_row: record.clone(),
                 reference: ref_allele.clone(),
                 alt: alt_allele.clone(),
-                genome_index: record.position
+                genome_index: record.position,
+                is_minor: false
             });
         }
 
@@ -267,7 +269,8 @@ impl VCFFile{
                         vcf_row: record.clone(),
                         reference: ref_allele.chars().nth(offset).unwrap().to_string(),
                         alt: base,
-                        genome_index: record.position + offset as i64
+                        genome_index: record.position + offset as i64,
+                        is_minor: true
                     });
                 }
             }

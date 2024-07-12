@@ -1,4 +1,5 @@
 use std::fs::File;
+use std::collections::{HashMap, HashSet};
 
 use string_cache::Atom;
 
@@ -7,7 +8,7 @@ use gb_io::seq::Location::Complement;
 use gb_io::seq::Location::Range;
 use gb_io::seq::Location::Join;
 
-use crate::common::{Alt, GeneDef, AltType};
+use crate::common::{Alt, AltType, Evidence, GeneDef};
 use crate::gene::Gene;
 use crate::vcf::VCFFile;
 
@@ -16,6 +17,8 @@ pub struct GenomePosition{
     // Updated during mutation
     pub reference: char,
     pub is_deleted: bool,
+    // Added for evidence of a deletion which didn't start at this position but affects it
+    pub deleted_evidence: Option<Evidence>,
 
     // Used to store calls from VCF
     // If populated, alts[0] is the actual call, others are minor calls
@@ -30,7 +33,9 @@ pub struct Genome{
     pub name: String,
     pub nucleotide_sequence: String,
     pub gene_definitions: Vec<GeneDef>,
-    pub genome_positions: Vec<GenomePosition>
+    pub genome_positions: Vec<GenomePosition>,
+    pub gene_names: Vec<String>,
+    pub genes: HashMap<String, Gene>
 }
 
 impl Genome{
@@ -143,7 +148,8 @@ impl Genome{
                     genome_idx,
                     alts: Vec::new(),
                     genes: Vec::new(),
-                    is_deleted: false
+                    is_deleted: false,
+                    deleted_evidence: None
                 }
             );
         }
@@ -151,7 +157,9 @@ impl Genome{
             name: genome_name,
             nucleotide_sequence: _nucleotide_sequence,
             gene_definitions: _gene_definitions,
-            genome_positions: genome_positions
+            genome_positions: genome_positions,
+            genes: HashMap::new(),
+            gene_names
         };
         genome.assign_promoters();
         return genome;
@@ -181,7 +189,14 @@ impl Genome{
                 continue;
             }
             else{
-                gene.promoter_start = gene.start;
+                if gene.start == 0{
+                    // Catch edge case of gene starting at genome index 0
+                    // this couldn't have a promoter so mark as such
+                    gene.promoter_start = -1;
+                }
+                else{
+                    gene.promoter_start = gene.start;
+                }
             }
         }
 
@@ -266,6 +281,22 @@ impl Genome{
 
     }
 
+    pub fn build_all_genes(&mut self) -> (){
+        for gene_name in self.gene_names.iter(){
+            let gene = self.build_gene(gene_name.clone());
+            self.genes.insert(gene_name.clone(), gene);
+        }
+    }
+
+    pub fn get_gene(&mut self, gene_name: String) -> Gene{
+        // Return a gene from the hashmap if it exists, else build and cache it
+        if !self.genes.contains_key(&gene_name){
+            let gene = self.build_gene(gene_name.clone());
+            self.genes.insert(gene_name.clone(), gene);
+        }
+        return self.genes.get(&gene_name).unwrap().clone();
+    }
+
     pub fn at_genome_index(&self, index: i64) -> GenomePosition{
         // 1-indexed genome index
         return self.genome_positions[(index + 1) as usize].clone();
@@ -274,30 +305,53 @@ impl Genome{
 
 pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome{
     let mut new_genome = reference.clone();
-    let mut idx = 0;
-    for position in new_genome.genome_positions.iter_mut(){
+    let mut deleted_positions = HashSet::new();
+    let mut deleted_evidence = None;
+    for (idx, position) in new_genome.genome_positions.iter_mut().enumerate(){
         if vcf.calls.contains_key(&position.genome_idx){
-            // Set the new base etc from the call
-            let call = vcf.calls.get(&position.genome_idx).unwrap().clone()[0].clone();
-            position.alts.push(Alt{
-                alt_type: call.clone().call_type,
-                base: call.clone().alt,
-                evidence: call.clone()
-            });
+            for call in vcf.calls.get(&position.genome_idx).unwrap(){
+                // Set the new base etc from the call
+                position.alts.push(Alt{
+                    alt_type: call.clone().call_type,
+                    base: call.clone().alt,
+                    evidence: call.clone()
+                });
+                
+                if call.call_type == AltType::DEL{
+                    // Mark all associated bases as deleted
+                    for del_idx in 0..call.alt.len(){
+                        deleted_positions.insert(idx + del_idx);
+                    }
+                    deleted_evidence = Some(call.clone());
+                }
 
-            if call.call_type == AltType::DEL{
-                position.is_deleted = true;
+                if call.call_type == AltType::SNP || call.call_type == AltType::HET || call.call_type == AltType::NULL{
+                    // Update nucleotide for SNP/het/null
+                    position.reference = call.clone().alt.chars().nth(0).unwrap();
+                    new_genome.nucleotide_sequence.replace_range(idx..idx+1, &call.clone().alt.chars().nth(0).unwrap().to_string());
+                }
             }
-
-            if call.call_type == AltType::SNP || call.call_type == AltType::HET || call.call_type == AltType::NULL{
-                // Update nucleotide for SNP/het/null
-                position.reference = call.clone().alt.chars().nth(0).unwrap();
-                new_genome.nucleotide_sequence.replace_range(idx..idx+1, &call.clone().alt.chars().nth(0).unwrap().to_string());
-            }
-
         }
-        idx += 1;
+
+        if vcf.minor_calls.contains_key(&position.genome_idx){
+            for call in vcf.minor_calls.get(&position.genome_idx).unwrap(){
+                // Set the new base etc from the call
+                position.alts.push(Alt{
+                    alt_type: call.clone().call_type,
+                    base: call.clone().alt,
+                    evidence: call.clone()
+                });
+            }
+        }
+
+        if deleted_positions.contains(&idx){
+            position.is_deleted = true;
+            position.deleted_evidence = deleted_evidence.clone();
+        }
     }
+
+    // Reset the gene hashmap as the nucleotide sequence has changed
+    new_genome.genes = HashMap::new();
 
     return new_genome;
 }

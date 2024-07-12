@@ -3,28 +3,39 @@ pub mod common;
 pub mod genome;
 pub mod gene;
 pub mod vcf;
+pub mod difference;
 
 use genome::mutate;
 use genome::Genome;
 use vcf::VCFFile;
+use difference::GenomeDifference;
+use common::MinorType;
 
 
 fn main() {
     let mut vcf = VCFFile::new("/home/jeremy/Documents/work/gnomonicus/e4b54393-e037-435e-b942-527f0e2b1616.merged.vcf".to_string(), false);
     let mut reference = Genome::new("reference/NC_000962.3.gbk");
+    // reference.build_all_genes();
     let mut sample = mutate(&reference, vcf);
+    // sample.build_all_genes();
 
-    let ref_nc = reference.clone().nucleotide_sequence.clone();
-    let mut sample_chars = sample.nucleotide_sequence.chars();
-    let mut idx = 0;
-    println!("{} {}", ref_nc.len(), sample.nucleotide_sequence.len());
-    for (r, a) in ref_nc.chars().zip(sample_chars){
-        // let a = sample_chars.nth(idx).unwrap().clone();
-        if r != a{
-            println!("{} {} {}", idx+1, r, a);
-        }
-        idx += 1;
-    }
+    let difference = GenomeDifference::new(reference, sample, MinorType::COV);
+    println!("{:?}", difference.variants.iter().map(|variant| variant.variant.clone()).collect::<Vec<String>>());
+    // for variant in difference.variants{
+    //     println!("{:?}", variant.variant);
+    // }
+
+    // let ref_nc = reference.clone().nucleotide_sequence.clone();
+    // let mut sample_chars = sample.nucleotide_sequence.chars();
+    // let mut idx = 0;
+    // println!("{} {}", ref_nc.len(), sample.nucleotide_sequence.len());
+    // for (r, a) in ref_nc.chars().zip(sample_chars){
+    //     // let a = sample_chars.nth(idx).unwrap().clone();
+    //     if r != a{
+    //         println!("{} {} {}", idx+1, r, a);
+    //     }
+    //     idx += 1;
+    // }
 
     // reference.assign_promoters();
     // for gene in reference.gene_definitions.iter(){

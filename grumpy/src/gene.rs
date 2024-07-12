@@ -22,6 +22,8 @@ pub struct GenePosition{
     pub reference: String, // Amino acid or nucleotide depending on gene coding
     pub reference_nucleotides: String, // Nucleotide or codon depending on gene coding
     pub gene_position: i64, // 1-indexed gene position
+    pub nucleotide_number: Vec<i64>, // 1-indexed nucleotide position
+    pub nucleotide_index: Vec<i64>, // 1-indexed genome position
     pub alts: Vec<GeneAlt>,
     pub is_deleted: bool
 }
@@ -35,7 +37,7 @@ pub struct Gene{
     pub nucleotide_index: Vec<i64>,
     pub nucleotide_number: Vec<i64>,
     pub gene_number: Vec<i64>,
-    pub gene_position: Vec<GenePosition>,
+    pub gene_positions: Vec<GenePosition>,
     pub amino_acid_sequence: String,
     pub amino_acid_number: Vec<i64>,
     pub ribosomal_shifts: Vec<i64>,
@@ -51,7 +53,7 @@ impl Gene {
         let mut amino_acid_number = Vec::new();
         let mut gene_number: Vec<i64> = Vec::new();
         let mut codons = Vec::new();
-        let mut gene_position: Vec<GenePosition> = Vec::new();
+        let mut gene_positions: Vec<GenePosition> = Vec::new();
 
         for pos in gene_def.ribosomal_shifts.iter(){
             // Figure out the index of the vectors to insert the ribosomal shift
@@ -86,9 +88,11 @@ impl Gene {
             for i in (-1*(gene_def.promoter_size + 1))..0{
                 nucleotide_number.push(i);
                 gene_number.push(i);
-                gene_position.push(GenePosition{
+                gene_positions.push(GenePosition{
                     reference: nucleotide_sequence.chars().nth(nc_idx).unwrap().to_string(),
                     reference_nucleotides: nucleotide_sequence.chars().nth(nc_idx).unwrap().to_string(),
+                    nucleotide_number: vec![nucleotide_index[nc_idx]],
+                    nucleotide_index: vec![nucleotide_index[nc_idx]],
                     gene_position: i,
                     alts: Vec::new(),
                     is_deleted: false
@@ -104,9 +108,11 @@ impl Gene {
             if !gene_def.coding{
                 // No adjustment needed for non-coding as gene pos == nucleotide num
                 gene_number.push(i);
-                gene_position.push(GenePosition{
+                gene_positions.push(GenePosition{
                     reference: nucleotide_sequence.chars().nth(nc_idx).unwrap().to_string(),
                     reference_nucleotides: nucleotide_sequence.chars().nth(nc_idx).unwrap().to_string(),
+                    nucleotide_number: vec![nucleotide_index[nc_idx]],
+                    nucleotide_index: vec![nucleotide_index[nc_idx]],
                     gene_position: i, 
                     alts: Vec::new(),
                     is_deleted: false
@@ -128,9 +134,11 @@ impl Gene {
                     codon_idx += 1;
                     gene_number.push(codon_idx);
                     amino_acid_number.push(codon_idx);
-                    gene_position.push(GenePosition{
+                    gene_positions.push(GenePosition{
                         reference: codon_to_aa(codon.clone()).to_string(),
                         reference_nucleotides: codon.clone(),
+                        nucleotide_number: vec![nucleotide_number[i-2], nucleotide_number[i-1], nucleotide_number[i]],
+                        nucleotide_index: vec![nucleotide_index[i-2], nucleotide_index[i-1], nucleotide_index[i]],
                         gene_position: codon_idx,
                         alts: Vec::new(),
                         is_deleted: false
@@ -150,7 +158,7 @@ impl Gene {
             nucleotide_sequence: nucleotide_sequence.to_string(),
             nucleotide_index,
             gene_number,
-            gene_position,
+            gene_positions,
             nucleotide_number,
             amino_acid_sequence,
             amino_acid_number,
@@ -158,6 +166,7 @@ impl Gene {
             codons
         }
     }
+
 }
 
 fn codon_to_aa(codon: String) -> char{
