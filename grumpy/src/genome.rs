@@ -28,7 +28,6 @@ pub struct GenomePosition{
 
     pub genome_idx: i64, // 1-indexed genome index
     pub genes: Vec<String>,
-    pub genes_with_mutations: HashSet<String>
 }
 
 #[derive(Clone)]
@@ -38,7 +37,8 @@ pub struct Genome{
     pub gene_definitions: Vec<GeneDef>,
     pub genome_positions: Vec<GenomePosition>,
     pub gene_names: Vec<String>,
-    pub genes: HashMap<String, Gene>
+    pub genes: HashMap<String, Gene>,
+    pub genes_with_mutations: HashSet<String>
 }
 
 impl Genome{
@@ -154,7 +154,6 @@ impl Genome{
                     is_deleted: false,
                     is_deleted_minor: false,
                     deleted_evidence: Vec::new(),
-                    genes_with_mutations: HashSet::new()
                 }
             );
         }
@@ -164,7 +163,8 @@ impl Genome{
             gene_definitions: _gene_definitions,
             genome_positions: genome_positions,
             genes: HashMap::new(),
-            gene_names
+            gene_names,
+            genes_with_mutations: HashSet::new()
         };
         genome.assign_promoters();
         return genome;
@@ -326,7 +326,7 @@ pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome{
                 // Mark containing gene as containing a mutation
                 // Should make finding genes level mutations easier
                 for gene_name in position.genes.iter(){
-                    position.genes_with_mutations.insert(gene_name.clone());
+                    new_genome.genes_with_mutations.insert(gene_name.clone());
                 }
                 
                 if call.call_type == AltType::DEL{

@@ -108,7 +108,7 @@ impl GenomeDifference{
                             garc = garc + ":" + &alt.evidence.cov.unwrap().to_string();
                         }
                         if minor_type == MinorType::FRS{
-                            garc = garc + ":" + &alt.evidence.frs.unwrap().to_string();
+                            garc = garc + ":" + &format!("{:.3}", alt.evidence.frs.unwrap());
                         }
                     }
                     let variant = Variant{
@@ -281,7 +281,6 @@ impl GeneDifference{
                         // If no minor mutation at nucleotide, give ref nucleotide and None for other values
                         let mut minor_snps: Vec<(char, Option<i32>, Option<OrderedFloat<f32>>, Option<Vec<Evidence>>)> = Vec::new();
                         let mut minor_snp_exists = false;
-                        let mut c_idx = 0;
                         for (ref_cd, alt_cd) in ref_codon.codon.iter().zip(alt_codon.codon.clone()){
                             let mut these_minor_snps = Vec::new();
                             let mut these_minor_indels = Vec::new();
@@ -387,10 +386,16 @@ impl GeneDifference{
                                             evidence = vec![e.evidence.clone()];
                                         }
                                         if e.alt_type == AltType::DEL{
-                                            mutation = ref_gene.name.clone() + "@" + &alt_cd.reference.to_string() + "_" + &alt_cd.nucleotide_number.to_string() + "_del_" + &e.base;
+                                            mutation = ref_gene.name.clone() + "@" + &alt_cd.nucleotide_number.to_string() + "_del_" + &e.base;
                                             indel_length = Some(e.base.len() as i64 * -1);
                                             indel_nucleotides = Some(e.base.clone());
                                             evidence = vec![e.evidence.clone()];
+                                        }
+                                        if minor_type == MinorType::COV{
+                                            mutation = mutation + ":" + &e.evidence.cov.unwrap().to_string();
+                                        }
+                                        if minor_type == MinorType::FRS{
+                                            mutation = mutation + ":" + &format!("{:.3}", e.evidence.frs.unwrap());
                                         }
                                         minor_mutations.push(Mutation{
                                             mutation: mutation.clone(),
@@ -434,7 +439,6 @@ impl GeneDifference{
                                     minor_snps.push((ref_cd.reference, None, None, None));
                                 }
                             }
-                            c_idx += 1;
                         }
                         if minor_snp_exists{
                             // Construct the minor amino acid change
@@ -466,7 +470,7 @@ impl GeneDifference{
                                 mutation = ref_gene.name.clone() + "@" + &ref_codon.amino_acid.to_string() + &ref_pos.gene_position.to_string() + &aa.to_string() + ":" + &minor_cov.to_string();
                             }
                             if minor_type == MinorType::FRS{
-                                mutation = ref_gene.name.clone() + "@" + &ref_codon.amino_acid.to_string() + &ref_pos.gene_position.to_string() + &aa.to_string() + ":" + &minor_frs.to_string();
+                                mutation = ref_gene.name.clone() + "@" + &ref_codon.amino_acid.to_string() + &ref_pos.gene_position.to_string() + &aa.to_string() + ":" + &format!("{:.3}", minor_frs);
                             }
                             minor_mutations.push(Mutation{
                                 mutation,
@@ -531,7 +535,7 @@ impl GeneDifference{
                                     mutation = mutation + ":" + &alt.evidence.cov.unwrap().to_string();
                                 }
                                 if minor_type == MinorType::FRS{
-                                    mutation = mutation + ":" + &alt.evidence.frs.unwrap().to_string();
+                                    mutation = mutation + ":" + &format!("{:.3}", alt.evidence.frs.unwrap());
                                 }
                             }
                             let m = Mutation{
@@ -601,11 +605,11 @@ impl GeneDifference{
             ).min().unwrap().to_string();
         }
         if minor_type == MinorType::FRS{
-            min_coverage = these_minors.iter().filter(
+            min_coverage = format!("{:.3}",these_minors.iter().filter(
                 |x| x.evidence.frs.is_some()
             ).map(
                 |x| x.evidence.frs.unwrap()
-            ).min().unwrap().to_string();
+            ).min().unwrap());
         }
         let mutation = gene_name.clone() + "@" + &nc_num.to_string() + "_" + &mutation_name + ":" + &min_coverage;
         let evidence = these_minors.iter().map(|x| x.evidence.clone()).collect();
