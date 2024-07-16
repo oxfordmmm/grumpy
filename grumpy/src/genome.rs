@@ -17,15 +17,18 @@ pub struct GenomePosition{
     // Updated during mutation
     pub reference: char,
     pub is_deleted: bool,
+    pub is_deleted_minor: bool,
     // Added for evidence of a deletion which didn't start at this position but affects it
-    pub deleted_evidence: Option<Evidence>,
+    // Includes evidence of minor deletions for simplicity
+    pub deleted_evidence: Vec<Evidence>,
 
     // Used to store calls from VCF
     // If populated, alts[0] is the actual call, others are minor calls
     pub alts: Vec<Alt>,
 
     pub genome_idx: i64, // 1-indexed genome index
-    pub genes: Vec<String>
+    pub genes: Vec<String>,
+    pub genes_with_mutations: HashSet<String>
 }
 
 #[derive(Clone)]
@@ -149,7 +152,9 @@ impl Genome{
                     alts: Vec::new(),
                     genes: Vec::new(),
                     is_deleted: false,
-                    deleted_evidence: None
+                    is_deleted_minor: false,
+                    deleted_evidence: Vec::new(),
+                    genes_with_mutations: HashSet::new()
                 }
             );
         }
@@ -247,7 +252,7 @@ impl Genome{
         let gene_def = maybe_gene_def.unwrap();
         let mut nucleotide_sequence = "".to_string();
         let mut nucleotide_index = Vec::new();
-        let mut genome_positions: Vec<&GenomePosition> = Vec::new();
+        let mut genome_positions: Vec<GenomePosition> = Vec::new();
         if gene_def.reverse_complement{
             let mut last_idx = gene_def.promoter_start;
             if gene_def.promoter_start == -1{
@@ -256,7 +261,7 @@ impl Genome{
             for i in gene_def.end..last_idx+1{
                 nucleotide_sequence.push(self.genome_positions[i as usize].reference);
                 nucleotide_index.push(self.genome_positions[i as usize].genome_idx);
-                genome_positions.push(&self.genome_positions[i as usize]);
+                genome_positions.push(self.genome_positions[i as usize].clone());
             }
         }
         else{
@@ -267,7 +272,7 @@ impl Genome{
             for i in first_idx..gene_def.end{
                 nucleotide_sequence.push(self.genome_positions[i as usize].reference);
                 nucleotide_index.push(self.genome_positions[i as usize].genome_idx);
-                genome_positions.push(&self.genome_positions[i as usize]);
+                genome_positions.push(self.genome_positions[i as usize].clone());
             }
         
         }
@@ -306,29 +311,37 @@ impl Genome{
 pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome{
     let mut new_genome = reference.clone();
     let mut deleted_positions = HashSet::new();
-    let mut deleted_evidence = None;
+    let mut deleted_evidence: HashMap<usize, Evidence> = HashMap::new();
     for (idx, position) in new_genome.genome_positions.iter_mut().enumerate(){
         if vcf.calls.contains_key(&position.genome_idx){
             for call in vcf.calls.get(&position.genome_idx).unwrap(){
                 // Set the new base etc from the call
+                let c = call.clone();
                 position.alts.push(Alt{
-                    alt_type: call.clone().call_type,
-                    base: call.clone().alt,
+                    alt_type: c.call_type,
+                    base: c.alt,
                     evidence: call.clone()
                 });
+
+                // Mark containing gene as containing a mutation
+                // Should make finding genes level mutations easier
+                for gene_name in position.genes.iter(){
+                    position.genes_with_mutations.insert(gene_name.clone());
+                }
                 
                 if call.call_type == AltType::DEL{
                     // Mark all associated bases as deleted
                     for del_idx in 0..call.alt.len(){
                         deleted_positions.insert(idx + del_idx);
+                        deleted_evidence.insert(idx + del_idx, call.clone());
                     }
-                    deleted_evidence = Some(call.clone());
                 }
 
                 if call.call_type == AltType::SNP || call.call_type == AltType::HET || call.call_type == AltType::NULL{
                     // Update nucleotide for SNP/het/null
-                    position.reference = call.clone().alt.chars().nth(0).unwrap();
-                    new_genome.nucleotide_sequence.replace_range(idx..idx+1, &call.clone().alt.chars().nth(0).unwrap().to_string());
+                    let base = call.clone().alt.chars().nth(0).unwrap();
+                    position.reference = base;
+                    new_genome.nucleotide_sequence.replace_range(idx..idx+1, &base.to_string());
                 }
             }
         }
@@ -336,17 +349,27 @@ pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome{
         if vcf.minor_calls.contains_key(&position.genome_idx){
             for call in vcf.minor_calls.get(&position.genome_idx).unwrap(){
                 // Set the new base etc from the call
+                let c = call.clone();
                 position.alts.push(Alt{
-                    alt_type: call.clone().call_type,
-                    base: call.clone().alt,
+                    alt_type: c.call_type,
+                    base: c.alt,
                     evidence: call.clone()
                 });
+
+                if call.call_type == AltType::DEL{
+                    position.is_deleted_minor = true;
+                    for del_idx in 0..call.alt.len(){
+                        deleted_evidence.insert(idx + del_idx, call.clone());
+                    }
+                }
             }
         }
 
         if deleted_positions.contains(&idx){
             position.is_deleted = true;
-            position.deleted_evidence = deleted_evidence.clone();
+            for ev in deleted_evidence.get(&idx).iter(){
+                position.deleted_evidence.push((*ev).clone());
+            }
         }
     }
 

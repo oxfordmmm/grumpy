@@ -1,5 +1,4 @@
-use vcf::{VCFReader, U8Vec, VCFHeaderFilterAlt, VCFError, VCFRecord};
-use flate2::read::MultiGzDecoder;
+use vcf::VCFReader;
 use std::fs::File;
 use std::io::BufReader;
 use std::string::String;
@@ -220,29 +219,32 @@ impl VCFFile{
             for (offset, alt_type, base) in call{
                 calls.push(Evidence{
                     cov: Some(call_cov),
-                    frs: Some(call_cov as f32 / dp as f32),
+                    frs: Some(ordered_float::OrderedFloat(call_cov as f32 / dp as f32)),
                     genotype: genotype.join("/"),
                     call_type: alt_type,
                     vcf_row: record.clone(),
                     reference: ref_allele.chars().nth(offset).unwrap().to_string(),
                     alt: base,
                     genome_index: record.position + offset as i64,
-                    is_minor: false
+                    is_minor: false,
+                    vcf_idx: (alt_idx + 1) as i64
                 });
             }
             // println!("Parsed calls {:?}\n", c);
         }
         else{
+            let call_cov = cov[(alt_idx + 1) as usize]; // COV should be [ref, alt1, alt2..]
             calls.push(Evidence{
-                cov: None,
-                frs: None,
+                cov: Some(call_cov),
+                frs: Some(ordered_float::OrderedFloat(call_cov as f32 / dp as f32)),
                 genotype: genotype.join("/"),
                 call_type,
                 vcf_row: record.clone(),
                 reference: ref_allele.clone(),
                 alt: alt_allele.clone(),
                 genome_index: record.position,
-                is_minor: false
+                is_minor: false,
+                vcf_idx: (alt_idx + 1) as i64
             });
         }
 
@@ -263,14 +265,15 @@ impl VCFFile{
                 for (offset, alt_type, base) in call{
                     minor_calls.push(Evidence{
                         cov: Some(call_cov),
-                        frs: Some(call_cov as f32 / dp as f32),
+                        frs: Some(ordered_float::OrderedFloat(call_cov as f32 / dp as f32)),
                         genotype: genotype.join("/"), // This is a minor call so the row's genotype is the same
                         call_type: alt_type,
                         vcf_row: record.clone(),
                         reference: ref_allele.chars().nth(offset).unwrap().to_string(),
                         alt: base,
                         genome_index: record.position + offset as i64,
-                        is_minor: true
+                        is_minor: true,
+                        vcf_idx: idx as i64
                     });
                 }
             }
@@ -305,7 +308,7 @@ impl VCFFile{
          */
         let mut x: String = "".to_string();
         let mut y: String = "".to_string();
-        let mut length = (reference.len() as i64 - alternate.len() as i64).abs();
+        let length = (reference.len() as i64 - alternate.len() as i64).abs();
         let mut indel_type = AltType::NULL;
         // Figure out which way around to approach this
         if reference.len() > alternate.len(){
@@ -326,7 +329,7 @@ impl VCFFile{
         for i in 0..x.len()+1{
             let x1 = x[0..i].to_string() + &padding + &x[i..x.len()].to_string();
             // println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", reference, alternate, x, y, x1);
-            let dist = snp_dist(x1.clone(), y.clone());
+            let dist = snp_dist(&x1, &y);
             if dist <= current_dist{
                 current = x1.clone();
                 current_dist = dist;
@@ -361,7 +364,7 @@ impl VCFFile{
     }
 }
 
-fn snp_dist(reference: String, alternate: String) -> i64{
+fn snp_dist(reference: &String, alternate: &String) -> i64{
     let mut dist = 0;
     for i in 0..reference.len(){
         let r = reference.chars().nth(i).unwrap();
