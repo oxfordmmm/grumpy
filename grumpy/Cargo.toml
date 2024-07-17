@@ -15,9 +15,3 @@ vcf = "0.6.1"
 [profile.dev]
 opt-level = 3
 debug = 1
-
-[build]
-rustflags = ["-C", "symbol-mangling-version=v0"]
-
-[rust]
-debuginfo-level = 1

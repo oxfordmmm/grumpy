@@ -1,7 +1,7 @@
 use ordered_float::{Float, OrderedFloat};
 
 use crate::common::{Alt, AltType, Evidence, MinorType, VCFRow};
-use crate::gene::{self, codon_to_aa, Gene, GenePos, GenePosition};
+use crate::gene::{codon_to_aa, Gene, GenePos};
 use crate::genome::Genome;
 
 #[derive(Clone, Debug)]
@@ -62,13 +62,13 @@ impl GenomeDifference{
                     let mut indel_length = 0;
                     let mut gene_name = None;
                     let mut gene_position = None;
-                    let mut codon_idx = None;
+                    let mut _codon_idx = None;
 
                     // Only annotate with gene information if there is a single gene at this position
                     if alt_pos.genes.len() == 1{
                         gene_name = Some(alt_pos.genes[0].clone());
                         let gene = alt_genome.get_gene(alt_pos.genes[0].clone());
-                        let (_gene_position, codon_idx) = gene.genome_idx_map.get(&alt_pos.genome_idx).unwrap();
+                        let (_gene_position, _codon_idx) = gene.genome_idx_map.get(&alt_pos.genome_idx).unwrap();
                         gene_position = Some(*_gene_position);
 
                     }
@@ -105,7 +105,7 @@ impl GenomeDifference{
                         indel_length,
                         indel_nucleotides: indel_bases,
                         gene_position,
-                        codon_idx,
+                        codon_idx: _codon_idx,
                         gene_name
                     };
 
@@ -146,42 +146,42 @@ impl GeneDifference{
                 match &alt_pos.gene_position_data{
                     GenePos::Codon(alt_codon) => {
                         // Unpack the ref codon too
-                        let mut maybe_ref_codon = None;
+                        let mut _maybe_ref_codon = None;
                         match &ref_pos.gene_position_data{
                             GenePos::Codon(x) => {
-                                maybe_ref_codon = Some(x);
+                                _maybe_ref_codon = Some(x);
                             },
                             _ => panic!("Reference gene position is not a codon")
                         }
-                        let ref_codon = maybe_ref_codon.unwrap();
+                        let ref_codon = _maybe_ref_codon.unwrap();
 
-                        let mut ref_nucleotides = None;
-                        let mut alt_nucleotides = None;
+                        let mut _ref_nucleotides = None;
+                        let mut _alt_nucleotides = None;
                         let mut nucleotide_number = None;
                         let mut nucleotide_index = None;
                         let mut indel_length = None;
                         let mut indel_nucleotides = None;
-                        let mut amino_acid_number = None;
-                        let mut amino_acid_sequence = None;
+                        let mut _amino_acid_number = None;
+                        let mut _amino_acid_sequence = None;
                         
 
-                        let mut mutation = "".to_string();
+                        let mut _mutation = "".to_string();
                         let mut evidence: Vec<Evidence> = Vec::new();
 
                         // Codons are annoying as they can be split across multiple nucleotides
                         // So let's first check for a SNP as that's simple
                         let ref_codon_str = ref_codon.codon.iter().map(|x| x.reference.to_string()).collect::<String>();
-                        ref_nucleotides = Some(
+                        _ref_nucleotides = Some(
                             ref_codon_str.clone()
                         );
-                        alt_nucleotides = Some(
+                        _alt_nucleotides = Some(
                             alt_codon.codon.iter().map(|x| x.reference.to_string()).collect::<String>()
                         );
                         if alt_codon.amino_acid != ref_codon.amino_acid{
                             // SNP at this amino acid so mutation is simple
-                            mutation = ref_gene.name.clone() + "@" + &ref_codon.amino_acid.to_string() + &ref_pos.gene_position.to_string() + &alt_codon.amino_acid.to_string();
-                            amino_acid_number = Some(gene_position);
-                            amino_acid_sequence = Some(alt_codon.amino_acid);
+                            _mutation = ref_gene.name.clone() + "@" + &ref_codon.amino_acid.to_string() + &ref_pos.gene_position.to_string() + &alt_codon.amino_acid.to_string();
+                            _amino_acid_number = Some(gene_position);
+                            _amino_acid_sequence = Some(alt_codon.amino_acid);
                             // Filter evidence only for SNP
                             for ev in alt_codon.codon.clone(){
                                 if ev.alts.len() > 0{
@@ -193,18 +193,18 @@ impl GeneDifference{
                                 }
                             }
                             mutations.push(Mutation{
-                                mutation,
+                                mutation: _mutation,
                                 evidence,
                                 gene_position,
                                 codes_protein,
-                                ref_nucleotides,
-                                alt_nucleotides,
+                                ref_nucleotides: _ref_nucleotides,
+                                alt_nucleotides: _alt_nucleotides,
                                 nucleotide_number,
                                 nucleotide_index,
                                 indel_length,
                                 indel_nucleotides: indel_nucleotides.clone(),
-                                amino_acid_number,
-                                amino_acid_sequence
+                                amino_acid_number: _amino_acid_number,
+                                amino_acid_sequence: _amino_acid_sequence
                             });
                         }
                         else{
@@ -228,9 +228,9 @@ impl GeneDifference{
                                 }
                             }
                             if synon_snp{
-                                mutation = ref_gene.name.clone() + "@" + &ref_codon.amino_acid.to_string() + &ref_pos.gene_position.to_string() + &alt_codon.amino_acid.to_string();
-                                amino_acid_number = Some(gene_position);
-                                amino_acid_sequence = Some(alt_codon.amino_acid);
+                                _mutation = ref_gene.name.clone() + "@" + &ref_codon.amino_acid.to_string() + &ref_pos.gene_position.to_string() + &alt_codon.amino_acid.to_string();
+                                _amino_acid_number = Some(gene_position);
+                                _amino_acid_sequence = Some(alt_codon.amino_acid);
                                 // Filter evidence only for SNP
                                 for ev in alt_codon.codon.clone(){
                                     if ev.alts.len() > 0{
@@ -242,18 +242,18 @@ impl GeneDifference{
                                     }
                                 }
                                 mutations.push(Mutation{
-                                    mutation,
+                                    mutation: _mutation,
                                     evidence,
                                     gene_position,
                                     codes_protein,
-                                    ref_nucleotides,
-                                    alt_nucleotides,
+                                    ref_nucleotides: _ref_nucleotides,
+                                    alt_nucleotides: _alt_nucleotides,
                                     nucleotide_number,
                                     nucleotide_index,
                                     indel_length,
                                     indel_nucleotides: indel_nucleotides.clone(),
-                                    amino_acid_number,
-                                    amino_acid_sequence
+                                    amino_acid_number: _amino_acid_number,
+                                    amino_acid_sequence: _amino_acid_sequence
                                 });
                             }
                         }
@@ -272,15 +272,15 @@ impl GeneDifference{
                             let mut these_minor_indels = Vec::new();
 
                             // Make sure these are empty for each nc in the codon
-                            ref_nucleotides = None;
-                            alt_nucleotides = None;
+                            _ref_nucleotides = None;
+                            _alt_nucleotides = None;
                             nucleotide_number = None;
                             nucleotide_index = None;
                             indel_length = None;
                             indel_nucleotides = None;
-                            amino_acid_number = None;
-                            amino_acid_sequence = None;
-                            mutation = "".to_string();
+                            _amino_acid_number = None;
+                            _amino_acid_sequence = None;
+                            _mutation = "".to_string();
                             evidence = Vec::new();
                             for e in alt_cd.alts.iter(){
                                 if e.evidence.is_minor{
@@ -294,33 +294,33 @@ impl GeneDifference{
                                 }
                                 else {
                                     if e.alt_type == AltType::INS{
-                                        mutation = ref_gene.name.clone() + "@" + &alt_cd.nucleotide_number.to_string() + "_ins_" + &e.base;
+                                        _mutation = ref_gene.name.clone() + "@" + &alt_cd.nucleotide_number.to_string() + "_ins_" + &e.base;
                                         indel_length = Some(e.base.len() as i64);
                                         indel_nucleotides = Some(e.base.clone());
                                         evidence = vec![e.evidence.clone()];
                                     }
                                     if e.alt_type == AltType::DEL{
-                                        mutation = ref_gene.name.clone() + "@" + &alt_cd.nucleotide_number.to_string() + "_del_" + &e.base;
+                                        _mutation = ref_gene.name.clone() + "@" + &alt_cd.nucleotide_number.to_string() + "_del_" + &e.base;
                                         indel_length = Some(e.base.len() as i64 * -1);
                                         indel_nucleotides = Some(e.base.clone());
                                         evidence = vec![e.evidence.clone()];
                                     }
 
-                                    if mutation != "".to_string(){
+                                    if _mutation != "".to_string(){
                                         // We picked up a mutation so lets append it
                                         mutations.push(Mutation{
-                                            mutation: mutation.clone(),
+                                            mutation: _mutation.clone(),
                                             evidence: evidence.clone(),
                                             gene_position,
                                             codes_protein,
-                                            ref_nucleotides: ref_nucleotides.clone(),
-                                            alt_nucleotides: alt_nucleotides.clone(),
+                                            ref_nucleotides: _ref_nucleotides.clone(),
+                                            alt_nucleotides: _alt_nucleotides.clone(),
                                             nucleotide_number,
                                             nucleotide_index,
                                             indel_length,
                                             indel_nucleotides: indel_nucleotides.clone(),
-                                            amino_acid_number,
-                                            amino_acid_sequence
+                                            amino_acid_number: _amino_acid_number,
+                                            amino_acid_sequence: _amino_acid_sequence
                                         });
                                     }
                                 }
@@ -366,25 +366,25 @@ impl GeneDifference{
                                         let e = these_minor_indels[0];
                                         // We have a single minor indel which is much easier
                                         if e.alt_type == AltType::INS{
-                                            mutation = ref_gene.name.clone() + "@" + &alt_cd.reference.to_string() + "_" + &alt_cd.nucleotide_number.to_string() + "_ins_" + &e.base;
+                                            _mutation = ref_gene.name.clone() + "@" + &alt_cd.reference.to_string() + "_" + &alt_cd.nucleotide_number.to_string() + "_ins_" + &e.base;
                                             indel_length = Some(e.base.len() as i64);
                                             indel_nucleotides = Some(e.base.clone());
                                             evidence = vec![e.evidence.clone()];
                                         }
                                         if e.alt_type == AltType::DEL{
-                                            mutation = ref_gene.name.clone() + "@" + &alt_cd.nucleotide_number.to_string() + "_del_" + &e.base;
+                                            _mutation = ref_gene.name.clone() + "@" + &alt_cd.nucleotide_number.to_string() + "_del_" + &e.base;
                                             indel_length = Some(e.base.len() as i64 * -1);
                                             indel_nucleotides = Some(e.base.clone());
                                             evidence = vec![e.evidence.clone()];
                                         }
                                         if minor_type == MinorType::COV{
-                                            mutation = mutation + ":" + &e.evidence.cov.unwrap().to_string();
+                                            _mutation = _mutation + ":" + &e.evidence.cov.unwrap().to_string();
                                         }
                                         if minor_type == MinorType::FRS{
-                                            mutation = mutation + ":" + &format!("{:.3}", e.evidence.frs.unwrap());
+                                            _mutation = _mutation + ":" + &format!("{:.3}", e.evidence.frs.unwrap());
                                         }
                                         minor_mutations.push(Mutation{
-                                            mutation: mutation.clone(),
+                                            mutation: _mutation.clone(),
                                             evidence: evidence.clone(),
                                             gene_position,
                                             codes_protein,
@@ -477,14 +477,14 @@ impl GeneDifference{
                     },
                     GenePos::Nucleotide(alt_nc) => {
                         // Unpack the ref nc too
-                        let mut maybe_ref_nc = None;
+                        let mut _maybe_ref_nc = None;
                         match &ref_pos.gene_position_data{
                             GenePos::Nucleotide(x) => {
-                                maybe_ref_nc = Some(x);
+                                _maybe_ref_nc = Some(x);
                             },
                             _ => panic!("Reference gene position is not a nucleotide")
                         }
-                        let ref_nc = maybe_ref_nc.unwrap();
+                        let ref_nc = _maybe_ref_nc.unwrap();
 
                         // Nucleotide mutations are much more simple
                         for alt in alt_nc.alts.iter(){

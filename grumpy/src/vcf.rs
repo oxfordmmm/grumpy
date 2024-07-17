@@ -78,20 +78,20 @@ impl VCFFile{
 
                     // Enforce that this record has a COV field
                     if !fields.contains_key("COV"){
-                        let mut cov_tag = "";
+                        let mut _cov_tag = "";
                         let mut cov = Vec::new();
                         if fields.contains_key("AD"){
-                            cov_tag = "AD";
+                            _cov_tag = "AD";
                         }
                         else if fields.contains_key("RO") && fields.contains_key("AO"){
                             // Annoying edge case where no single COV field exists but can be constructed
-                            cov_tag = "RO";
+                            _cov_tag = "RO";
                         }
                         else{
                             panic!("No COV tag found in record");
                         }
-                        if cov_tag != "RO"{
-                            for c in fields.get(cov_tag).unwrap(){
+                        if _cov_tag != "RO"{
+                            for c in fields.get(_cov_tag).unwrap(){
                                 cov.push(c.to_string());
                             }
                         }
@@ -235,20 +235,20 @@ impl VCFFile{
             alt_allele = record.alternative[alt_idx as usize].clone().to_lowercase();
             let call = VCFFile::simplify_call(ref_allele.clone(), alt_allele.clone());
             let call_cov = cov[(alt_idx + 1) as usize]; // COV should be [ref, alt1, alt2..]
-            for (offset, alt_type, base) in call{
+            for (offset, _alt_type, _base) in call{
                 if call_cov < min_dp{
                     // Override calls with null if the coverage is too low
-                    let alt_type = AltType::NULL;
-                    let base = "x".to_string();
+                    let _alt_type = AltType::NULL;
+                    let _base = "x".to_string();
                 }
                 calls.push(Evidence{
                     cov: Some(call_cov),
                     frs: Some(ordered_float::OrderedFloat(call_cov as f32 / dp as f32)),
                     genotype: genotype.join("/"),
-                    call_type: alt_type,
+                    call_type: _alt_type,
                     vcf_row: record.clone(),
                     reference: ref_allele.chars().nth(offset).unwrap().to_string(),
-                    alt: base,
+                    alt: _base,
                     genome_index: record.position + offset as i64,
                     is_minor: false,
                     vcf_idx: (alt_idx + 1) as i64
@@ -335,30 +335,30 @@ impl VCFFile{
             of SNPs... Could be adapted to check for multi-indel but this will scale
             exponentially the number of versions checked.
          */
-        let mut x: String = "".to_string();
-        let mut y: String = "".to_string();
+        let mut _x: String = "".to_string();
+        let mut _y: String = "".to_string();
         let length = (reference.len() as i64 - alternate.len() as i64).abs();
-        let mut indel_type = AltType::NULL;
+        let mut _indel_type = AltType::NULL;
         // Figure out which way around to approach this
         if reference.len() > alternate.len(){
-            y = reference.clone();
-            x = alternate.clone();
-            indel_type = AltType::DEL;
+            _y = reference.clone();
+            _x = alternate.clone();
+            _indel_type = AltType::DEL;
         }
         else{
-            y = alternate.clone();
-            x= reference.clone();
-            indel_type = AltType::INS;
+            _y = alternate.clone();
+            _x= reference.clone();
+            _indel_type = AltType::INS;
         }
 
         let padding = "N".repeat(length as usize);
         let mut current = "".to_string();
         let mut current_dist = i64::MAX;
         let mut indel_start = 0;
-        for i in 0..x.len()+1{
-            let x1 = x[0..i].to_string() + &padding + &x[i..x.len()].to_string();
+        for i in 0.._x.len()+1{
+            let x1 = _x[0..i].to_string() + &padding + &_x[i.._x.len()].to_string();
             // println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", reference, alternate, x, y, x1);
-            let dist = snp_dist(&x1, &y);
+            let dist = snp_dist(&x1, &_y);
             if dist <= current_dist{
                 current = x1.clone();
                 current_dist = dist;
@@ -366,7 +366,7 @@ impl VCFFile{
             }
         }
 
-        if indel_type == AltType::INS{
+        if _indel_type == AltType::INS{
             // Ins after, del at, so adjust
             indel_start -= 1;
         }
@@ -374,16 +374,16 @@ impl VCFFile{
         let mut indel_str = "".to_string();
         for i in 0..current.len(){
             if current.chars().nth(i).unwrap() == 'N'{
-                indel_str += &y.chars().nth(i).unwrap().to_string();
+                indel_str += &_y.chars().nth(i).unwrap().to_string();
             }
         }
 
-        calls.push((indel_start as usize, indel_type, indel_str));
+        calls.push((indel_start as usize, _indel_type, indel_str));
 
 
-        for i in 0..x.len(){
-            let r = y.chars().nth(i).unwrap();
-            let a = x.chars().nth(i).unwrap();
+        for i in 0.._x.len(){
+            let r = _y.chars().nth(i).unwrap();
+            let a = _x.chars().nth(i).unwrap();
             if r != 'N' && a != 'N' && r != a{
                 calls.push((i, AltType::SNP, a.to_string()));
             }

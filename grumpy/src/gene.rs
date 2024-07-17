@@ -3,7 +3,7 @@ use std::vec::Vec;
 use std::collections::HashMap;
 
 use crate::common::{Evidence, AltType, GeneDef, Alt};
-use crate::genome::{self, GenomePosition};
+use crate::genome::GenomePosition;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum GenePos{
