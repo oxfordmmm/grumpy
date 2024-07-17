@@ -187,7 +187,26 @@ impl VCFFile{
     
         let first = genotype[0];
         // Adjust for 1-indexed VCF
-        let alt_idx = first.parse::<i32>().unwrap() - 1;
+        let mut alt_idx = 0;
+        if first != "."{
+            alt_idx = first.parse::<i32>().unwrap() - 1;
+        }
+        if cov.len() == 1{
+            // Just 1 item in the call so it's a null call
+            calls.push(Evidence{
+                cov: Some(cov[0 as usize]),
+                frs: Some(ordered_float::OrderedFloat(1.0)),
+                genotype: genotype.join("/"),
+                call_type: AltType::NULL,
+                vcf_row: record.clone(),
+                reference: ref_allele.chars().nth(0).unwrap().to_string(),
+                alt: "x".to_string(),
+                genome_index: record.position,
+                is_minor: false,
+                vcf_idx: 0 as i64
+            });
+            return (calls, minor_calls);
+        }
 
         for i in 1..genotype.len(){
             if genotype[i] != first{

@@ -175,7 +175,7 @@ impl Genome{
         Assigns promoters to genes iteratively. 
         Expand out to a given distance from the start of each gene without overlapping with other genes.
         */
-        let max_promoter_length = 100 - 1;
+        let max_promoter_length = 100;
         for gene in self.gene_definitions.iter_mut(){
             // First pass to add gene names to all positions they exist in
             let mut start_idx = gene.start;

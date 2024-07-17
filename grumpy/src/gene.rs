@@ -1,8 +1,9 @@
 use std::string::String;
 use std::vec::Vec;
+use std::collections::HashMap;
 
 use crate::common::{Evidence, AltType, GeneDef, Alt};
-use crate::genome::GenomePosition;
+use crate::genome::{self, GenomePosition};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum GenePos{
@@ -52,7 +53,8 @@ pub struct Gene{
     pub amino_acid_sequence: String,
     pub amino_acid_number: Vec<i64>,
     pub ribosomal_shifts: Vec<i64>,
-    pub codons: Vec<String>
+    pub codons: Vec<String>,
+    pub genome_idx_map: HashMap<i64, (i64, Option<i64>)>,
 }
 
 impl Gene {
@@ -66,6 +68,9 @@ impl Gene {
         let mut gene_number: Vec<i64> = Vec::new();
         let mut codons = Vec::new();
         let mut gene_positions: Vec<GenePosition> = Vec::new();
+
+        // Map of genome index -> gene number
+        let mut genome_idx_map: HashMap<i64, (i64, Option<i64>)> = HashMap::new();
 
 
         // Ensure we pick up deletions upstream or downstream of the gene
@@ -174,6 +179,7 @@ impl Gene {
                     }),
                     gene_position: i
                 });
+                genome_idx_map.insert(nucleotide_index[nc_idx], (i, None));
                 nc_idx += 1;
             }
         }
@@ -195,6 +201,7 @@ impl Gene {
                     }),
                     gene_position: i, 
                 });
+                genome_idx_map.insert(nucleotide_index[nc_idx], (i, None));
                 nc_idx += 1;
             }
         }
@@ -202,14 +209,14 @@ impl Gene {
         if gene_def.coding{
             // Now figure out the amino acid sequence from the nucleotide sequence
             let mut codon = "".to_string();
-            let mut codon_idx = 0;
+            let mut codon_idx = 1;
             for i in prom_end..nucleotide_sequence.len(){
                 codon.push(nucleotide_sequence.chars().nth(i).unwrap());
+                genome_idx_map.insert(nucleotide_index[i], (codon_idx, Some((i % 3).try_into().unwrap())));
                 if codon.len() == 3{
                     // Codon is complete
                     amino_acid_sequence.push(codon_to_aa(codon.clone()));
                     codons.push(codon.clone());
-                    codon_idx += 1;
                     gene_number.push(codon_idx);
                     amino_acid_number.push(codon_idx);
                     gene_positions.push(GenePosition{
@@ -241,6 +248,7 @@ impl Gene {
                         }),
                         gene_position: codon_idx,
                     });
+                    codon_idx += 1;
                     codon = "".to_string();
                 }
             }
@@ -261,7 +269,8 @@ impl Gene {
             amino_acid_sequence,
             amino_acid_number,
             ribosomal_shifts: gene_def.ribosomal_shifts,
-            codons
+            codons,
+            genome_idx_map
         }
     }
 

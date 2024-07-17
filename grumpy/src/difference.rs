@@ -1,7 +1,7 @@
 use ordered_float::{Float, OrderedFloat};
 
 use crate::common::{Alt, AltType, Evidence, MinorType, VCFRow};
-use crate::gene::{Gene, GenePos, codon_to_aa};
+use crate::gene::{self, codon_to_aa, Gene, GenePos, GenePosition};
 use crate::genome::Genome;
 
 #[derive(Clone, Debug)]
@@ -46,13 +46,13 @@ pub struct GeneDifference{
 }
 
 impl GenomeDifference{
-    pub fn new(ref_genome: Genome, alt_genome: Genome, minor_type: MinorType) -> Self{
+    pub fn new(ref_genome: Genome, mut alt_genome: Genome, minor_type: MinorType) -> Self{
         let mut variants: Vec<Variant> = Vec::new();
         let mut minor_variants: Vec<Variant> = Vec::new();
 
         for idx in 0..ref_genome.genome_positions.len(){
             let ref_pos = &ref_genome.genome_positions[idx];
-            let alt_pos = &alt_genome.genome_positions[idx];
+            let alt_pos = alt_genome.genome_positions[idx].clone();
 
             if alt_pos.alts.len() > 0{
                 // Alt has a variant at this position, so figure out what it is
@@ -67,24 +67,10 @@ impl GenomeDifference{
                     // Only annotate with gene information if there is a single gene at this position
                     if alt_pos.genes.len() == 1{
                         gene_name = Some(alt_pos.genes[0].clone());
-                        let gene = alt_genome.build_gene(alt_pos.genes[0].clone());
-                        for g_pos in gene.gene_positions{
-                            match g_pos.gene_position_data{
-                                GenePos::Codon(x) => {
-                                    for (c_idx, codon) in x.codon.iter().enumerate(){
-                                        if codon.nucleotide_index == alt_pos.genome_idx{
-                                            gene_position = Some(g_pos.gene_position);
-                                            codon_idx = Some(c_idx as i64);
-                                        }
-                                    }
-                                },
-                                GenePos::Nucleotide(x) => {
-                                    if x.nucleotide_index == alt_pos.genome_idx{
-                                        gene_position = Some(g_pos.gene_position);
-                                    }
-                                }
-                            }
-                        }
+                        let gene = alt_genome.get_gene(alt_pos.genes[0].clone());
+                        let (_gene_position, codon_idx) = gene.genome_idx_map.get(&alt_pos.genome_idx).unwrap();
+                        gene_position = Some(*_gene_position);
+
                     }
 
 
@@ -431,7 +417,7 @@ impl GeneDifference{
                                     }
                                     else{
                                         // Single minor SNP
-                                        minor_snps.push((these_minor_snps[0].base.chars().next().unwrap(), these_minor_snps[0].evidence.cov, these_minor_snps[0].evidence.frs, Some(vec![these_minor_snps[0].evidence.clone()])));
+                                        minor_snps.push((these_minor_snps[0].base.chars().nth(0).unwrap(), these_minor_snps[0].evidence.cov, these_minor_snps[0].evidence.frs, Some(vec![these_minor_snps[0].evidence.clone()])));
                                     }
                                 }
                                 else{
@@ -440,7 +426,7 @@ impl GeneDifference{
                                 }
                             }
                         }
-                        if minor_snp_exists{
+                        if minor_snp_exists && minor_snps.len() == 3{
                             // Construct the minor amino acid change
                             let mut codon = "".to_string();
                             let mut minor_cov = i32::MAX;
