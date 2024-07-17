@@ -16,8 +16,8 @@ use common::MinorType;
 
 fn main() {
     let vcf_start = SystemTime::now();
-    // let mut vcf = VCFFile::new("/home/jeremy/Documents/work/gnomonicus/e4b54393-e037-435e-b942-527f0e2b1616.merged.vcf".to_string(), false);
-    let mut vcf = VCFFile::new("/home/jeremy/Downloads/e4b54393-e037-435e-b942-527f0e2b1616_final.full.vcf".to_string(), false);
+    // let mut vcf = VCFFile::new("/home/jeremy/Documents/work/gnomonicus/e4b54393-e037-435e-b942-527f0e2b1616.merged.vcf".to_string(), false, 5);
+    let mut vcf = VCFFile::new("/home/jeremy/Downloads/e4b54393-e037-435e-b942-527f0e2b1616_final.full.vcf".to_string(), false, 5);
     let vcf_end = SystemTime::now();
 
     let reference_start = SystemTime::now();

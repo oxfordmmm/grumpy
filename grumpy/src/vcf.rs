@@ -15,7 +15,7 @@ pub struct VCFFile{
 
 impl VCFFile{
     // Rust doesn't have optional args so sorry
-    pub fn new(filename: String, ignore_filter: bool) -> Self{
+    pub fn new(filename: String, ignore_filter: bool, min_dp: i32) -> Self{
         let file = File::open(filename).unwrap();
         let buf = BufReader::new(file);
         let mut reader = VCFReader::new(buf).unwrap();
@@ -125,7 +125,7 @@ impl VCFFile{
                         is_filter_pass: passed
                     });
 
-                    let (record_calls, record_minor_calls) = VCFFile::parse_record_for_calls(records[records.len()-1].clone());
+                    let (record_calls, record_minor_calls) = VCFFile::parse_record_for_calls(records[records.len()-1].clone(), min_dp);
                     // println!("Calls {:?}", record_calls);
                     // println!("Minor calls {:?}\n", record_minor_calls);
 
@@ -165,7 +165,7 @@ impl VCFFile{
         }
     }
 
-    pub fn parse_record_for_calls(record: VCFRow) -> (Vec<Evidence>, Vec<Evidence>){
+    pub fn parse_record_for_calls(record: VCFRow, min_dp: i32) -> (Vec<Evidence>, Vec<Evidence>){
         let mut calls: Vec<Evidence> = Vec::new();
         let mut minor_calls: Vec<Evidence> = Vec::new();
 
@@ -236,6 +236,11 @@ impl VCFFile{
             let call = VCFFile::simplify_call(ref_allele.clone(), alt_allele.clone());
             let call_cov = cov[(alt_idx + 1) as usize]; // COV should be [ref, alt1, alt2..]
             for (offset, alt_type, base) in call{
+                if call_cov < min_dp{
+                    // Override calls with null if the coverage is too low
+                    let alt_type = AltType::NULL;
+                    let base = "x".to_string();
+                }
                 calls.push(Evidence{
                     cov: Some(call_cov),
                     frs: Some(ordered_float::OrderedFloat(call_cov as f32 / dp as f32)),
@@ -253,6 +258,11 @@ impl VCFFile{
         }
         else{
             let call_cov = cov[(alt_idx + 1) as usize]; // COV should be [ref, alt1, alt2..]
+            if call_cov < min_dp{
+                // Override calls with null if the coverage is too low
+                call_type = AltType::NULL;
+                alt_allele = "x".to_string();
+            }
             calls.push(Evidence{
                 cov: Some(call_cov),
                 frs: Some(ordered_float::OrderedFloat(call_cov as f32 / dp as f32)),
