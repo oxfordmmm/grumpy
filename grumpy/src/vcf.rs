@@ -1,3 +1,5 @@
+use pyo3::prelude::*;
+
 use vcf::VCFReader;
 use std::fs::File;
 use std::io::BufReader;
@@ -5,16 +7,26 @@ use std::string::String;
 use std::collections::HashMap;
 
 use crate::common::{Evidence, VCFRow, AltType};
-
+#[pyclass]
+#[derive(Clone, Debug)]
 pub struct VCFFile{
+    #[pyo3(get, set)]
     pub header: Vec<String>,
+
+    #[pyo3(get, set)]
     pub records: Vec<VCFRow>,
+
+    #[pyo3(get, set)]
     pub calls: HashMap<i64, Vec<Evidence>>,
+
+    #[pyo3(get, set)]
     pub minor_calls: HashMap<i64, Vec<Evidence>>
 }
 
+#[pymethods]
 impl VCFFile{
     // Rust doesn't have optional args so sorry
+    #[new]
     pub fn new(filename: String, ignore_filter: bool, min_dp: i32) -> Self{
         let file = File::open(filename).unwrap();
         let buf = BufReader::new(file);
@@ -165,6 +177,7 @@ impl VCFFile{
         }
     }
 
+    #[staticmethod]
     pub fn parse_record_for_calls(record: VCFRow, min_dp: i32) -> (Vec<Evidence>, Vec<Evidence>){
         let mut calls: Vec<Evidence> = Vec::new();
         let mut minor_calls: Vec<Evidence> = Vec::new();
@@ -312,6 +325,7 @@ impl VCFFile{
         return (calls, minor_calls);
     }
 
+    #[staticmethod]
     pub fn simplify_call(reference: String, alternate: String) -> Vec<(usize, AltType, String)>{
         let mut calls: Vec<(usize, AltType, String)> = Vec::new();
         if reference.len() == alternate.len(){

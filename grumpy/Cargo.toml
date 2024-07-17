@@ -6,12 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-flate2 = "1.0.30"
 gb-io = "0.7.1"
 ordered-float = "4.2.1"
 string_cache = "0.8.7"
 vcf = "0.6.1"
+pyo3 = { version = "0.22.1", features = ["extension-module"] }
 
 [profile.dev]
 opt-level = 3
 debug = 1
+
+[lib]
+name = "grumpy"
+crate-type = ["cdylib", "rlib"]

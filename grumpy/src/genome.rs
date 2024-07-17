@@ -1,3 +1,5 @@
+use pyo3::prelude::*;
+
 use std::fs::File;
 use std::collections::{HashMap, HashSet};
 
@@ -12,36 +14,63 @@ use crate::common::{Alt, AltType, Evidence, GeneDef};
 use crate::gene::Gene;
 use crate::vcf::VCFFile;
 
+#[pyclass]
 #[derive(Clone, Debug)] 
 pub struct GenomePosition{
     // Updated during mutation
+    #[pyo3(get, set)]
     pub reference: char,
+
+    #[pyo3(get, set)]
     pub is_deleted: bool,
+
+    #[pyo3(get, set)]
     pub is_deleted_minor: bool,
     // Added for evidence of a deletion which didn't start at this position but affects it
     // Includes evidence of minor deletions for simplicity
+    #[pyo3(get, set)]
     pub deleted_evidence: Vec<Evidence>,
 
     // Used to store calls from VCF
     // If populated, alts[0] is the actual call, others are minor calls
+    #[pyo3(get, set)]
     pub alts: Vec<Alt>,
 
+    #[pyo3(get, set)]
     pub genome_idx: i64, // 1-indexed genome index
+
+    #[pyo3(get, set)]
     pub genes: Vec<String>,
 }
 
+#[pyclass]
 #[derive(Clone)]
 pub struct Genome{
+    #[pyo3(get, set)]
     pub name: String,
+
+    #[pyo3(get, set)]
     pub nucleotide_sequence: String,
+
+    #[pyo3(get, set)]
     pub gene_definitions: Vec<GeneDef>,
+
+    #[pyo3(get, set)]
     pub genome_positions: Vec<GenomePosition>,
+
+    #[pyo3(get, set)]
     pub gene_names: Vec<String>,
+
+    #[pyo3(get, set)]
     pub genes: HashMap<String, Gene>,
+
+    #[pyo3(get, set)]
     pub genes_with_mutations: HashSet<String>
 }
 
+#[pymethods]
 impl Genome{
+    #[new]
     pub fn new(filename: &str) -> Self {
         let file = File::open(filename).unwrap();
         let mut _gene_definitions = Vec::new();
@@ -308,6 +337,7 @@ impl Genome{
     }
 }
 
+#[pyfunction]
 pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome{
     let mut new_genome = reference.clone();
     let mut deleted_positions = HashSet::new();

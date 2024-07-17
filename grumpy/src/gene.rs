@@ -1,3 +1,4 @@
+use pyo3::prelude::*;
 use std::string::String;
 use std::vec::Vec;
 use std::collections::HashMap;
@@ -5,55 +6,94 @@ use std::collections::HashMap;
 use crate::common::{Evidence, AltType, GeneDef, Alt};
 use crate::genome::GenomePosition;
 
+#[pyclass(eq)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum GenePos{
     Nucleotide(NucleotideType),
     Codon(CodonType)
 }
 
+#[pyclass(eq)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CodonType{
+    #[pyo3(get, set)]
     pub amino_acid: char,
 
     // 3-tuple for each nucleotide in the codon
+    #[pyo3(get, set)]
     pub codon: Vec<NucleotideType>,
-    // pub codon: (char, char, char),
-    // pub nucleotide_number: (i64, i64, i64),
-    // pub nucleotide_index: (i64, i64, i64),
-    // pub alts: (Vec<Alt>, Vec<Alt>, Vec<Alt>),
-    // pub is_deleted: (bool, bool, bool)
 }
 
+#[pyclass(eq)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NucleotideType{
+    #[pyo3(get, set)]
     pub reference: char,
+
+    #[pyo3(get, set)]
     pub nucleotide_number: i64,
+
+    #[pyo3(get, set)]
     pub nucleotide_index: i64,
+
+    #[pyo3(get, set)]
     pub alts: Vec<Alt>,
+
+    #[pyo3(get, set)]
     pub is_deleted: bool
 }
 
+#[pyclass(eq)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GenePosition{
     // Indexed by gene position
+    #[pyo3(get, set)]
     pub gene_position: i64, // 1-indexed gene position
+
+    #[pyo3(get, set)]
     pub gene_position_data: GenePos,
 }
 
+#[pyclass]
 #[derive(Clone, Debug)]
 pub struct Gene{
+    #[pyo3(get, set)]
     pub name: String,
+
+    #[pyo3(get, set)]
     pub coding: bool,
+
+    #[pyo3(get, set)]
     pub reverse_complement: bool,
+
+    #[pyo3(get, set)]
     pub nucleotide_sequence: String,
+
+    #[pyo3(get, set)]
     pub nucleotide_index: Vec<i64>,
+
+    #[pyo3(get, set)]
     pub nucleotide_number: Vec<i64>,
+
+    #[pyo3(get, set)]
     pub gene_number: Vec<i64>,
+
+    #[pyo3(get, set)]
     pub gene_positions: Vec<GenePosition>,
+
+    #[pyo3(get, set)]
     pub amino_acid_sequence: String,
+
+    #[pyo3(get, set)]
     pub amino_acid_number: Vec<i64>,
+
+    #[pyo3(get, set)]
     pub ribosomal_shifts: Vec<i64>,
+
+    #[pyo3(get, set)]
     pub codons: Vec<String>,
+
+    #[pyo3(get, set)]
     pub genome_idx_map: HashMap<i64, (i64, Option<i64>)>,
 }
 
