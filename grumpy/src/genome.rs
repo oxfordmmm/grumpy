@@ -249,7 +249,6 @@ impl Genome{
                 }
                 if self.genome_positions[(gene.promoter_start + expanding) as usize].genes.len() > 0{
                     // Pre-existing gene at this position so ignore expanding!
-                    // println!("Gene {} would overlap with gene {}", gene.name, self.genome_positions[gene.promoter_start as usize].genes[0]);
                     continue;
                 }
                 else{

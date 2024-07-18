@@ -6,7 +6,7 @@ use std::io::BufReader;
 use std::string::String;
 use std::collections::HashMap;
 
-use crate::common::{Evidence, VCFRow, AltType};
+use crate::common::{AltType, Evidence, VCFRow};
 #[pyclass]
 #[derive(Clone, Debug)]
 pub struct VCFFile{
@@ -49,7 +49,7 @@ impl VCFFile{
                     // For whatever reason non of these fields are strings, so we need to convert them
                     let mut alts = Vec::new(); // One string per alt
                     for alt in record.alternative.iter(){
-                        alts.push(String::from_utf8_lossy(alt).to_string());
+                        alts.push(String::from_utf8_lossy(alt).to_string().to_lowercase());
                     }
                     let mut filters = Vec::new(); // String per filter
                     for filter in record.filter.iter(){
@@ -130,7 +130,7 @@ impl VCFFile{
 
                     records.push(VCFRow{
                         position: record.position as i64,
-                        reference: String::from_utf8_lossy(&record.reference).to_string(),
+                        reference: String::from_utf8_lossy(&record.reference).to_string().to_lowercase(),
                         alternative: alts.clone(),
                         filter: filters.clone(),
                         fields: fields.clone(),
@@ -153,12 +153,15 @@ impl VCFFile{
                         }
                         // calls.extend(record_calls);
                     }
-                    for call in record_minor_calls{
-                        if minor_calls_map.contains_key(&call.genome_index){
-                            minor_calls_map.get_mut(&call.genome_index).unwrap().push(call.clone());
-                        }
-                        else{
-                            minor_calls_map.insert(call.genome_index, vec![call.clone()]);
+                    // Add minor calls if the filter is passed or ignored, or specifcally just the MIN_FRS has failed
+                    if (ignore_filter || passed) || (!passed && filters.len() == 1 && filters.contains(&"MIN_FRS".to_string())){
+                        for call in record_minor_calls{
+                            if minor_calls_map.contains_key(&call.genome_index){
+                                minor_calls_map.get_mut(&call.genome_index).unwrap().push(call.clone());
+                            }
+                            else{
+                                minor_calls_map.insert(call.genome_index, vec![call.clone()]);
+                            }
                         }
                     }
                     // minor_calls.extend(record_minor_calls);
@@ -280,7 +283,7 @@ impl VCFFile{
                 cov: Some(call_cov),
                 frs: Some(ordered_float::OrderedFloat(call_cov as f32 / dp as f32)),
                 genotype: genotype.join("/"),
-                call_type,
+                call_type: call_type.clone(),
                 vcf_row: record.clone(),
                 reference: ref_allele.clone(),
                 alt: alt_allele.clone(),
@@ -288,6 +291,11 @@ impl VCFFile{
                 is_minor: false,
                 vcf_idx: (alt_idx + 1) as i64
             });
+        }
+
+        if call_type == AltType::NULL{
+            // Don't check for minor calls if the call is null
+            return (calls, minor_calls);
         }
 
         // Now we've got the main call, we need to figure out the minor calls

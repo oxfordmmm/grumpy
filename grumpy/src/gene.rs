@@ -40,7 +40,10 @@ pub struct NucleotideType{
     pub alts: Vec<Alt>,
 
     #[pyo3(get, set)]
-    pub is_deleted: bool
+    pub is_deleted: bool,
+
+    #[pyo3(get, set)]
+    pub is_deleted_minor: bool
 }
 
 #[pyclass(eq)]
@@ -168,8 +171,11 @@ impl Gene {
             for (pos, indel_size, is_minor) in indel_positions.iter_mut(){
                 if *indel_size > 0{
                     // Insertion
+                    if *pos == 0{
+                        panic!("Insertion at start of gene {} is revcomp and cannot be adjusted", gene_def.name);
+                    }
                     let new_pos = *pos - 1;
-                    let fixed_alts = genome_positions[*pos].alts.iter().map(Gene::rev_comp_indel_alt).collect::<Vec<Alt>>();
+                    let fixed_alts = genome_positions[*pos].alts.iter().map(|x| Gene::rev_comp_indel_alt(x, i64::MAX)).collect::<Vec<Alt>>();
 
                     // Remove the insertion from the old position
                     fixed_genome_positions[*pos].alts = genome_positions[*pos].alts.iter().filter(|x| x.alt_type != AltType::INS && x.evidence.is_minor == *is_minor).map(|x| x.clone()).collect::<Vec<Alt>>();
@@ -180,8 +186,17 @@ impl Gene {
                 }
                 else{
                     // Deletion
-                    let new_pos = *pos - indel_size.abs() as usize + 1;
-                    let fixed_alts = genome_positions[*pos].alts.iter().map(Gene::rev_comp_indel_alt).collect::<Vec<Alt>>();
+                    let mut _max_del_length = i64::MAX;
+                    if indel_size.abs() as usize > *pos{
+                        // Deletion may start in this gene, but needs truncating to just the part in this gene
+                        _max_del_length = *pos as i64;
+                    }
+                    let mut new_pos = 0;
+                    if _max_del_length == i64::MAX{
+                        // Update new position if deletion is entirely in this gene
+                        new_pos = *pos - indel_size.abs() as usize + 1;
+                    }
+                    let fixed_alts = genome_positions[*pos].alts.iter().map(|x| Gene::rev_comp_indel_alt(x, _max_del_length)).collect::<Vec<Alt>>();
 
                     // Remove the deletion from the old position
                     fixed_genome_positions[*pos].alts = genome_positions[*pos].alts.iter().filter(|x| x.alt_type != AltType::DEL && x.evidence.is_minor == *is_minor).map(|x| x.clone()).collect::<Vec<Alt>>();
@@ -215,7 +230,8 @@ impl Gene {
                         nucleotide_number: i,
                         nucleotide_index: nucleotide_index[nc_idx],
                         alts: genome_positions[nc_idx].alts.clone(),
-                        is_deleted: genome_positions[nc_idx].is_deleted
+                        is_deleted: genome_positions[nc_idx].is_deleted,
+                        is_deleted_minor: genome_positions[nc_idx].is_deleted_minor
                     }),
                     gene_position: i
                 });
@@ -237,7 +253,8 @@ impl Gene {
                         nucleotide_number: i,
                         nucleotide_index: nucleotide_index[nc_idx],
                         alts: genome_positions[nc_idx].alts.clone(),
-                        is_deleted: genome_positions[nc_idx].is_deleted
+                        is_deleted: genome_positions[nc_idx].is_deleted,
+                        is_deleted_minor: genome_positions[nc_idx].is_deleted_minor
                     }),
                     gene_position: i, 
                 });
@@ -252,7 +269,7 @@ impl Gene {
             let mut codon_idx = 1;
             for i in prom_end..nucleotide_sequence.len(){
                 codon.push(nucleotide_sequence.chars().nth(i).unwrap());
-                genome_idx_map.insert(nucleotide_index[i], (codon_idx, Some((i % 3).try_into().unwrap())));
+                genome_idx_map.insert(nucleotide_index[i], (codon_idx, Some((i % 3) as i64)));
                 if codon.len() == 3{
                     // Codon is complete
                     amino_acid_sequence.push(codon_to_aa(codon.clone()));
@@ -268,21 +285,26 @@ impl Gene {
                                     nucleotide_number: nucleotide_number[i-2],
                                     nucleotide_index: nucleotide_index[i-2],
                                     alts: genome_positions[i-2].alts.clone(),
-                                    is_deleted: genome_positions[i-2].is_deleted
+                                    is_deleted: genome_positions[i-2].is_deleted,
+                                    is_deleted_minor: genome_positions[i-2].is_deleted_minor
                                 },
                                 NucleotideType{
                                     reference: codon.chars().nth(1).unwrap(),
                                     nucleotide_number: nucleotide_number[i-1],
                                     nucleotide_index: nucleotide_index[i-1],
                                     alts: genome_positions[i-1].alts.clone(),
-                                    is_deleted: genome_positions[i-1].is_deleted
+                                    is_deleted: genome_positions[i-1].is_deleted,
+                                    is_deleted_minor: genome_positions[i-1].is_deleted_minor
+
                                 },
                                 NucleotideType{
                                     reference: codon.chars().nth(2).unwrap(),
                                     nucleotide_number: nucleotide_number[i],
                                     nucleotide_index: nucleotide_index[i],
                                     alts: genome_positions[i].alts.clone(),
-                                    is_deleted: genome_positions[i].is_deleted
+                                    is_deleted: genome_positions[i].is_deleted,
+                                    is_deleted_minor: genome_positions[i].is_deleted_minor
+
                                 }
                             ]
                         }),
@@ -314,11 +336,15 @@ impl Gene {
         }
     }
 
-    fn rev_comp_indel_alt(alt: &Alt) -> Alt{
+    fn rev_comp_indel_alt(alt: &Alt, max_del_length: i64) -> Alt{
         if alt.alt_type == AltType::INS || alt.alt_type == AltType::DEL{
             let mut new_base = "".to_string();
+            let mut indel_length = 0;
             for c in alt.base.chars().rev(){
-                new_base.push(complement_base(c));
+                if indel_length < max_del_length{
+                    new_base.push(complement_base(c));
+                }
+                indel_length += 1;
             }
             return Alt{
                 alt_type: alt.alt_type.clone(),

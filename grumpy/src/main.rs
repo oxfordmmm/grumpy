@@ -1,4 +1,5 @@
 use std::time::SystemTime;
+use std::env;
 
 pub mod common;
 pub mod genome;
@@ -15,13 +16,20 @@ use common::MinorType;
 
 
 fn main() {
+    let args: Vec<String> = env::args().collect();
+    if args.len() != 3 {
+        println!("Usage: grumpy <reference_genome> <vcf_file>");
+        return;
+    }
+    let reference_path = &args[1];
+    let vcf_path = &args[2];
+
     let vcf_start = SystemTime::now();
-    let vcf = VCFFile::new("/home/jeremy/Documents/work/gnomonicus/e4b54393-e037-435e-b942-527f0e2b1616.merged.vcf".to_string(), false, 5);
-    // let vcf = VCFFile::new("/home/jeremy/Downloads/e4b54393-e037-435e-b942-527f0e2b1616_final.full.vcf".to_string(), false, 5);
+    let vcf = VCFFile::new(vcf_path.to_string(), false, 5);
     let vcf_end = SystemTime::now();
 
     let reference_start = SystemTime::now();
-    let mut reference = Genome::new("reference/NC_000962.3.gbk");
+    let mut reference = Genome::new(reference_path);
     let reference_end = SystemTime::now();
 
     let sample_start = SystemTime::now();
