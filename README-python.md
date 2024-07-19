@@ -1,4 +1,4 @@
-# `grumpy` - Re-implementation of [gumpy](https://github.com/oxfordmmm/gumpy) in Rust for speed
+# grumpy - Re-implementation of [gumpy](https://github.com/oxfordmmm/gumpy) in Rust for speed
 Does not implement the same interface, but rather the same premise. 
 
 Up to 100x faster than `gumpy`
