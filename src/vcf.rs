@@ -1,3 +1,4 @@
+//! Module for handling VCF files
 use pyo3::prelude::*;
 
 use vcf::VCFReader;
@@ -9,24 +10,34 @@ use std::collections::HashMap;
 use crate::common::{AltType, Evidence, VCFRow};
 #[pyclass]
 #[derive(Clone, Debug)]
+/// Struct to hold the information from a VCF file
 pub struct VCFFile{
     #[pyo3(get, set)]
+    /// Header of the VCF file. TODO: populate
     pub header: Vec<String>,
 
     #[pyo3(get, set)]
+    /// Records of the VCF file
     pub records: Vec<VCFRow>,
 
     #[pyo3(get, set)]
+    /// Calls from the VCF file, indexed by genome index
     pub calls: HashMap<i64, Vec<Evidence>>,
 
     #[pyo3(get, set)]
+    /// Minor calls from the VCF file, indexed by genome index
     pub minor_calls: HashMap<i64, Vec<Evidence>>
 }
 
 #[pymethods]
 impl VCFFile{
-    // Rust doesn't have optional args so sorry
     #[new]
+    /// Create a new VCFFile object
+    /// 
+    /// # Arguments
+    /// - `filename`: String - Path to the VCF file
+    /// - `ignore_filter`: bool - Whether to ignore the filter column
+    /// - `min_dp`: i32 - Minimum depth to consider a call
     pub fn new(filename: String, ignore_filter: bool, min_dp: i32) -> Self{
         let file = File::open(filename).unwrap();
         let buf = BufReader::new(file);
@@ -181,6 +192,16 @@ impl VCFFile{
     }
 
     #[staticmethod]
+    /// Parse a record from a VCF file to get the calls
+    /// 
+    /// # Arguments
+    /// - `record`: VCFRow - Record to parse
+    /// - `min_dp`: i32 - Minimum depth to consider a call
+    /// 
+    /// # Returns
+    /// Tuple of:
+    /// - `calls`: Vec of Evidence - Calls from the record
+    /// - `minor_calls`: Vec of Evidence - Minor calls from the record
     pub fn parse_record_for_calls(record: VCFRow, min_dp: i32) -> (Vec<Evidence>, Vec<Evidence>){
         let mut calls: Vec<Evidence> = Vec::new();
         let mut minor_calls: Vec<Evidence> = Vec::new();
@@ -334,6 +355,19 @@ impl VCFFile{
     }
 
     #[staticmethod]
+    /// Simplify a call into a list of SNPs, INSs and DELs
+    /// 
+    /// Some rows have long ref/alt pairs which need to be decomposed into constituent calls
+    /// 
+    /// # Arguments
+    /// - `reference`: String - Reference sequence
+    /// - `alternate`: String - Alternate sequence
+    /// 
+    /// # Returns
+    /// `Vec of (usize, AltType, String)` - Vec where each element is a 3-tuple of:
+    ///    - `usize`: Offset of the call from row's genome index
+    ///    - `AltType`: Type of call
+    ///    - `String`: Base(s) of the call. If SNP/HET/NULL this will be a single base. If INS/DEL this will be the sequence inserted/deleted
     pub fn simplify_call(reference: String, alternate: String) -> Vec<(usize, AltType, String)>{
         let mut calls: Vec<(usize, AltType, String)> = Vec::new();
         if reference.len() == alternate.len(){
@@ -415,6 +449,14 @@ impl VCFFile{
     }
 }
 
+/// Calculate the distance between two strings ignoring N characters
+/// 
+/// # Arguments
+/// - `reference`: &String - Reference sequence
+/// - `alternate`: &String - Alternate sequence
+/// 
+/// # Returns
+/// SNP distance between the two strings
 fn snp_dist(reference: &String, alternate: &String) -> i64{
     let mut dist = 0;
     for i in 0..reference.len(){

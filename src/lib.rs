@@ -1,3 +1,10 @@
+//! Grumpy, genetic analysis in Rust.
+//! 
+//! This library provides a set of tools for genetic analysis, including:
+//! - Genome representation
+//! - Gene representation
+//! - VCF file parsing
+//! - Finding effects of a given VCF file at both genome and gene levels
 use pyo3::prelude::*;
 
 pub mod common;
@@ -5,13 +12,6 @@ pub mod genome;
 pub mod gene;
 pub mod vcf;
 pub mod difference;
-
-// use difference::GeneDifference;
-// use genome::mutate;
-// use genome::Genome;
-// use vcf::VCFFile;
-// use difference::GenomeDifference;
-// use common::MinorType;
 
 /// A Python module implemented in Rust.
 #[pymodule]

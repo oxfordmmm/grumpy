@@ -1,3 +1,4 @@
+//! Module for handling genome data
 use pyo3::prelude::*;
 
 use std::fs::File;
@@ -16,61 +17,79 @@ use crate::vcf::VCFFile;
 
 #[pyclass]
 #[derive(Clone, Debug)] 
+/// Struct to hold the information of a genome position
 pub struct GenomePosition{
     // Updated during mutation
     #[pyo3(get, set)]
+    /// Nucleotide at this position
     pub reference: char,
 
     #[pyo3(get, set)]
+    /// Whether this position has been deleted
     pub is_deleted: bool,
 
     #[pyo3(get, set)]
+    /// Whether this position has been deleted in a minor allele
     pub is_deleted_minor: bool,
-    // Added for evidence of a deletion which didn't start at this position but affects it
-    // Includes evidence of minor deletions for simplicity
+
     #[pyo3(get, set)]
+    /// Added for evidence of a deletion which didn't start at this position but affects it
+    /// Includes evidence of minor deletions for simplicity
     pub deleted_evidence: Vec<Evidence>,
 
-    // Used to store calls from VCF
-    // If populated, alts[0] is the actual call, others are minor calls
     #[pyo3(get, set)]
+    /// Used to store calls from VCF
     pub alts: Vec<Alt>,
 
     #[pyo3(get, set)]
-    pub genome_idx: i64, // 1-indexed genome index
+    /// 1-indexed genome index
+    pub genome_idx: i64,
 
     #[pyo3(get, set)]
+    /// Names of genes present at this position
     pub genes: Vec<String>,
 }
 
 #[pyclass]
 #[derive(Clone)]
+/// Struct to hold the information about a genome
 pub struct Genome{
     #[pyo3(get, set)]
+    /// Name of the genome
     pub name: String,
 
     #[pyo3(get, set)]
+    /// Nucleotide sequence which comprises this genome
     pub nucleotide_sequence: String,
 
     #[pyo3(get, set)]
+    /// Definitions for each gene in the genome
     pub gene_definitions: Vec<GeneDef>,
 
     #[pyo3(get, set)]
+    /// Positions in the genome
     pub genome_positions: Vec<GenomePosition>,
 
     #[pyo3(get, set)]
+    /// Names of all of the genes with definitions
     pub gene_names: Vec<String>,
 
     #[pyo3(get, set)]
+    /// HashMap of genes which have been built
     pub genes: HashMap<String, Gene>,
 
     #[pyo3(get, set)]
+    /// Set of genes with mutations
     pub genes_with_mutations: HashSet<String>
 }
 
 #[pymethods]
 impl Genome{
     #[new]
+    /// Create a new genome from a GenBank file
+    /// 
+    /// # Arguments
+    /// - `filename` - A string reference to the GenBank file
     pub fn new(filename: &str) -> Self {
         let file = File::open(filename).unwrap();
         let mut _gene_definitions = Vec::new();
@@ -199,7 +218,8 @@ impl Genome{
         return genome;
     }
 
-    pub fn assign_promoters(&mut self) -> (){
+    /// Assign promoters to genes
+    fn assign_promoters(&mut self) -> (){
         /* 
         Assigns promoters to genes iteratively. 
         Expand out to a given distance from the start of each gene without overlapping with other genes.
@@ -263,6 +283,13 @@ impl Genome{
         }
     }
 
+    /// Build a gene from the genome
+    /// 
+    /// # Arguments
+    /// - `gene_name` - Name of the gene to build
+    /// 
+    /// # Returns
+    /// Corresponding Gene object
     pub fn build_gene(&self, gene_name: String) -> Gene{
         let mut valid = false;
         let mut maybe_gene_def: Option<GeneDef> = None;
@@ -314,6 +341,7 @@ impl Genome{
 
     }
 
+    /// Build all genes in the genome, storing them in the genes hashmap
     pub fn build_all_genes(&mut self) -> (){
         for gene_name in self.gene_names.iter(){
             let gene = self.build_gene(gene_name.clone());
@@ -321,6 +349,7 @@ impl Genome{
         }
     }
 
+    /// Get a gene from the genome, building as required
     pub fn get_gene(&mut self, gene_name: String) -> Gene{
         // Return a gene from the hashmap if it exists, else build and cache it
         if !self.genes.contains_key(&gene_name){
@@ -330,6 +359,13 @@ impl Genome{
         return self.genes.get(&gene_name).unwrap().clone();
     }
 
+    /// Get the data at a given genome index
+    /// 
+    /// # Arguments
+    /// - `index` - 1-indexed genome index
+    /// 
+    /// # Returns
+    /// GenomePosition at the given index
     pub fn at_genome_index(&self, index: i64) -> GenomePosition{
         // 1-indexed genome index
         return self.genome_positions[(index + 1) as usize].clone();
@@ -337,6 +373,14 @@ impl Genome{
 }
 
 #[pyfunction]
+/// Mutate a genome using a VCF file
+/// 
+/// # Arguments
+/// - `reference` - Reference genome to mutate
+/// - `vcf` - VCF file to use for mutation
+/// 
+/// # Returns
+/// Mutated genome
 pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome{
     let mut new_genome = reference.clone();
     let mut deleted_positions = HashSet::new();

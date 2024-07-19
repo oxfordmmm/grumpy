@@ -1,3 +1,4 @@
+//! Module for handling gene data
 use pyo3::prelude::*;
 use std::string::String;
 use std::vec::Vec;
@@ -8,99 +9,137 @@ use crate::genome::GenomePosition;
 
 #[pyclass(eq)]
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Each position of a gene can either be a nucleotde or a codon
 pub enum GenePos{
+    /// Nucelotide
     Nucleotide(NucleotideType),
+
+    /// Codon
     Codon(CodonType)
 }
 
 #[pyclass(eq)]
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Tracks each constituent nucleotide in the codon, along with the amino acid it codes for
 pub struct CodonType{
     #[pyo3(get, set)]
+    /// Amino acid the codon codes for
     pub amino_acid: char,
 
-    // 3-tuple for each nucleotide in the codon
     #[pyo3(get, set)]
+    /// 3-tuple for each nucleotide in the codon
     pub codon: Vec<NucleotideType>,
 }
 
 #[pyclass(eq)]
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Stores information about a single nucleotide in a gene
 pub struct NucleotideType{
     #[pyo3(get, set)]
+    /// Nucleotide at this position
     pub reference: char,
 
     #[pyo3(get, set)]
+    /// Gene position of this nucleotide. 1-indexed from gene start
     pub nucleotide_number: i64,
 
     #[pyo3(get, set)]
+    /// Genome position of this nucleotide. 1-indexed from genome start
     pub nucleotide_index: i64,
 
     #[pyo3(get, set)]
+    /// Alts at this position
     pub alts: Vec<Alt>,
 
     #[pyo3(get, set)]
+    /// Whether this position is deleted
     pub is_deleted: bool,
 
     #[pyo3(get, set)]
+    /// Whether this position is deleted in a minor allele
     pub is_deleted_minor: bool
 }
 
 #[pyclass(eq)]
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// A position of a gene is some position in the gene, along with the data at that position
 pub struct GenePosition{
-    // Indexed by gene position
     #[pyo3(get, set)]
-    pub gene_position: i64, // 1-indexed gene position
+    /// 1-indexed gene position
+    pub gene_position: i64,
 
     #[pyo3(get, set)]
+    /// Data at this position
     pub gene_position_data: GenePos,
 }
 
 #[pyclass]
 #[derive(Clone, Debug)]
+/// A gene is a collection of gene positions, along with some metadata
 pub struct Gene{
     #[pyo3(get, set)]
+    /// Name of the gene
     pub name: String,
 
     #[pyo3(get, set)]
+    /// Whether the gene codes protein
     pub coding: bool,
 
     #[pyo3(get, set)]
+    /// Whether this gene is reverse complement
     pub reverse_complement: bool,
 
     #[pyo3(get, set)]
+    /// Nucleotide sequence of the gene
     pub nucleotide_sequence: String,
 
     #[pyo3(get, set)]
+    /// Genome index of each nucleotide of the gene. 1-indexed from genome start
     pub nucleotide_index: Vec<i64>,
 
     #[pyo3(get, set)]
+    /// Gene positions of the nucleotides of the gene. 1-indexed from gene start
     pub nucleotide_number: Vec<i64>,
 
     #[pyo3(get, set)]
+    /// Gene positions of the gene, using amino acid numbers where appropriate. 1-indexed from gene start
     pub gene_number: Vec<i64>,
 
     #[pyo3(get, set)]
+    /// Vec of gene positions. Stores data about each gene position.
     pub gene_positions: Vec<GenePosition>,
 
     #[pyo3(get, set)]
+    /// Sequence of amino acid residues coded for by the gene. Empty if gene is non-coding
     pub amino_acid_sequence: String,
 
     #[pyo3(get, set)]
+    /// Sequence of amino acid numbers coded for by the gene. Empty if gene is non-coding
     pub amino_acid_number: Vec<i64>,
 
     #[pyo3(get, set)]
+    /// Positions of genome indicies duplicated by ribosomal shifts
     pub ribosomal_shifts: Vec<i64>,
 
     #[pyo3(get, set)]
+    /// Codons of the gene. Empty if gene is non-coding
     pub codons: Vec<String>,
 
     #[pyo3(get, set)]
+    /// Map of genome index -> (gene number, optional codon position>)
     pub genome_idx_map: HashMap<i64, (i64, Option<i64>)>,
 }
 
 impl Gene {
+    /// Instantiates a new gene.
+    /// 
+    /// Recommended to call Genome.build_gene() instead of this directly as arguments are auto-populated
+    /// 
+    /// # Arguments
+    /// - `gene_def`: GeneDef struct containing gene metadata
+    /// - `nc_sequence`: Nucleotide sequence of the gene
+    /// - `nc_index`: Genome index of each nucleotide of the gene. 1-indexed from genome start
+    /// - `_genome_positions`: Genome positions of the gene
     pub fn new(gene_def: GeneDef, nc_sequence: String, nc_index: Vec<i64>, _genome_positions: Vec<GenomePosition>) -> Self {
         let mut nucleotide_sequence = nc_sequence.clone();
         let mut nucleotide_index = nc_index.clone();
@@ -336,6 +375,14 @@ impl Gene {
         }
     }
 
+    /// Perform alterations required to an indel when reverse complementing
+    /// 
+    /// # Arguments
+    /// - `alt`: Alt to reverse complement
+    /// - `max_del_length`: Maximum length of a deletion
+    /// 
+    /// # Returns
+    /// - Reverse complemented Alt
     fn rev_comp_indel_alt(alt: &Alt, max_del_length: i64) -> Alt{
         if alt.alt_type == AltType::INS || alt.alt_type == AltType::DEL{
             let mut new_base = "".to_string();
@@ -355,6 +402,13 @@ impl Gene {
         return alt.clone();
     }
 
+    /// Perform alterations required to a SNP when reverse complementing
+    /// 
+    /// # Arguments
+    /// - `alt`: Alt to reverse complement
+    /// 
+    /// # Returns
+    /// - Reverse complemented Alt
     fn rev_comp_other_alt(alt: &Alt) -> Alt{
         if alt.alt_type != AltType::INS && alt.alt_type != AltType::DEL{
             let mut new_base = "".to_string();
@@ -370,6 +424,14 @@ impl Gene {
         return alt.clone();
     }
 
+    /// Adjust deletions to ensure they don't cross gene boundaries
+    /// 
+    /// If a deletion starts upstream of the gene, 
+    /// this will truncate it to the part in the gene, ensuring a valid Alt at the gene position
+    /// 
+    /// # Arguments
+    /// - `genome_positions`: Vec of genome positions for the gene
+    /// - `gene_name`: Name of the gene
     fn adjust_dels(genome_positions: &mut Vec<GenomePosition>, gene_name: String){
         // Adjust any deletions which may cross gene boundaries as required
         let mut first_pos = genome_positions[0].clone();
@@ -442,6 +504,13 @@ impl Gene {
 
 }
 
+/// Converts a codon to an amino acid
+/// 
+/// # Arguments
+/// - `codon`: Codon to convert
+/// 
+/// # Returns
+/// - Amino acid the codon codes for
 pub fn codon_to_aa(codon: String) -> char{
     if codon.contains("x"){
         return 'X';
@@ -475,6 +544,7 @@ pub fn codon_to_aa(codon: String) -> char{
     }
 }
 
+/// Complements a base
 fn complement_base(base: char) -> char{
     match base {
         'a' => 't',

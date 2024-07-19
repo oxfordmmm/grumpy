@@ -1,3 +1,4 @@
+//! Module for handling differences between genomes and genes
 use pyo3::prelude::*;
 
 use ordered_float::{Float, OrderedFloat};
@@ -8,99 +9,135 @@ use crate::genome::Genome;
 
 #[pyclass]
 #[derive(Clone, Debug)]
+/// Genome level variant
 pub struct Variant{
     #[pyo3(get, set)]
+    /// GARC for genome level variant
     pub variant: String,
 
     #[pyo3(get, set)]
+    /// Nucleotide index of this variant
     pub nucleotide_index: i64,
 
     #[pyo3(get, set)]
+    /// Evidence for this variant
     pub evidence: VCFRow,
 
     #[pyo3(get, set)]
+    /// Index of the VCF row. i.e COV at vcf_idx == coverage for this variant
     pub vcf_idx: i64,
 
     #[pyo3(get, set)]
+    /// Length of the indel
     pub indel_length: i64,
 
     #[pyo3(get, set)]
+    /// Bases for the indel (if this is an indel)
     pub indel_nucleotides: Option<String>,
 
     #[pyo3(get, set)]
+    /// Gene name this variant lies in. None if not in a gene or in multiple genes
     pub gene_name: Option<String>,
 
     #[pyo3(get, set)]
+    /// Gene position of this variant. None if not in a gene or in multiple genes
     pub gene_position: Option<i64>,
 
     #[pyo3(get, set)]
+    /// Codon index of this variant. None if not in exactly 1 gene and not within a codon
     pub codon_idx: Option<i64>
 }
 
 #[pyclass]
 #[derive(Clone, Debug)]
+/// Gene level mutation
 pub struct Mutation{
     #[pyo3(get, set)]
+    /// GARC for gene level mutation
     pub mutation: String,
 
     #[pyo3(get, set)]
+    /// Gene name
     pub gene: String,
 
     #[pyo3(get, set)]
+    /// Evidence to support this mutation
     pub evidence: Vec<Evidence>,
 
     #[pyo3(get, set)]
+    /// Gene position of this mutation. None if large deletion
     pub gene_position: Option<i64>,
 
     #[pyo3(get, set)]
+    /// Whether this mutation lies within a region which codes protein. None if large deletion
     pub codes_protein: Option<bool>,
 
     #[pyo3(get, set)]
+    /// Reference nucleotides for this mutation. None if not a SNP
     pub ref_nucleotides: Option<String>,
 
     #[pyo3(get, set)]
+    /// Alternate nucleotides for this mutation. None if not a SNP
     pub alt_nucleotides: Option<String>,
 
     #[pyo3(get, set)]
+    /// Nucleotide number for this mutation. None if not referring to a single nucleotide
     pub nucleotide_number: Option<i64>,
 
     #[pyo3(get, set)]
+    /// Nucleotide index for this mutation. None if not referring to a single nucleotide
     pub nucleotide_index: Option<i64>,
 
     #[pyo3(get, set)]
+    /// Length of the indel. None if not an indel
     pub indel_length: Option<i64>,
 
     #[pyo3(get, set)]
+    /// Bases for the indel (if this is an indel). None if not an indel
     pub indel_nucleotides: Option<String>,
 
     #[pyo3(get, set)]
+    /// Amino acid number this mutation refers to. None if not an amino acid SNP
     pub amino_acid_number: Option<i64>,
 
     #[pyo3(get, set)]
+    /// Amino acid alt. None if not an amino acid SNP
     pub amino_acid_sequence: Option<char>,
 }
 
 #[pyclass]
+/// Struct to hold the difference between two genomes
 pub struct GenomeDifference{
     #[pyo3(get, set)]
+    /// Variants in the genome
     pub variants: Vec<Variant>,
 
     #[pyo3(get, set)]
+    /// Minor variants in the genome
     pub minor_variants: Vec<Variant>
 }
 
 #[pyclass]
+/// Struct to hold the difference between two genes
 pub struct GeneDifference{
     #[pyo3(get, set)]
+    /// Mutations in the gene
     pub mutations: Vec<Mutation>,
 
     #[pyo3(get, set)]
+    /// Minor mutations in the gene
     pub minor_mutations: Vec<Mutation>
 }
 
 #[pymethods]
 impl GenomeDifference{
     #[new]
+    /// Create a new GenomeDifference object
+    /// 
+    /// # Arguments
+    /// - `ref_genome` - Reference genome
+    /// - `alt_genome` - Alternate genome
+    /// - `minor_type` - Type of minor allele evidence to use in minor variants
     pub fn new(ref_genome: Genome, mut alt_genome: Genome, minor_type: MinorType) -> Self{
         let mut variants: Vec<Variant> = Vec::new();
         let mut minor_variants: Vec<Variant> = Vec::new();
@@ -210,6 +247,12 @@ impl GenomeDifference{
 #[pymethods]
 impl GeneDifference{
     #[new]
+    /// Create a new GeneDifference object
+    /// 
+    /// # Arguments
+    /// - `ref_gene` - Reference gene
+    /// - `alt_gene` - Alternate gene
+    /// - `minor_type` - Type of minor allele evidence to use in minor variants
     pub fn new(ref_gene: Gene, alt_gene: Gene, minor_type: MinorType) -> Self{
         if ref_gene.name != alt_gene.name{
             panic!("Gene names do not match!");
@@ -693,6 +736,20 @@ impl GeneDifference{
     }
 
     #[staticmethod]
+    /// Create a new Mutation object for a nucleotide SNP
+    /// 
+    /// # Arguments
+    /// - `gene_name` - Name of the gene
+    /// - `gene_position` - Position of the SNP in the gene
+    /// - `codes_protein` - Whether this SNP codes protein
+    /// - `ref_nc` - Reference nucleotide
+    /// - `alt_nc` - Alternate nucleotide
+    /// - `nc_num` - Nucleotide number
+    /// - `nc_idx` - Nucleotide index
+    /// - `evidence` - Evidence for this SNP
+    /// 
+    /// # Returns
+    /// - Mutation of the SNP
     fn nc_snp(gene_name: String, gene_position: i64, codes_protein: bool, ref_nc: char, alt_nc: char, nc_num: i64, nc_idx: i64, evidence: Vec<Alt>) -> Mutation{
         let mutation = ref_nc.to_string() + &nc_num.to_string() + &alt_nc.to_string();
         let ref_nucleotides = Some(ref_nc.to_string());
@@ -718,6 +775,20 @@ impl GeneDifference{
     }
 
     #[staticmethod]
+    /// Create a new Mutation object for a mixed indel. This could either be >1 indel at this position, or >=1 indel and >=1 SNP
+    /// 
+    /// # Arguments
+    /// - `gene_name` - Name of the gene
+    /// - `gene_position` - Position of the indel in the gene
+    /// - `codes_protein` - Whether this indel codes protein
+    /// - `nc_num` - Nucleotide number
+    /// - `nc_idx` - Nucleotide index
+    /// - `these_minors` - Minor alleles at this position
+    /// - `minor_type` - Type of minor allele evidence to use
+    /// - `mutation_name` - 'indel' or 'mixed' depending on the type of mixed indel
+    /// 
+    /// # Returns
+    /// - Mutation object for the mixed indel
     fn mixed_indel(gene_name: String, gene_position: i64, codes_protein: bool, nc_num: i64, nc_idx: i64, these_minors: Vec<Alt>, minor_type: MinorType, mutation_name: String) -> Mutation{
         let mut min_coverage = "".to_string();
         if minor_type == MinorType::COV{
