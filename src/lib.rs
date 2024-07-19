@@ -13,7 +13,7 @@
 //! use grumpy::difference::{GenomeDifference, GeneDifference};
 //! 
 //! let reference = Genome::new("some/path/to/a/genbank/file.gb");
-//! let vcf = VCFFile::new("some/path/to/a/vcf/file.vcf");
+//! let vcf = VCFFile::new("some/path/to/a/vcf/file.vcf", false, 3);
 //! let sample = mutate(&reference, vcf);
 //! 
 //! let genome_diff = GenomeDifference::new(reference, sample);

@@ -11,6 +11,15 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
+readme = "README-python.md"
+license = "LICENSE"
 dynamic = ["version"]
+authors = [
+    { name = "Jeremy Westhead", email = "jeremy.westhead@ndm.ox.ac.uk" }
+]
+
+[project.urls]
+Source = "https://github.com/oxfordmmm/grumpy"
+
 [tool.maturin]
 features = ["pyo3/extension-module"]
