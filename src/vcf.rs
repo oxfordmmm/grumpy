@@ -152,17 +152,18 @@ impl VCFFile{
                     // println!("Calls {:?}", record_calls);
                     // println!("Minor calls {:?}\n", record_minor_calls);
 
-                    if ignore_filter || passed {
-                        for call in record_calls{
-                            if calls_map.contains_key(&call.genome_index){
+                    for call in record_calls{
+                        if calls_map.contains_key(&call.genome_index){
+                            println!("Multiple calls at genome position {}! {:?}\n", call.genome_index, calls_map.get(&call.genome_index).unwrap());
+                            if ignore_filter || passed || call.call_type == AltType::NULL{
                                 calls_map.get_mut(&call.genome_index).unwrap().push(call.clone());
-                                println!("Multiple calls at genome position {}! {:?}\n", call.genome_index, calls_map.get(&call.genome_index).unwrap());
                             }
-                            else{
+                        }
+                        else{
+                            if ignore_filter || passed || call.call_type == AltType::NULL{
                                 calls_map.insert(call.genome_index, vec![call.clone()]);
                             }
                         }
-                        // calls.extend(record_calls);
                     }
                     // Add minor calls if the filter is passed or ignored, or specifcally just the MIN_FRS has failed
                     if (ignore_filter || passed) || (!passed && filters.len() == 1 && filters.contains(&"MIN_FRS".to_string())){
@@ -210,11 +211,18 @@ impl VCFFile{
 
         // Convert ugly genotype into a list of strings for each allele
         let genotype = &(record.fields.get("GT").unwrap())[0].split("/").collect::<Vec<&str>>();
-        let dp = record.fields.get("DP").unwrap()[0].parse::<i32>().unwrap();
-
         let mut cov = Vec::new();
         for c in record.fields.get("COV").unwrap(){
             cov.push(c.parse::<i32>().unwrap());
+        }
+
+        let mut dp = 0;
+        if record.fields.contains_key("DP") && record.fields.get("DP").unwrap()[0].parse::<i32>().is_ok(){
+            dp = record.fields.get("DP").unwrap()[0].parse::<i32>().unwrap();
+        }
+        else{
+            // If there isn't a valid DP field defined then default to the sum of the COV field
+            cov.iter().for_each(|x| dp += x);
         }
 
         let ref_allele = record.reference.clone().to_lowercase();
@@ -321,7 +329,6 @@ impl VCFFile{
 
         // Now we've got the main call, we need to figure out the minor calls
         // So check all possible values of COV for threshold to be considered a minor call
-        let minor_threshold = 2;
         let mut idx = 0;
         for coverage in cov.iter(){
             if idx == (alt_idx + 1) as usize || idx == 0{
@@ -329,7 +336,7 @@ impl VCFFile{
                 idx += 1;
                 continue;
             }
-            if *coverage >= minor_threshold{
+            if *coverage >= min_dp{
                 alt_allele = record.alternative[(idx - 1) as usize].clone().to_lowercase();
                 let call = VCFFile::simplify_call(ref_allele.clone(), alt_allele.clone());
                 let call_cov = *coverage;

@@ -33,9 +33,9 @@ for variant in genome_diff.minor_variants:
 for gene_name in sample.genes_with_mutations:
     print(gene_name)
     gene_diff = grumpy.GeneDifference(
-            reference.get_gene(gene_name),
+            ref.get_gene(gene_name),
             sample.get_gene(gene_name),
-            get_minority_population_type(resistanceCatalogue),
+            grumpy.MinorType.COV,
         )
     for mutation in gene_diff.mutations:
         print(mutation.mutation)
