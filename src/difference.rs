@@ -508,7 +508,7 @@ impl GeneDifference{
                                         let e = these_minor_indels[0];
                                         // We have a single minor indel which is much easier
                                         if e.alt_type == AltType::INS{
-                                            _mutation = alt_cd.reference.to_string() + "_" + &alt_cd.nucleotide_number.to_string() + "_ins_" + &e.base;
+                                            _mutation = alt_cd.nucleotide_number.to_string() + "_ins_" + &e.base;
                                             indel_length = Some(e.base.len() as i64);
                                             indel_nucleotides = Some(e.base.clone());
                                             evidence = vec![e.evidence.clone()];
