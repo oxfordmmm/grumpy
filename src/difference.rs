@@ -156,6 +156,11 @@ impl GenomeDifference{
                     let mut gene_position = None;
                     let mut codon_idx = None;
 
+                    if alt.alt_type == AltType::REF{
+                        // Skip ref calls
+                        continue;
+                    }
+
                     // Only annotate with gene information if there is a single gene at this position
                     if alt_pos.genes.len() == 1{
                         gene_name = Some(alt_pos.genes[0].clone());
@@ -637,6 +642,11 @@ impl GeneDifference{
                             let mut indel_nucleotides = None;
                             let amino_acid_number = None;
                             let amino_acid_sequence = None;
+
+                            if alt.alt_type == AltType::REF{
+                                // Skip ref calls
+                                continue;
+                            }
 
                             if alt.alt_type == AltType::SNP || alt.alt_type == AltType::HET || alt.alt_type == AltType::NULL{
                                 mutation = ref_nc.reference.to_string() + &ref_nc.nucleotide_number.to_string() + &alt.base;
