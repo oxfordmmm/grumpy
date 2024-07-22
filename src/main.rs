@@ -35,13 +35,7 @@ fn main() {
     let sample_start = SystemTime::now();
     let mut sample = mutate(&reference, vcf);
     let sample_end = SystemTime::now();
-    // sample.build_all_genes();
 
-    // let gene_name = "ponA1".to_string();
-
-    // let gene_diff = GeneDifference::new(reference.get_gene(gene_name.clone()), sample.get_gene(gene_name.clone()), MinorType::COV);
-    // println!("{:?}", gene_diff.mutations.iter().map(|mutation| mutation.mutation.clone()).collect::<Vec<String>>());
-    // println!("{:?}\n", gene_diff.minor_mutations.iter().map(|mutation| mutation.mutation.clone()).collect::<Vec<String>>());
     let genome_start = SystemTime::now();
     let difference = GenomeDifference::new(reference.clone(), sample.clone(), MinorType::COV);
     println!("{:?}", difference.variants.iter().map(|variant| variant.variant.clone()).collect::<Vec<String>>());
@@ -61,13 +55,5 @@ fn main() {
     println!("Sample took {:?}", sample_end.duration_since(sample_start).unwrap());
     println!("Genome diff took {:?}", genome_end.duration_since(genome_start).unwrap());
     println!("Gene diff took {:?}", gene_end.duration_since(gene_start).unwrap());
-
-
-    // let gene_name = "fabG1".to_string();
-    // let rrs_diff = GeneDifference::new(reference.get_gene(gene_name.clone()), sample.get_gene(gene_name.clone()), MinorType::COV);
-    // println!("{:?}", rrs_diff.mutations.iter().map(|mutation| mutation.mutation.clone()).collect::<Vec<String>>());
-    // println!("{:?}", rrs_diff.minor_mutations.iter().map(|mutation| mutation.mutation.clone()).collect::<Vec<String>>());
-
-
 
 }

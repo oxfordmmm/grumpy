@@ -237,15 +237,25 @@ impl VCFFile{
             alt_idx = first.parse::<i32>().unwrap() - 1;
         }
         if cov.len() == 1{
-            // Just 1 item in the call so it's a null call
+            // Just 1 item in the call so santiy check if it's a null call
+            if genotype == &vec!["0", "0"]{
+                // Ref call
+                call_type = AltType::REF;
+                alt_allele = ref_allele.clone();
+            }
+            else{
+                // Null call
+                call_type = AltType::NULL;
+                alt_allele = "x".to_string();
+            }
             calls.push(Evidence{
                 cov: Some(cov[0 as usize]),
                 frs: Some(ordered_float::OrderedFloat(1.0)),
                 genotype: genotype.join("/"),
-                call_type: AltType::NULL,
+                call_type,
                 vcf_row: record.clone(),
                 reference: ref_allele.chars().nth(0).unwrap().to_string(),
-                alt: "x".to_string(),
+                alt: alt_allele.clone(),
                 genome_index: record.position,
                 is_minor: false,
                 vcf_idx: 0 as i64
