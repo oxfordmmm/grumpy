@@ -153,17 +153,32 @@ impl VCFFile{
                     // println!("Minor calls {:?}\n", record_minor_calls);
 
                     for call in record_calls{
+                        let mut added = false;
                         if calls_map.contains_key(&call.genome_index){
                             println!("Multiple calls at genome position {}! {:?}\n", call.genome_index, calls_map.get(&call.genome_index).unwrap());
                             if ignore_filter || passed || call.call_type == AltType::NULL{
                                 calls_map.get_mut(&call.genome_index).unwrap().push(call.clone());
+                                added = true;
                             }
                         }
                         else{
                             if ignore_filter || passed || call.call_type == AltType::NULL{
                                 calls_map.insert(call.genome_index, vec![call.clone()]);
+                                added = true;
                             }
                         }
+                        if !added{
+                            // Call skipped due to filter fail, so add as a minor call
+                            let mut c = call.clone();
+                            c.is_minor = true;
+                            if minor_calls_map.contains_key(&c.genome_index){
+                                minor_calls_map.get_mut(&c.genome_index).unwrap().push(c.clone());
+                            }
+                            else{
+                                minor_calls_map.insert(c.genome_index, vec![c.clone()]);
+                            }
+                        }
+
                     }
                     // Add minor calls if the filter is passed or ignored, or specifcally just the MIN_FRS has failed
                     if (ignore_filter || passed) || (!passed && filters.len() == 1 && filters.contains(&"MIN_FRS".to_string())){
