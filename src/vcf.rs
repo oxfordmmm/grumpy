@@ -136,7 +136,6 @@ impl VCFFile{
                     }
                     
 
-
                     // println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
 
                     records.push(VCFRow{
@@ -151,6 +150,17 @@ impl VCFFile{
                     let (record_calls, record_minor_calls) = VCFFile::parse_record_for_calls(records[records.len()-1].clone(), min_dp);
                     // println!("Calls {:?}", record_calls);
                     // println!("Minor calls {:?}\n", record_minor_calls);
+
+                    // if record.position == 3339734{
+                    //     println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
+                    //     for call in record_calls.iter(){
+                    //         println!("{:?}\n", call);
+                    //     }
+                    //     println!("--");
+                    //     for call in record_minor_calls.iter(){
+                    //         println!("{:?}\n", call);
+                    //     }
+                    // }
 
                     for call in record_calls{
                         let mut added = false;

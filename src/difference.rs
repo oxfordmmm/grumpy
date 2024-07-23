@@ -183,13 +183,13 @@ impl GenomeDifference{
                             if gene_pos == -1{
                                 panic!("Failed to find gene position for indel at genome index {} in gene {}", alt_pos.genome_idx, gene.name);
                             }
-                            if alt.alt_type == AltType::INS{
-                                gene_pos -= 1;
-                                if gene_pos == 0{
-                                    // Can't have 0 as a gene position so nudge to promoter start
-                                    gene_pos = -1;
-                                }
-                            }
+                            // if alt.alt_type == AltType::INS{
+                            //     gene_pos -= 1;
+                            //     if gene_pos == 0{
+                            //         // Can't have 0 as a gene position so nudge to promoter start
+                            //         gene_pos = -1;
+                            //     }
+                            // }
                             gene_position = Some(gene_pos);
                         }
 
@@ -425,6 +425,10 @@ impl GeneDifference{
                             evidence = Vec::new();
                             for e in alt_cd.alts.iter(){
                                 if e.evidence.is_minor{
+                                    if e.alt_type == AltType::REF{
+                                        //Not sure why we get minor ref calls but skip
+                                        continue;
+                                    }
                                     if e.alt_type == AltType::SNP || e.alt_type == AltType::HET || e.alt_type == AltType::NULL{
                                         these_minor_snps.push(e);
                                         minor_snp_exists = true;
@@ -476,7 +480,7 @@ impl GeneDifference{
                                 minor_mutations.push(
                                     GeneDifference::mixed_indel(
                                         gene_name.clone(),
-                                        gene_position,
+                                        alt_cd.nucleotide_number,
                                         codes_protein,
                                         alt_cd.nucleotide_number,
                                         alt_cd.nucleotide_index,
@@ -494,7 +498,7 @@ impl GeneDifference{
                                         minor_mutations.push(
                                             GeneDifference::mixed_indel(
                                                 gene_name.clone(),
-                                                gene_position,
+                                                alt_cd.nucleotide_number,
                                                 codes_protein,
                                                 alt_cd.nucleotide_number,
                                                 alt_cd.nucleotide_index,
@@ -529,7 +533,7 @@ impl GeneDifference{
                                             mutation: _mutation.clone(),
                                             gene: gene_name.clone(),
                                             evidence: evidence.clone(),
-                                            gene_position: Some(gene_position),
+                                            gene_position: Some(alt_pos.gene_position),
                                             codes_protein: Some(codes_protein),
                                             ref_nucleotides: None,
                                             alt_nucleotides: None,
@@ -800,6 +804,11 @@ impl GeneDifference{
     /// # Returns
     /// - Mutation object for the mixed indel
     fn mixed_indel(gene_name: String, gene_position: i64, codes_protein: bool, nc_num: i64, nc_idx: i64, these_minors: Vec<Alt>, minor_type: MinorType, mutation_name: String) -> Mutation{
+        // println!("{} {} -> ", gene_name, mutation_name);
+        // for m in these_minors.clone().iter(){
+        //     println!("{:?}", m);
+        // }
+        // println!("");
         let mut min_coverage = "".to_string();
         if minor_type == MinorType::COV{
             min_coverage = these_minors.iter().filter(

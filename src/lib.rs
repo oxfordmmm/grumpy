@@ -40,8 +40,15 @@ pub mod gene;
 pub mod vcf;
 pub mod difference;
 
-/// A Python module implemented in Rust.
+
 #[pymodule]
+/// Grumpy, genetic analysis in Rust.
+/// 
+/// This library provides a set of tools for genetic analysis, including:
+/// - Genome representation
+/// - Gene representation
+/// - VCF file parsing
+/// - Finding effects of a given VCF file at both genome and gene levels
 fn grumpy(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<common::AltType>()?;
     m.add_class::<common::MinorType>()?;

@@ -25,7 +25,7 @@ fn main() {
     let vcf_path = &args[2];
 
     let vcf_start = SystemTime::now();
-    let vcf = VCFFile::new(vcf_path.to_string(), false, 5);
+    let vcf = VCFFile::new(vcf_path.to_string(), false, 3);
     let vcf_end = SystemTime::now();
 
     let reference_start = SystemTime::now();
@@ -50,6 +50,7 @@ fn main() {
     }
     let gene_end = SystemTime::now();
 
+    println!("\n-----------------------------------\n");
     println!("VCF took {:?}", vcf_end.duration_since(vcf_start).unwrap());
     println!("Reference took {:?}", reference_end.duration_since(reference_start).unwrap());
     println!("Sample took {:?}", sample_end.duration_since(sample_start).unwrap());

@@ -429,6 +429,12 @@ pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome{
                     evidence: call.clone()
                 });
 
+                // Mark containing gene as containing a mutation
+                // Should make finding genes level mutations easier
+                for gene_name in position.genes.iter(){
+                    new_genome.genes_with_mutations.insert(gene_name.clone());
+                }
+
                 if call.call_type == AltType::DEL{
                     position.is_deleted_minor = true;
                     for del_idx in 0..call.alt.len(){
