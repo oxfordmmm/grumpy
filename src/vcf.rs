@@ -147,22 +147,11 @@ impl VCFFile{
                         is_filter_pass: passed
                     });
 
-                    let (record_calls, record_minor_calls) = VCFFile::parse_record_for_calls(records[records.len()-1].clone(), min_dp);
+                    let (record_calls, mut record_minor_calls) = VCFFile::parse_record_for_calls(records[records.len()-1].clone(), min_dp);
                     // println!("Calls {:?}", record_calls);
                     // println!("Minor calls {:?}\n", record_minor_calls);
 
-                    // if record.position == 3339734{
-                    //     println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
-                    //     for call in record_calls.iter(){
-                    //         println!("{:?}\n", call);
-                    //     }
-                    //     println!("--");
-                    //     for call in record_minor_calls.iter(){
-                    //         println!("{:?}\n", call);
-                    //     }
-                    // }
-
-                    for call in record_calls{
+                    for call in record_calls.iter(){
                         let mut added = false;
                         if calls_map.contains_key(&call.genome_index){
                             println!("Multiple calls at genome position {}! {:?}\n", call.genome_index, calls_map.get(&call.genome_index).unwrap());
@@ -181,18 +170,13 @@ impl VCFFile{
                             // Call skipped due to filter fail, so add as a minor call
                             let mut c = call.clone();
                             c.is_minor = true;
-                            if minor_calls_map.contains_key(&c.genome_index){
-                                minor_calls_map.get_mut(&c.genome_index).unwrap().push(c.clone());
-                            }
-                            else{
-                                minor_calls_map.insert(c.genome_index, vec![c.clone()]);
-                            }
+                            record_minor_calls.push(c);
                         }
 
                     }
                     // Add minor calls if the filter is passed or ignored, or specifcally just the MIN_FRS has failed
                     if (ignore_filter || passed) || (!passed && filters.len() == 1 && filters.contains(&"MIN_FRS".to_string())){
-                        for call in record_minor_calls{
+                        for call in record_minor_calls.iter(){
                             if minor_calls_map.contains_key(&call.genome_index){
                                 minor_calls_map.get_mut(&call.genome_index).unwrap().push(call.clone());
                             }
@@ -201,6 +185,19 @@ impl VCFFile{
                             }
                         }
                     }
+
+
+                    // if record.position == 776100{
+                    //     println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
+                    //     for call in record_calls.iter(){
+                    //         println!("{:?}\n", call);
+                    //     }
+                    //     println!("--");
+                    //     for call in record_minor_calls.iter(){
+                    //         println!("{:?}\n", call);
+                    //     }
+                    // }
+
                     // minor_calls.extend(record_minor_calls);
 
                     // Get the next record
@@ -315,11 +312,13 @@ impl VCFFile{
             alt_allele = record.alternative[alt_idx as usize].clone().to_lowercase();
             let call = VCFFile::simplify_call(ref_allele.clone(), alt_allele.clone());
             let call_cov = cov[(alt_idx + 1) as usize]; // COV should be [ref, alt1, alt2..]
-            for (offset, _alt_type, _base) in call{
+            for (offset, __alt_type, __base) in call{
+                let mut _alt_type = __alt_type;
+                let mut _base = __base;
                 if call_cov < min_dp{
                     // Override calls with null if the coverage is too low
-                    let _alt_type = AltType::NULL;
-                    let _base = "x".to_string();
+                    _alt_type = AltType::NULL;
+                    _base = "x".to_string();
                 }
                 calls.push(Evidence{
                     cov: Some(call_cov),

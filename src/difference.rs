@@ -183,13 +183,13 @@ impl GenomeDifference{
                             if gene_pos == -1{
                                 panic!("Failed to find gene position for indel at genome index {} in gene {}", alt_pos.genome_idx, gene.name);
                             }
-                            // if alt.alt_type == AltType::INS{
-                            //     gene_pos -= 1;
-                            //     if gene_pos == 0{
-                            //         // Can't have 0 as a gene position so nudge to promoter start
-                            //         gene_pos = -1;
-                            //     }
-                            // }
+                            if alt.alt_type == AltType::INS && gene.reverse_complement{
+                                gene_pos -= 1;
+                                if gene_pos == 0{
+                                    // Can't have 0 as a gene position so nudge to promoter start
+                                    gene_pos = -1;
+                                }
+                            }
                             gene_position = Some(gene_pos);
                         }
 
@@ -533,7 +533,7 @@ impl GeneDifference{
                                             mutation: _mutation.clone(),
                                             gene: gene_name.clone(),
                                             evidence: evidence.clone(),
-                                            gene_position: Some(alt_pos.gene_position),
+                                            gene_position: Some(alt_cd.nucleotide_number),
                                             codes_protein: Some(codes_protein),
                                             ref_nucleotides: None,
                                             alt_nucleotides: None,
