@@ -153,17 +153,41 @@ impl VCFFile{
 
                     for call in record_calls.iter(){
                         let mut added = false;
+                        if call.call_type == AltType::NULL{
+                            if passed || ignore_filter {
+                                added = true;
+                            }
+                            else if !passed {
+                                // Not passed filter, so check if all filters are in allowed filters
+                                let allowed_filters = vec!["MIN_FRS".to_string(), "MIN_DP".to_string(), "MIN_GCP".to_string(), "NO_DATA".to_string()];
+                                let mut all_allowed = true;
+                                for f in filters.iter(){
+                                    if !allowed_filters.contains(f){
+                                        all_allowed = false;
+                                        break;
+                                    }
+                                }
+                                if all_allowed{
+                                    added = true;
+                                }
+                            }
+                            else{
+                                // Skip this call as it's a null call with extra filter fails
+                                continue;
+                            }
+                        }
+                        else if ignore_filter || passed {
+                            added = true;
+                        }
                         if calls_map.contains_key(&call.genome_index){
                             println!("Multiple calls at genome position {}! {:?}\n", call.genome_index, calls_map.get(&call.genome_index).unwrap());
-                            if ignore_filter || passed || call.call_type == AltType::NULL{
+                            if added {
                                 calls_map.get_mut(&call.genome_index).unwrap().push(call.clone());
-                                added = true;
                             }
                         }
                         else{
-                            if ignore_filter || passed || call.call_type == AltType::NULL{
+                            if added{
                                 calls_map.insert(call.genome_index, vec![call.clone()]);
-                                added = true;
                             }
                         }
                         if !added{
@@ -175,7 +199,7 @@ impl VCFFile{
 
                     }
                     // Add minor calls if the filter is passed or ignored, or specifcally just the MIN_FRS has failed
-                    if (ignore_filter || passed) || (!passed && filters.len() == 1 && filters.contains(&"MIN_FRS".to_string())){
+                    if (ignore_filter || passed) || (!passed && filters.contains(&"MIN_FRS".to_string())){
                         for call in record_minor_calls.iter(){
                             if minor_calls_map.contains_key(&call.genome_index){
                                 minor_calls_map.get_mut(&call.genome_index).unwrap().push(call.clone());
@@ -187,7 +211,7 @@ impl VCFFile{
                     }
 
 
-                    // if record.position == 776100{
+                    // if record.position == 7581 || record.position == 7582 || record.position == 7583{
                     //     println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
                     //     for call in record_calls.iter(){
                     //         println!("{:?}\n", call);
@@ -196,6 +220,7 @@ impl VCFFile{
                     //     for call in record_minor_calls.iter(){
                     //         println!("{:?}\n", call);
                     //     }
+                    //     println!("\n\n");
                     // }
 
                     // minor_calls.extend(record_minor_calls);
@@ -260,7 +285,7 @@ impl VCFFile{
         }
         if cov.len() == 1{
             // Just 1 item in the call so santiy check if it's a null call
-            if genotype == &vec!["0", "0"]{
+            if genotype == &vec!["0", "0"]  && cov[0] >= min_dp{
                 // Ref call
                 call_type = AltType::REF;
                 alt_allele = ref_allele.clone();

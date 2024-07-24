@@ -266,6 +266,8 @@ impl GeneDifference{
         let mut minor_mutations = Vec::new();
         let mut deleted_bases = 0;
         let mut minor_deleted_bases = 0;
+        let mut minor_deleted_cov = 0;
+        let mut minor_deleted_frs = OrderedFloat(0.0);
         let gene_name = ref_gene.name.clone();
 
         for idx in 0..ref_gene.gene_positions.len(){
@@ -434,6 +436,15 @@ impl GeneDifference{
                                         minor_snp_exists = true;
                                     }
                                     else{
+                                        if e.alt_type == AltType::DEL {
+                                            if e.evidence.cov.unwrap() > minor_deleted_cov{
+                                                minor_deleted_cov = e.evidence.cov.unwrap();
+                                            }
+                                            if e.evidence.frs.unwrap() > minor_deleted_frs{
+                                                minor_deleted_frs = e.evidence.frs.unwrap();
+                                            }
+                                        }
+
                                         these_minor_indels.push(e);
                                     }
                                 }
@@ -554,12 +565,12 @@ impl GeneDifference{
                                                 |x| x.evidence.cov.is_some()
                                             ).map(
                                                 |x| x.evidence.cov.unwrap()
-                                            ).min().unwrap();
+                                            ).max().unwrap();
                                         let min_frs = these_minor_snps.iter().filter(
                                                 |x| x.evidence.frs.is_some()
                                             ).map(
                                                 |x| x.evidence.frs.unwrap()
-                                            ).min().unwrap();
+                                            ).max().unwrap();
                                         minor_snps.push(('z', Some(min_cov), Some(min_frs), Some(these_minor_snps.iter().map(|x| x.evidence.clone()).collect())));
                                     }
                                     else{
@@ -676,6 +687,22 @@ impl GeneDifference{
                                 if minor_type == MinorType::FRS{
                                     mutation = mutation + ":" + &format!("{:.3}", alt.evidence.frs.unwrap());
                                 }
+                                if alt.alt_type == AltType::DEL{
+                                    if alt.evidence.cov.unwrap() > minor_deleted_cov{
+                                        minor_deleted_cov = alt.evidence.cov.unwrap();
+                                    }
+                                    if alt.evidence.frs.unwrap() > minor_deleted_frs{
+                                        minor_deleted_frs = alt.evidence.frs.unwrap();
+                                    }
+                                }
+                                if alt.alt_type == AltType::DEL || alt.alt_type == AltType::INS{
+                                    minor_deleted_bases += 1;
+                                }
+                            }
+                            else{
+                                if alt.alt_type == AltType::DEL || alt.alt_type == AltType::INS{
+                                    deleted_bases += 1;
+                                }
                             }
                             let m = Mutation{
                                 mutation,
@@ -703,43 +730,50 @@ impl GeneDifference{
                     }
                 }
             }
+        }
 
-            let deleted_percent = (deleted_bases as f64 / ref_gene.nucleotide_number.len() as f64) * 100.0;
-            let minor_deleted_percent = (minor_deleted_bases as f64 / ref_gene.nucleotide_number.len() as f64) * 100.0;
-            if deleted_percent >= 0.5{
-                mutations.push(Mutation{
-                    mutation: "del_".to_string() + format!("{:.2}", deleted_percent).as_str(),
-                    gene: gene_name.clone(),
-                    evidence: Vec::new(),
-                    gene_position: None,
-                    codes_protein: None,
-                    ref_nucleotides: None,
-                    alt_nucleotides: None,
-                    nucleotide_number: None,
-                    nucleotide_index: None,
-                    indel_length: None,
-                    indel_nucleotides: None,
-                    amino_acid_number: None,
-                    amino_acid_sequence: None
-                });
+        let deleted_percent = deleted_bases as f64 / ref_gene.nucleotide_number.len() as f64;
+        let minor_deleted_percent = minor_deleted_bases as f64 / ref_gene.nucleotide_number.len() as f64;
+        if deleted_percent >= 0.5{
+            mutations.push(Mutation{
+                mutation: "del_".to_string() + format!("{:.2}", deleted_percent).as_str(),
+                gene: gene_name.clone(),
+                evidence: Vec::new(),
+                gene_position: None,
+                codes_protein: None,
+                ref_nucleotides: None,
+                alt_nucleotides: None,
+                nucleotide_number: None,
+                nucleotide_index: None,
+                indel_length: None,
+                indel_nucleotides: None,
+                amino_acid_number: None,
+                amino_acid_sequence: None
+            });
+        }
+        if minor_deleted_percent >= 0.5{
+            let mut mutation = "del_".to_string() + format!("{:.2}", minor_deleted_percent).as_str();
+            if minor_type == MinorType::COV{
+                mutation = mutation + ":" + &minor_deleted_cov.to_string();
             }
-            if minor_deleted_percent >= 0.5{
-                minor_mutations.push(Mutation{
-                    mutation: "del_".to_string() + format!("{:.2}", minor_deleted_percent).as_str(),
-                    gene: gene_name.clone(),
-                    evidence: Vec::new(),
-                    gene_position: None,
-                    codes_protein: None,
-                    ref_nucleotides: None,
-                    alt_nucleotides: None,
-                    nucleotide_number: None,
-                    nucleotide_index: None,
-                    indel_length: None,
-                    indel_nucleotides: None,
-                    amino_acid_number: None,
-                    amino_acid_sequence: None
-                });
+            if minor_type == MinorType::FRS{
+                mutation = mutation + ":" + &format!("{:.3}", minor_deleted_frs);
             }
+            minor_mutations.push(Mutation{
+                mutation,
+                gene: gene_name.clone(),
+                evidence: Vec::new(),
+                gene_position: None,
+                codes_protein: None,
+                ref_nucleotides: None,
+                alt_nucleotides: None,
+                nucleotide_number: None,
+                nucleotide_index: None,
+                indel_length: None,
+                indel_nucleotides: None,
+                amino_acid_number: None,
+                amino_acid_sequence: None
+            });
         }
 
 
@@ -815,14 +849,14 @@ impl GeneDifference{
                 |x| x.evidence.cov.is_some()
             ).map(
                 |x| x.evidence.cov.unwrap()
-            ).min().unwrap().to_string();
+            ).max().unwrap().to_string();
         }
         if minor_type == MinorType::FRS{
             min_coverage = format!("{:.3}",these_minors.iter().filter(
                 |x| x.evidence.frs.is_some()
             ).map(
                 |x| x.evidence.frs.unwrap()
-            ).min().unwrap());
+            ).max().unwrap());
         }
         let mutation = nc_num.to_string() + "_" + &mutation_name + ":" + &min_coverage;
         let evidence = these_minors.iter().map(|x| x.evidence.clone()).collect();
