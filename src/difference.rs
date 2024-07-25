@@ -183,7 +183,7 @@ impl GenomeDifference{
                             if gene_pos == -1{
                                 panic!("Failed to find gene position for indel at genome index {} in gene {}", alt_pos.genome_idx, gene.name);
                             }
-                            if alt.alt_type == AltType::INS && gene.reverse_complement{
+                            if (alt.alt_type == AltType::INS || alt.alt_type == AltType::DEL) && gene.reverse_complement{
                                 gene_pos -= 1;
                                 if gene_pos == 0{
                                     // Can't have 0 as a gene position so nudge to promoter start
@@ -587,8 +587,8 @@ impl GeneDifference{
                         if minor_snp_exists && minor_snps.len() == 3{
                             // Construct the minor amino acid change
                             let mut codon = "".to_string();
-                            let mut minor_cov = i32::MAX;
-                            let mut minor_frs = OrderedFloat::max_value();
+                            let mut minor_cov = 0;
+                            let mut minor_frs = OrderedFloat::min_value();
                             let mut minor_evidence = Vec::new();
                             for (nc, cov, frs, ev) in minor_snps.iter(){
                                 codon += &nc.to_string();
@@ -598,10 +598,10 @@ impl GeneDifference{
                                         for e in e.iter(){
                                             minor_evidence.push(e.clone());
                                         }
-                                        if cov.unwrap() < minor_cov{
+                                        if cov.unwrap() > minor_cov{
                                             minor_cov = cov.unwrap();
                                         }
-                                        if frs.unwrap() < minor_frs{
+                                        if frs.unwrap() > minor_frs{
                                             minor_frs = frs.unwrap();
                                         }
                                     },

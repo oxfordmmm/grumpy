@@ -213,7 +213,7 @@ impl Gene {
                     if *pos == 0{
                         panic!("Insertion at start of gene {} is revcomp and cannot be adjusted", gene_def.name);
                     }
-                    let new_pos = *pos;
+                    let new_pos = *pos - 1;
                     let fixed_alts = genome_positions[*pos].alts.iter().map(|x| Gene::rev_comp_indel_alt(x, i64::MAX)).collect::<Vec<Alt>>();
 
                     // Remove the insertion from the old position
