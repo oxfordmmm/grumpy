@@ -374,17 +374,19 @@ impl VCFFile {
             let mut call_cov = None;
             let mut frs = None;
             let mut vcf_idx = None;
-            if call_type != AltType::HET{
+            if call_type != AltType::HET {
                 call_cov = Some(cov[(alt_idx + 1) as usize]); // COV should be [ref, alt1, alt2..]
                 if call_cov.unwrap() < min_dp {
                     // Override calls with null if the coverage is too low
                     call_type = AltType::NULL;
                     alt_allele = "x".to_string();
                 }
-                frs = Some(ordered_float::OrderedFloat(call_cov.unwrap() as f32 / dp as f32));
+                frs = Some(ordered_float::OrderedFloat(
+                    call_cov.unwrap() as f32 / dp as f32,
+                ));
                 vcf_idx = Some((alt_idx + 1) as i64);
             }
-            
+
             calls.push(Evidence {
                 cov: call_cov,
                 frs,
@@ -413,7 +415,7 @@ impl VCFFile {
                 idx += 1;
                 continue;
             }
-            if *coverage >= min_dp{
+            if *coverage >= min_dp {
                 alt_allele = record.alternative[(idx - 1) as usize]
                     .clone()
                     .to_lowercase();
@@ -542,12 +544,11 @@ impl VCFFile {
                 continue;
             }
             let r = _y.chars().nth(i).unwrap();
-            let a = _x.chars().nth(i-offset).unwrap();
+            let a = _x.chars().nth(i - offset).unwrap();
             if r != 'N' && a != 'N' && r != a {
-                if _indel_type == AltType::DEL{
+                if _indel_type == AltType::DEL {
                     calls.push((i, AltType::SNP, a.to_string()));
-                }
-                else{
+                } else {
                     calls.push((i, AltType::SNP, r.to_string()));
                 }
             }
@@ -595,7 +596,10 @@ mod tests {
         // Some trivial cases
         assert_eq!(snp_dist(&"ACGT".to_string(), &"ACGT".to_string()), 0);
         assert_eq!(snp_dist(&"AAAAA".to_string(), &"AAAAA".to_string()), 0);
-        assert_eq!(snp_dist(&"ACGTACGT".to_string(), &"ACGTACGT".to_string()), 0);
+        assert_eq!(
+            snp_dist(&"ACGTACGT".to_string(), &"ACGTACGT".to_string()),
+            0
+        );
         assert_eq!(snp_dist(&"ACGT".to_string(), &"AAGT".to_string()), 1);
         assert_eq!(snp_dist(&"ACGT".to_string(), &"AAAT".to_string()), 2);
         assert_eq!(snp_dist(&"ACGT".to_string(), &"AAAA".to_string()), 3);
@@ -653,9 +657,7 @@ mod tests {
         );
         assert_eq!(
             VCFFile::simplify_call("ACGT".to_string(), "AGT".to_string()),
-            vec![
-                (1, AltType::DEL, "C".to_string()),
-            ]
+            vec![(1, AltType::DEL, "C".to_string()),]
         );
 
         // Somewhat pathological cases
@@ -696,7 +698,7 @@ mod tests {
                 filter: vec![],
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["0/0".to_string()]),
-                    ("COV".to_string(),vec!["1".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string()]),
                 ]),
                 is_filter_pass: true,
             };
@@ -722,7 +724,7 @@ mod tests {
                 filter: vec![],
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["1/1".to_string()]),
-                    ("COV".to_string(),vec!["1".to_string(), "2".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "2".to_string()]),
                 ]),
                 is_filter_pass: true,
             };
@@ -734,10 +736,9 @@ mod tests {
             assert_eq!(calls[0].alt, "t".to_string());
             assert_eq!(calls[0].call_type, AltType::SNP);
             assert_eq!(calls[0].cov, Some(2));
-            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(2.0/3.0)));
+            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(2.0 / 3.0)));
             assert_eq!(calls[0].is_minor, false);
             assert_eq!(calls[0].vcf_idx, Some(1));
-
         }
 
         // Het call (including minor call)
@@ -749,7 +750,7 @@ mod tests {
                 filter: vec![],
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["0/1".to_string()]),
-                    ("COV".to_string(),vec!["1".to_string(), "3".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
                 ]),
                 is_filter_pass: true,
             };
@@ -776,7 +777,6 @@ mod tests {
             assert_eq!(minor_calls[0].vcf_idx, Some(1));
         }
 
-
         // Null call (in a few forms)
         // Null call due to low coverage
         {
@@ -787,7 +787,7 @@ mod tests {
                 filter: vec![],
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["1/1".to_string()]),
-                    ("COV".to_string(),vec!["1".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string()]),
                 ]),
                 is_filter_pass: true,
             };
@@ -813,7 +813,7 @@ mod tests {
                 filter: vec![],
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["./.".to_string()]),
-                    ("COV".to_string(),vec!["1".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string()]),
                 ]),
                 is_filter_pass: true,
             };
@@ -828,7 +828,6 @@ mod tests {
             assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(1.0)));
             assert_eq!(calls[0].is_minor, false);
             assert_eq!(calls[0].vcf_idx, None);
-
         }
 
         // Null call due to low coverage and filter fail (should still make it)
@@ -840,7 +839,7 @@ mod tests {
                 filter: vec!["MIN_DP".to_string()],
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["1/1".to_string()]),
-                    ("COV".to_string(),vec!["1".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string()]),
                 ]),
                 is_filter_pass: false,
             };
@@ -855,7 +854,6 @@ mod tests {
             assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(1.0)));
             assert_eq!(calls[0].is_minor, false);
             assert_eq!(calls[0].vcf_idx, None);
-
         }
 
         // Ins call
@@ -867,7 +865,7 @@ mod tests {
                 filter: vec![],
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["1/1".to_string()]),
-                    ("COV".to_string(),vec!["1".to_string(), "5".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "5".to_string()]),
                 ]),
                 is_filter_pass: true,
             };
@@ -879,10 +877,9 @@ mod tests {
             assert_eq!(calls[0].alt, "t".to_string());
             assert_eq!(calls[0].call_type, AltType::INS);
             assert_eq!(calls[0].cov, Some(5));
-            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(5.0/6.0)));
+            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(5.0 / 6.0)));
             assert_eq!(calls[0].is_minor, false);
             assert_eq!(calls[0].vcf_idx, Some(1));
-
         }
 
         // Del call
@@ -894,7 +891,7 @@ mod tests {
                 filter: vec![],
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["1/1".to_string()]),
-                    ("COV".to_string(),vec!["1".to_string(), "5".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "5".to_string()]),
                 ]),
                 is_filter_pass: true,
             };
@@ -906,10 +903,9 @@ mod tests {
             assert_eq!(calls[0].alt, "t".to_string());
             assert_eq!(calls[0].call_type, AltType::DEL);
             assert_eq!(calls[0].cov, Some(5));
-            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(5.0/6.0)));
+            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(5.0 / 6.0)));
             assert_eq!(calls[0].is_minor, false);
             assert_eq!(calls[0].vcf_idx, Some(1));
-
         }
 
         // Del call with SNP
@@ -921,7 +917,7 @@ mod tests {
                 filter: vec![],
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["1/1".to_string()]),
-                    ("COV".to_string(),vec!["1".to_string(), "5".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "5".to_string()]),
                 ]),
                 is_filter_pass: true,
             };
@@ -933,7 +929,7 @@ mod tests {
             assert_eq!(calls[0].alt, "t".to_string());
             assert_eq!(calls[0].call_type, AltType::DEL);
             assert_eq!(calls[0].cov, Some(5));
-            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(5.0/6.0)));
+            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(5.0 / 6.0)));
             assert_eq!(calls[0].is_minor, false);
             assert_eq!(calls[0].vcf_idx, Some(1));
 
@@ -942,12 +938,10 @@ mod tests {
             assert_eq!(calls[1].alt, "c".to_string());
             assert_eq!(calls[1].call_type, AltType::SNP);
             assert_eq!(calls[1].cov, Some(5));
-            assert_eq!(calls[1].frs, Some(ordered_float::OrderedFloat(5.0/6.0)));
+            assert_eq!(calls[1].frs, Some(ordered_float::OrderedFloat(5.0 / 6.0)));
             assert_eq!(calls[1].is_minor, false);
             assert_eq!(calls[1].vcf_idx, Some(1));
-
         }
-
 
         // More complex mix of SNP and indel minors
         {
@@ -958,7 +952,10 @@ mod tests {
                 filter: vec![],
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["1/1".to_string()]),
-                    ("COV".to_string(),vec!["1".to_string(), "57".to_string(), "12".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec!["1".to_string(), "57".to_string(), "12".to_string()],
+                    ),
                 ]),
                 is_filter_pass: true,
             };
@@ -971,7 +968,7 @@ mod tests {
             assert_eq!(calls[0].alt, "t".to_string());
             assert_eq!(calls[0].call_type, AltType::DEL);
             assert_eq!(calls[0].cov, Some(57));
-            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(57.0/70.0)));
+            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(57.0 / 70.0)));
             assert_eq!(calls[0].is_minor, false);
             assert_eq!(calls[0].vcf_idx, Some(1));
 
@@ -980,11 +977,11 @@ mod tests {
             assert_eq!(calls[1].alt, "c".to_string());
             assert_eq!(calls[1].call_type, AltType::SNP);
             assert_eq!(calls[1].cov, Some(57));
-            assert_eq!(calls[1].frs, Some(ordered_float::OrderedFloat(57.0/70.0)));
+            assert_eq!(calls[1].frs, Some(ordered_float::OrderedFloat(57.0 / 70.0)));
             assert_eq!(calls[1].is_minor, false);
             assert_eq!(calls[1].vcf_idx, Some(1));
 
-            for call in minor_calls.iter(){
+            for call in minor_calls.iter() {
                 println!("{:?}", call);
             }
 
@@ -993,7 +990,10 @@ mod tests {
             assert_eq!(minor_calls[0].alt, "c".to_string());
             assert_eq!(minor_calls[0].call_type, AltType::INS);
             assert_eq!(minor_calls[0].cov, Some(12));
-            assert_eq!(minor_calls[0].frs, Some(ordered_float::OrderedFloat(12.0/70.0)));
+            assert_eq!(
+                minor_calls[0].frs,
+                Some(ordered_float::OrderedFloat(12.0 / 70.0))
+            );
             assert_eq!(minor_calls[0].is_minor, true);
             assert_eq!(minor_calls[0].vcf_idx, Some(2));
 
@@ -1002,7 +1002,10 @@ mod tests {
             assert_eq!(minor_calls[1].alt, "g".to_string());
             assert_eq!(minor_calls[1].call_type, AltType::SNP);
             assert_eq!(minor_calls[1].cov, Some(12));
-            assert_eq!(minor_calls[1].frs, Some(ordered_float::OrderedFloat(12.0/70.0)));
+            assert_eq!(
+                minor_calls[1].frs,
+                Some(ordered_float::OrderedFloat(12.0 / 70.0))
+            );
             assert_eq!(minor_calls[1].is_minor, true);
             assert_eq!(minor_calls[1].vcf_idx, Some(2));
 
@@ -1011,15 +1014,15 @@ mod tests {
             assert_eq!(minor_calls[2].alt, "c".to_string());
             assert_eq!(minor_calls[2].call_type, AltType::SNP);
             assert_eq!(minor_calls[2].cov, Some(12));
-            assert_eq!(minor_calls[2].frs, Some(ordered_float::OrderedFloat(12.0/70.0)));
+            assert_eq!(
+                minor_calls[2].frs,
+                Some(ordered_float::OrderedFloat(12.0 / 70.0))
+            );
             assert_eq!(minor_calls[2].is_minor, true);
             assert_eq!(minor_calls[2].vcf_idx, Some(2));
-            
         }
-
-
     }
-    
+
     #[test]
     fn test_instanciate_vcffile() {
         let vcf = VCFFile::new("test/dummy.vcf".to_string(), false, 3);
@@ -1032,8 +1035,8 @@ mod tests {
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["1/1".to_string()]),
                     ("DP".to_string(), vec!["68".to_string()]),
-                    ("COV".to_string(),vec!["0".to_string(), "68".to_string()]),
-                    ("GT_CONF".to_string(),vec!["613.77".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
             },
@@ -1045,8 +1048,8 @@ mod tests {
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["1/1".to_string()]),
                     ("DP".to_string(), vec!["68".to_string()]),
-                    ("COV".to_string(),vec!["0".to_string(), "68".to_string()]),
-                    ("GT_CONF".to_string(),vec!["613.77".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: false,
             },
@@ -1058,8 +1061,11 @@ mod tests {
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["1/2".to_string()]),
                     ("DP".to_string(), vec!["200".to_string()]),
-                    ("COV".to_string(),vec!["1".to_string(), "99".to_string(), "100".to_string()]),
-                    ("GT_CONF".to_string(),vec!["613.77".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec!["1".to_string(), "99".to_string(), "100".to_string()],
+                    ),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
             },
@@ -1071,8 +1077,8 @@ mod tests {
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["1/1".to_string()]),
                     ("DP".to_string(), vec!["68".to_string()]),
-                    ("COV".to_string(),vec!["0".to_string(), "68".to_string()]),
-                    ("GT_CONF".to_string(),vec!["63.77".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["63.77".to_string()]),
                 ]),
                 is_filter_pass: true,
             },
@@ -1084,8 +1090,8 @@ mod tests {
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["1/1".to_string()]),
                     ("DP".to_string(), vec!["68".to_string()]),
-                    ("COV".to_string(),vec!["0".to_string(), "68".to_string()]),
-                    ("GT_CONF".to_string(),vec!["63.77".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["63.77".to_string()]),
                 ]),
                 is_filter_pass: false,
             },
@@ -1097,8 +1103,8 @@ mod tests {
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["./.".to_string()]),
                     ("DP".to_string(), vec!["68".to_string()]),
-                    ("COV".to_string(),vec!["0".to_string(), "68".to_string()]),
-                    ("GT_CONF".to_string(),vec!["613.77".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: false,
             },
@@ -1110,8 +1116,8 @@ mod tests {
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["./.".to_string()]),
                     ("DP".to_string(), vec!["68".to_string()]),
-                    ("COV".to_string(),vec!["0".to_string(), "68".to_string()]),
-                    ("GT_CONF".to_string(),vec!["613.77".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
             },
@@ -1123,8 +1129,8 @@ mod tests {
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["./.".to_string()]),
                     ("DP".to_string(), vec!["68".to_string()]),
-                    ("COV".to_string(),vec!["0".to_string(), "68".to_string()]),
-                    ("GT_CONF".to_string(),vec!["613.77".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
             },
@@ -1136,8 +1142,11 @@ mod tests {
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["1/2".to_string()]),
                     ("DP".to_string(), vec!["100".to_string()]),
-                    ("COV".to_string(),vec!["2".to_string(), "50".to_string(), "48".to_string()]),
-                    ("GT_CONF".to_string(),vec!["613".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec!["2".to_string(), "50".to_string(), "48".to_string()],
+                    ),
+                    ("GT_CONF".to_string(), vec!["613".to_string()]),
                 ]),
                 is_filter_pass: false,
             },
@@ -1149,13 +1158,13 @@ mod tests {
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["1/1".to_string()]),
                     ("DP".to_string(), vec!["68".to_string()]),
-                    ("COV".to_string(),vec!["0".to_string(), "68".to_string()]),
-                    ("GT_CONF".to_string(),vec!["3.77".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["3.77".to_string()]),
                 ]),
                 is_filter_pass: false,
             },
         ];
-        for (idx, record) in expected_records.iter().enumerate(){
+        for (idx, record) in expected_records.iter().enumerate() {
             assert_eq!(record.position, vcf.records[idx].position);
             assert_eq!(record.reference, vcf.records[idx].reference);
             assert_eq!(record.alternative, vcf.records[idx].alternative);
