@@ -211,7 +211,7 @@ impl VCFFile{
                     }
 
 
-                    // if record.position == 7581 || record.position == 7582 || record.position == 7583{
+                    // if record.position == 1474466{
                     //     println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
                     //     for call in record_calls.iter(){
                     //         println!("{:?}\n", call);
@@ -289,6 +289,11 @@ impl VCFFile{
                 // Ref call
                 call_type = AltType::REF;
                 alt_allele = ref_allele.clone();
+            }
+            else if genotype[0] != genotype[1] && cov[0] >= min_dp{
+                // Het call
+                call_type = AltType::HET;
+                alt_allele = "z".to_string();
             }
             else{
                 // Null call
@@ -395,7 +400,8 @@ impl VCFFile{
                 idx += 1;
                 continue;
             }
-            if *coverage >= min_dp{
+            // if *coverage >= min_dp{
+            if *coverage >= 2{
                 alt_allele = record.alternative[(idx - 1) as usize].clone().to_lowercase();
                 let call = VCFFile::simplify_call(ref_allele.clone(), alt_allele.clone());
                 let call_cov = *coverage;

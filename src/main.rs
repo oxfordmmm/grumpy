@@ -33,16 +33,34 @@ fn main() {
     let reference_end = SystemTime::now();
 
     let sample_start = SystemTime::now();
-    let mut sample = mutate(&reference, vcf);
+    // let mut sample = mutate(&reference, vcf);
+    let mut sample = reference.clone() + vcf;
     let sample_end = SystemTime::now();
 
+    let target_gene = "rrl";
+
     let genome_start = SystemTime::now();
-    let difference = GenomeDifference::new(reference.clone(), sample.clone(), MinorType::COV);
-    println!("{:?}", difference.variants.iter().map(|variant| variant.variant.clone()).collect::<Vec<String>>());
+    let mut difference = GenomeDifference::new(reference.clone(), sample.clone(), MinorType::COV);
     let genome_end = SystemTime::now();
+    // println!("{:?}", difference.variants.iter().map(|variant| variant.variant.clone()).collect::<Vec<String>>());
+    for variant in difference.variants.iter_mut(){
+        if variant.gene_name.clone().is_none() || (variant.gene_name.clone().is_some() && variant.gene_name.clone().unwrap() != target_gene){
+            continue;
+        }
+        println!("{:?}@{:?} --> {:?}", variant.gene_name, variant.gene_position, variant.variant.clone());
+    }
+    for variant in difference.minor_variants.iter_mut(){
+        if variant.gene_name.clone().is_none() || (variant.gene_name.clone().is_some() && variant.gene_name.clone().unwrap() != target_gene){
+            continue;
+        }
+        println!("{:?}@{:?} --> {:?}", variant.gene_name, variant.gene_position, variant.variant.clone());
+    }
 
     let gene_start = SystemTime::now();
     for gene_name in sample.genes_with_mutations.clone().iter(){
+        if gene_name != target_gene{
+            continue;
+        }
         println!("{}", gene_name);
         let gene_diff = GeneDifference::new(reference.get_gene(gene_name.clone()), sample.get_gene(gene_name.clone()), MinorType::COV);
         println!("{:?}", gene_diff.mutations.iter().map(|mutation| mutation.mutation.clone()).collect::<Vec<String>>());

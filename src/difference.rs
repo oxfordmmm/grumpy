@@ -173,24 +173,7 @@ impl GenomeDifference{
                         }
                         else{
                             // Use nucleotide number for indels as they shouldn't be construed as codon indices
-                            let mut gene_pos = -1;
-                            for (nc_idx, nc_num) in gene.nucleotide_index.iter().zip(gene.nucleotide_number){
-                                if nc_idx == &alt_pos.genome_idx{
-                                    gene_pos = nc_num;
-                                    break;
-                                }
-                            }
-                            if gene_pos == -1{
-                                panic!("Failed to find gene position for indel at genome index {} in gene {}", alt_pos.genome_idx, gene.name);
-                            }
-                            if (alt.alt_type == AltType::INS || alt.alt_type == AltType::DEL) && gene.reverse_complement{
-                                gene_pos -= 1;
-                                if gene_pos == 0{
-                                    // Can't have 0 as a gene position so nudge to promoter start
-                                    gene_pos = -1;
-                                }
-                            }
-                            gene_position = Some(gene_pos);
+                            gene_position = GenomeDifference::get_nucleotide_number(&gene, &alt);
                         }
 
                     }
@@ -227,7 +210,7 @@ impl GenomeDifference{
                         indel_length,
                         indel_nucleotides: indel_bases,
                         gene_position,
-                        codon_idx: codon_idx,
+                        codon_idx,
                         gene_name
                     };
 
@@ -246,6 +229,44 @@ impl GenomeDifference{
             variants,
             minor_variants
         }
+    }
+
+    #[staticmethod]
+    /// Find the nucleotide number (at the gene level) of a given alt (at the genome level)
+    /// Easy enough to pull out a gene position, but for indels we need to find the nucleotide number
+    /// 
+    /// # Arguments
+    /// - `gene` - Gene to search
+    /// - `genome_alt` - Alt to search for
+    /// 
+    /// # Returns
+    /// Nucleotide number of the alt in the gene. None if not found
+    pub fn get_nucleotide_number(gene: &Gene, genome_alt: &Alt) -> Option<i64>{
+        for gene_pos in gene.gene_positions.iter(){
+            match &gene_pos.gene_position_data{
+                GenePos::Codon(c) => {
+                    for codon in c.codon.iter(){
+                        for alt in codon.alts.iter(){
+                            // Match on evidence and base length
+                            // This is to catch cases where a deletion starts outside of this gene
+                            if genome_alt.base.len() == alt.base.len() && genome_alt.evidence == alt.evidence{
+                                return Some(codon.nucleotide_number);
+                            }
+                        }
+                    }
+                },
+                GenePos::Nucleotide(n) => {
+                    for alt in n.alts.iter(){
+                        // Match on evidence and base length
+                        // This is to catch cases where a deletion starts outside of this gene
+                        if genome_alt.base.len() == alt.base.len() && genome_alt.evidence == alt.evidence{
+                            return Some(n.nucleotide_number);
+                        }
+                    }
+                }
+            }
+        }
+        return None;
     }
 }
 

@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 
 use std::fs::File;
 use std::collections::{HashMap, HashSet};
+use std::ops;
 
 use string_cache::Atom;
 
@@ -370,6 +371,10 @@ impl Genome{
         // 1-indexed genome index
         return self.genome_positions[(index + 1) as usize].clone();
     }
+
+    fn __add__(&self, other: VCFFile) -> Genome{
+        return mutate(&self, other);
+    }
 }
 
 #[pyfunction]
@@ -456,4 +461,11 @@ pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome{
     new_genome.genes = HashMap::new();
 
     return new_genome;
+}
+
+impl ops::Add<VCFFile> for Genome{
+    type Output = Genome;
+    fn add(self, vcf: VCFFile) -> Genome{
+        return mutate(&self, vcf);
+    }
 }
