@@ -7,27 +7,27 @@ use ordered_float::OrderedFloat;
 #[pyclass(eq, eq_int)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// Enum for the types alts can take
-pub enum AltType{
+pub enum AltType {
     SNP,
     REF,
     HET,
     NULL,
     INS,
-    DEL
+    DEL,
 }
 
 #[pyclass(eq, eq_int)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// Enum for the types of minor evidence
-pub enum MinorType{
+pub enum MinorType {
     COV,
-    FRS
+    FRS,
 }
 
 #[pyclass(eq)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Struct to hold the information from a VCF row
-pub struct VCFRow{
+pub struct VCFRow {
     #[pyo3(get, set)]
     /// Genome position specified in the VCF row
     pub position: i64,
@@ -56,13 +56,13 @@ pub struct VCFRow{
 #[pyclass(eq)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Struct to hold the information parsed for a call
-pub struct Evidence{
+pub struct Evidence {
     #[pyo3(get, set)]
     /// Coverage at this position. i.e how many reads cover this call
     pub cov: Option<i32>,
 
     /// FRS at this position. i.e proportion of reads at this position have this alt
-    /// 
+    ///
     /// Annoyingly f32 doesn't implement Eq so use OrderedFloat
     pub frs: Option<OrderedFloat<f32>>,
 
@@ -100,12 +100,12 @@ pub struct Evidence{
 }
 
 #[pymethods]
-impl Evidence{
+impl Evidence {
     #[getter]
     fn frs(&self) -> PyResult<i32> {
-        match self.frs{
+        match self.frs {
             Some(frs) => Ok(frs.into_inner() as i32),
-            None => Ok(0)
+            None => Ok(0),
         }
     }
 }
@@ -113,7 +113,7 @@ impl Evidence{
 #[pyclass]
 #[derive(Clone)]
 /// Struct to hold the information to construct a gene
-pub struct GeneDef{
+pub struct GeneDef {
     #[pyo3(get, set)]
     /// Gene name
     pub name: String,
@@ -150,7 +150,7 @@ pub struct GeneDef{
 #[pyclass(eq)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Struct to hold the information of a call
-pub struct Alt{
+pub struct Alt {
     #[pyo3(get, set)]
     /// Type of the call
     pub alt_type: AltType,
@@ -161,5 +161,5 @@ pub struct Alt{
 
     #[pyo3(get, set)]
     /// Evidence associated with this call
-    pub evidence: Evidence
+    pub evidence: Evidence,
 }
