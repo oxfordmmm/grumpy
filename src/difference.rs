@@ -25,7 +25,7 @@ pub struct Variant {
 
     #[pyo3(get, set)]
     /// Index of the VCF row. i.e COV at vcf_idx == coverage for this variant
-    pub vcf_idx: i64,
+    pub vcf_idx: Option<i64>,
 
     #[pyo3(get, set)]
     /// Length of the indel

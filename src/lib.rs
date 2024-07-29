@@ -11,18 +11,19 @@
 //! use grumpy::genome::{Genome, mutate};
 //! use grumpy::vcf::VCFFile;
 //! use grumpy::difference::{GenomeDifference, GeneDifference};
+//! use grumpy::common::MinorType;
 //!
-//! let reference = Genome::new("some/path/to/a/genbank/file.gb");
-//! let vcf = VCFFile::new("some/path/to/a/vcf/file.vcf", false, 3);
-//! let sample = mutate(&reference, vcf);
+//! let mut reference = Genome::new("reference/MN908947.3.gb");
+//! let vcf = VCFFile::new("test/dummy.vcf".to_string(), false, 3);
+//! let mut sample = mutate(&reference, vcf);
 //!
-//! let genome_diff = GenomeDifference::new(reference, sample);
+//! let genome_diff = GenomeDifference::new(reference.clone(), sample.clone(), MinorType::COV);
 //! for variant in genome_diff.variants.iter(){
 //!    println!("{}", variant.variant);
 //! }
 //!
 //! for gene_name in sample.genes_with_mutations.clone().iter(){
-//!   let gene_diff = GeneDifference::new(reference.get_gene(gene_name.clone()), sample.get_gene(gene_name.clone()));
+//!   let gene_diff = GeneDifference::new(reference.get_gene(gene_name.clone()), sample.get_gene(gene_name.clone()), MinorType::COV);
 //!   for mutation in gene_diff.mutations.iter(){
 //!     println!("{}", mutation.mutation);
 //!   }
