@@ -5,7 +5,6 @@ use std::collections::{hash_map, HashMap};
 use std::fs::File;
 use std::io::BufReader;
 use std::string::String;
-use std::thread::panicking;
 use vcf::VCFReader;
 
 use crate::common::{AltType, Evidence, VCFRow};
@@ -290,7 +289,10 @@ impl VCFFile {
 
         let mut call_type = AltType::NULL;
 
-        println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, record.reference, record.alternative, record.filter, record.fields);
+        println!(
+            "{:?}\t{:?}\t{:?}\t{:?}\t{:?}",
+            record.position, record.reference, record.alternative, record.filter, record.fields
+        );
         let first = genotype[0];
         // Adjust for 1-indexed VCF
         let mut alt_idx = 0;
@@ -346,7 +348,7 @@ impl VCFFile {
                 call_type = AltType::SNP;
             }
         }
-        if *genotype == vec![".", "."]{
+        if *genotype == vec![".", "."] {
             call_type = AltType::NULL;
         }
         if call_type == AltType::NULL {
@@ -388,9 +390,7 @@ impl VCFFile {
                     // Explicit null GT can't point to a coverage so null
                     call_type = AltType::NULL;
                     alt_allele = "x".to_string();
-
-                }
-                else{
+                } else {
                     call_cov = Some(cov[(alt_idx + 1) as usize]); // COV should be [ref, alt1, alt2..]
                     if call_cov.unwrap() < min_dp {
                         // Override calls with null if the coverage is too low
@@ -1190,91 +1190,79 @@ mod tests {
             assert_eq!(record.is_filter_pass, vcf.records[idx].is_filter_pass);
         }
 
-        let expected_calls = vec![
-            vec![
-                Evidence {
-                    cov: Some(68),
-                    frs: Some(ordered_float::OrderedFloat(1.0)),
-                    genotype: "1/1".to_string(),
-                    call_type: AltType::SNP,
-                    vcf_row: expected_records[0].clone(),
-                    reference: "t".to_string(),
-                    alt: "c".to_string(),
-                    genome_index: 4687,
-                    is_minor: false,
-                    vcf_idx: Some(1),
-                },
-            ],
-            vec![
-                Evidence {
-                    cov: None,
-                    frs: None,
-                    genotype: "1/2".to_string(),
-                    call_type: AltType::HET,
-                    vcf_row: expected_records[2].clone(),
-                    reference: "c".to_string(),
-                    alt: "z".to_string(),
-                    genome_index: 4730,
-                    is_minor: false,
-                    vcf_idx: None,
-                },
-            ],
-            vec![
-                Evidence {
-                    cov: Some(68),
-                    frs: Some(ordered_float::OrderedFloat(1.0)),
-                    genotype: "1/1".to_string(),
-                    call_type: AltType::INS,
-                    vcf_row: expected_records[3].clone(),
-                    reference: "g".to_string(),
-                    alt: "cc".to_string(),
-                    genome_index: 4735,
-                    is_minor: false,
-                    vcf_idx: Some(1),
-                },
-            ],
-            vec![
-                Evidence {
-                    cov: None,
-                    frs: None,
-                    genotype: "./.".to_string(),
-                    call_type: AltType::NULL,
-                    vcf_row: expected_records[5].clone(),
-                    reference: "t".to_string(),
-                    alt: "x".to_string(),
-                    genome_index: 13148,
-                    is_minor: false,
-                    vcf_idx: None,
-                },
-            ],
-            vec![
-                Evidence {
-                    cov: None,
-                    frs: None,
-                    genotype: "./.".to_string(),
-                    call_type: AltType::NULL,
-                    vcf_row: expected_records[6].clone(),
-                    reference: "g".to_string(),
-                    alt: "x".to_string(),
-                    genome_index: 13149,
-                    is_minor: false,
-                    vcf_idx: None,
-                },
-            ],
-            vec![
-                Evidence {
-                    cov: None,
-                    frs: None,
-                    genotype: "./.".to_string(),
-                    call_type: AltType::NULL,
-                    vcf_row: expected_records[7].clone(),
-                    reference: "a".to_string(),
-                    alt: "x".to_string(),
-                    genome_index: 13150,
-                    is_minor: false,
-                    vcf_idx: None,
-                },
-            ],
+        let expected_calls = [
+            vec![Evidence {
+                cov: Some(68),
+                frs: Some(ordered_float::OrderedFloat(1.0)),
+                genotype: "1/1".to_string(),
+                call_type: AltType::SNP,
+                vcf_row: expected_records[0].clone(),
+                reference: "t".to_string(),
+                alt: "c".to_string(),
+                genome_index: 4687,
+                is_minor: false,
+                vcf_idx: Some(1),
+            }],
+            vec![Evidence {
+                cov: None,
+                frs: None,
+                genotype: "1/2".to_string(),
+                call_type: AltType::HET,
+                vcf_row: expected_records[2].clone(),
+                reference: "c".to_string(),
+                alt: "z".to_string(),
+                genome_index: 4730,
+                is_minor: false,
+                vcf_idx: None,
+            }],
+            vec![Evidence {
+                cov: Some(68),
+                frs: Some(ordered_float::OrderedFloat(1.0)),
+                genotype: "1/1".to_string(),
+                call_type: AltType::INS,
+                vcf_row: expected_records[3].clone(),
+                reference: "g".to_string(),
+                alt: "cc".to_string(),
+                genome_index: 4735,
+                is_minor: false,
+                vcf_idx: Some(1),
+            }],
+            vec![Evidence {
+                cov: None,
+                frs: None,
+                genotype: "./.".to_string(),
+                call_type: AltType::NULL,
+                vcf_row: expected_records[5].clone(),
+                reference: "t".to_string(),
+                alt: "x".to_string(),
+                genome_index: 13148,
+                is_minor: false,
+                vcf_idx: None,
+            }],
+            vec![Evidence {
+                cov: None,
+                frs: None,
+                genotype: "./.".to_string(),
+                call_type: AltType::NULL,
+                vcf_row: expected_records[6].clone(),
+                reference: "g".to_string(),
+                alt: "x".to_string(),
+                genome_index: 13149,
+                is_minor: false,
+                vcf_idx: None,
+            }],
+            vec![Evidence {
+                cov: None,
+                frs: None,
+                genotype: "./.".to_string(),
+                call_type: AltType::NULL,
+                vcf_row: expected_records[7].clone(),
+                reference: "a".to_string(),
+                alt: "x".to_string(),
+                genome_index: 13150,
+                is_minor: false,
+                vcf_idx: None,
+            }],
         ];
 
         for (row_idx, calls) in expected_calls.iter().enumerate() {
@@ -1282,7 +1270,7 @@ mod tests {
             println!("{:?}", vcf.calls.keys());
             let actual = vcf.calls.get(&calls[0].genome_index).unwrap();
             println!("{:?}\n", actual);
-            for (idx, call) in calls.iter().enumerate(){
+            for (idx, call) in calls.iter().enumerate() {
                 assert_eq!(call.cov, actual[idx].cov);
                 assert_eq!(call.frs, actual[idx].frs);
                 assert_eq!(call.genotype, actual[idx].genotype);
