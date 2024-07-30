@@ -9,7 +9,7 @@ env:
 
 jobs:
   build_and_test:
-    name: Rust project
+    name: Rust tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -27,5 +27,5 @@ jobs:
       - name: rustfmt
         run: cargo fmt --all -- --check
 
-      # - name: clippy
-      #   run: cargo clippy --all --all-features --tests -- -D warnings
+      - name: clippy
+        run: cargo clippy --all --all-features --tests -- -D warnings

@@ -165,8 +165,8 @@ impl Gene {
         for pos in gene_def.ribosomal_shifts.iter() {
             // Figure out the index of the vectors to insert the ribosomal shift
             let mut idx: i64 = -1;
-            for i in 0..nucleotide_index.len() {
-                if nucleotide_index[i] == *pos {
+            for (i, nc_idx) in nucleotide_index.iter().enumerate() {
+                if nc_idx == pos {
                     idx = i as i64;
                     break;
                 }
@@ -191,7 +191,7 @@ impl Gene {
             nucleotide_sequence = nc_sequence
                 .chars()
                 .rev()
-                .map(|x| complement_base(x))
+                .map(complement_base)
                 .collect::<String>();
             nucleotide_index = Vec::new();
             for i in nc_index.iter().rev() {
@@ -208,17 +208,13 @@ impl Gene {
             let mut fixed_genome_positions = genome_positions.clone();
             // First figure out where the indels are
             let mut indel_positions: Vec<(usize, i64, bool)> = Vec::new();
-            for i in 0..genome_positions.len() {
-                for alt in genome_positions[i].alts.iter() {
+            for (i, genome_pos) in genome_positions.iter().enumerate() {
+                for alt in genome_pos.alts.iter() {
                     if alt.alt_type == AltType::INS {
                         indel_positions.push((i, alt.base.len() as i64, alt.evidence.is_minor));
                     }
                     if alt.alt_type == AltType::DEL {
-                        indel_positions.push((
-                            i,
-                            alt.base.len() as i64 * -1,
-                            alt.evidence.is_minor,
-                        ));
+                        indel_positions.push((i, -(alt.base.len() as i64), alt.evidence.is_minor));
                     }
                 }
             }
@@ -245,7 +241,7 @@ impl Gene {
                         .alts
                         .iter()
                         .filter(|x| x.alt_type != AltType::INS && x.evidence.is_minor == *is_minor)
-                        .map(|x| x.clone())
+                        .cloned()
                         .collect::<Vec<Alt>>();
 
                     // Update the new position
@@ -253,14 +249,14 @@ impl Gene {
                 } else {
                     // Deletion
                     let mut _max_del_length = i64::MAX;
-                    if indel_size.abs() as usize > *pos {
+                    if indel_size.unsigned_abs() as usize > *pos {
                         // Deletion may start in this gene, but needs truncating to just the part in this gene
                         _max_del_length = *pos as i64;
                     }
                     let mut new_pos = 0;
                     if _max_del_length == i64::MAX {
                         // Update new position if deletion is entirely in this gene
-                        new_pos = *pos - indel_size.abs() as usize + 1;
+                        new_pos = *pos - indel_size.unsigned_abs() as usize + 1;
                     }
                     let fixed_alts = genome_positions[*pos]
                         .alts
@@ -273,7 +269,7 @@ impl Gene {
                         .alts
                         .iter()
                         .filter(|x| x.alt_type != AltType::DEL && x.evidence.is_minor == *is_minor)
-                        .map(|x| x.clone())
+                        .cloned()
                         .collect::<Vec<Alt>>();
 
                     // Update the new position
@@ -294,8 +290,7 @@ impl Gene {
         // Figure out the nucelotide number for each position
         // Promoter first
         if gene_def.promoter_start != -1 {
-            let mut nc_idx = 0;
-            for i in (-1 * (gene_def.promoter_size + 1))..0 {
+            for (nc_idx, i) in ((-(gene_def.promoter_size + 1))..0).enumerate() {
                 nucleotide_number.push(i);
                 gene_number.push(i);
                 gene_positions.push(GenePosition {
@@ -310,7 +305,6 @@ impl Gene {
                     gene_position: i,
                 });
                 genome_idx_map.insert(nucleotide_index[nc_idx], (i, None));
-                nc_idx += 1;
             }
         }
         let prom_end = nucleotide_number.len();
@@ -388,12 +382,13 @@ impl Gene {
                     codon = "".to_string();
                 }
             }
-            if codon.len() > 0 {
+            if !codon.is_empty() {
                 panic!("Incomplete codon at end of gene {}", gene_def.name);
             }
         }
 
-        return Gene {
+        // I hate implicit returns, but appease clippy
+        Gene {
             name: gene_def.name.to_string(),
             coding: gene_def.coding,
             reverse_complement: gene_def.reverse_complement,
@@ -407,7 +402,7 @@ impl Gene {
             ribosomal_shifts: gene_def.ribosomal_shifts,
             codons,
             genome_idx_map,
-        };
+        }
     }
 
     /// Perform alterations required to an indel when reverse complementing
@@ -421,12 +416,10 @@ impl Gene {
     fn rev_comp_indel_alt(alt: &Alt, max_del_length: i64) -> Alt {
         if alt.alt_type == AltType::INS || alt.alt_type == AltType::DEL {
             let mut new_base = "".to_string();
-            let mut indel_length = 0;
-            for c in alt.base.chars().rev() {
-                if indel_length < max_del_length {
+            for (indel_length, c) in alt.base.chars().rev().enumerate() {
+                if indel_length < max_del_length as usize {
                     new_base.push(complement_base(c));
                 }
-                indel_length += 1;
             }
             return Alt {
                 alt_type: alt.alt_type.clone(),
@@ -434,7 +427,9 @@ impl Gene {
                 evidence: alt.evidence.clone(),
             };
         }
-        return alt.clone();
+
+        // I hate implicit returns, but appease clippy
+        alt.clone()
     }
 
     /// Perform alterations required to a SNP when reverse complementing
@@ -456,7 +451,9 @@ impl Gene {
                 evidence: alt.evidence.clone(),
             };
         }
-        return alt.clone();
+
+        // I hate implicit returns, but appease clippy
+        alt.clone()
     }
 
     /// Adjust deletions to ensure they don't cross gene boundaries
@@ -467,7 +464,7 @@ impl Gene {
     /// # Arguments
     /// - `genome_positions`: Vec of genome positions for the gene
     /// - `gene_name`: Name of the gene
-    fn adjust_dels(genome_positions: &mut Vec<GenomePosition>, gene_name: String) {
+    fn adjust_dels(genome_positions: &mut [GenomePosition], gene_name: String) {
         // Adjust any deletions which may cross gene boundaries as required
         let mut first_pos = genome_positions[0].clone();
         if genome_positions[0].is_deleted {
@@ -484,7 +481,7 @@ impl Gene {
                     .iter()
                     .filter(|x| !x.is_minor)
                     .collect::<Vec<&Evidence>>();
-                if del_evidence.len() == 0 {
+                if del_evidence.is_empty() {
                     panic!("No deleted evidence found for gene {}", gene_name);
                 } else if del_evidence.len() > 1 {
                     panic!("Multiple deleted evidence found for gene {}", gene_name);
@@ -506,34 +503,33 @@ impl Gene {
                 });
             }
         }
-        if genome_positions[0].is_deleted_minor {
-            if !genome_positions[0]
+        if genome_positions[0].is_deleted_minor
+            && !genome_positions[0]
                 .alts
                 .iter()
                 .any(|x| x.alt_type == AltType::DEL && x.evidence.is_minor)
+        {
+            // None of the alts at this position are deletions, so didn't start here
+            // Lets look at the deleted evidence to piece together what this should be
+            for del_evidence in genome_positions[0]
+                .deleted_evidence
+                .iter()
+                .filter(|x| x.is_minor)
             {
-                // None of the alts at this position are deletions, so didn't start here
-                // Lets look at the deleted evidence to piece together what this should be
-                for del_evidence in genome_positions[0]
-                    .deleted_evidence
-                    .iter()
-                    .filter(|x| x.is_minor)
-                {
-                    let mut fixed_del_evidence = del_evidence.clone();
-                    let del_start_genome_idx = del_evidence.genome_index;
-                    let bases_to_trim =
-                        (genome_positions[0].genome_idx - del_start_genome_idx) as usize;
-                    let new_deleted_bases =
-                        del_evidence.alt[bases_to_trim..del_evidence.alt.len()].to_string();
+                let mut fixed_del_evidence = del_evidence.clone();
+                let del_start_genome_idx = del_evidence.genome_index;
+                let bases_to_trim =
+                    (genome_positions[0].genome_idx - del_start_genome_idx) as usize;
+                let new_deleted_bases =
+                    del_evidence.alt[bases_to_trim..del_evidence.alt.len()].to_string();
 
-                    fixed_del_evidence.alt = new_deleted_bases.clone();
-                    fixed_del_evidence.genome_index = genome_positions[0].genome_idx;
-                    first_pos.alts.push(Alt {
-                        alt_type: AltType::DEL,
-                        base: new_deleted_bases.clone(),
-                        evidence: fixed_del_evidence,
-                    });
-                }
+                fixed_del_evidence.alt = new_deleted_bases.clone();
+                fixed_del_evidence.genome_index = genome_positions[0].genome_idx;
+                first_pos.alts.push(Alt {
+                    alt_type: AltType::DEL,
+                    base: new_deleted_bases.clone(),
+                    evidence: fixed_del_evidence,
+                });
             }
         }
         genome_positions[0] = first_pos;
@@ -544,12 +540,12 @@ impl Gene {
         // truncating those which do
         for position in genome_positions.iter_mut() {
             for alt in position.alts.iter_mut() {
-                if alt.alt_type == AltType::DEL {
-                    if position.genome_idx + (alt.base.len() as i64) > last_pos {
-                        let bases_to_trim =
-                            (position.genome_idx + alt.base.len() as i64 - last_pos) as usize;
-                        alt.base = alt.base[0..alt.base.len() - bases_to_trim].to_string();
-                    }
+                if alt.alt_type == AltType::DEL
+                    && position.genome_idx + (alt.base.len() as i64) > last_pos
+                {
+                    let bases_to_trim =
+                        (position.genome_idx + alt.base.len() as i64 - last_pos) as usize;
+                    alt.base = alt.base[0..alt.base.len() - bases_to_trim].to_string();
                 }
             }
         }

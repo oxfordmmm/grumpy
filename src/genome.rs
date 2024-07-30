@@ -4,8 +4,6 @@ use pyo3::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 
-use string_cache::Atom;
-
 use gb_io::reader::SeqReader;
 use gb_io::seq::Location::Complement;
 use gb_io::seq::Location::Join;
@@ -110,8 +108,8 @@ impl Genome {
                 let mut coding: bool = false;
                 let mut reverse_complement: bool = false;
                 let mut ribosomal_shifts: Vec<i64> = Vec::new();
-                if feature.kind == Atom::from("CDS") || feature.kind == Atom::from("rRNA") {
-                    if feature.kind != Atom::from("rRNA") {
+                if feature.kind == *"CDS" || feature.kind == *"rRNA" {
+                    if feature.kind != *"rRNA" {
                         coding = true;
                     }
                     match feature.location {
@@ -156,11 +154,11 @@ impl Genome {
                     for qual in feature.qualifiers {
                         match qual.1 {
                             Some(val) => {
-                                if qual.0 == Atom::from("gene") {
+                                if qual.0 == *"gene" {
                                     // Use gene name if it exists
                                     name = val.clone();
                                 }
-                                if name == "" && qual.0 == Atom::from("locus_tag") {
+                                if name.is_empty() && qual.0 == *"locus_tag" {
                                     // Else default to locus tag
                                     name = val.clone();
                                 }
@@ -189,12 +187,10 @@ impl Genome {
             }
         }
         let mut genome_positions = Vec::new();
-        let mut genome_idx = 0;
-        for c in _nucleotide_sequence.chars() {
-            genome_idx += 1;
+        for (genome_idx, c) in _nucleotide_sequence.chars().enumerate() {
             genome_positions.push(GenomePosition {
                 reference: c,
-                genome_idx,
+                genome_idx: genome_idx as i64 + 1,
                 alts: Vec::new(),
                 genes: Vec::new(),
                 is_deleted: false,
@@ -206,17 +202,19 @@ impl Genome {
             name: genome_name,
             nucleotide_sequence: _nucleotide_sequence,
             gene_definitions: _gene_definitions,
-            genome_positions: genome_positions,
+            genome_positions,
             genes: HashMap::new(),
             gene_names,
             genes_with_mutations: HashSet::new(),
         };
         genome.assign_promoters();
-        return genome;
+
+        // I hate implicit returns, but appease clippy
+        genome
     }
 
     /// Assign promoters to genes
-    fn assign_promoters(&mut self) -> () {
+    fn assign_promoters(&mut self) {
         /*
         Assigns promoters to genes iteratively.
         Expand out to a given distance from the start of each gene without overlapping with other genes.
@@ -240,14 +238,12 @@ impl Genome {
             // Check for overlapping genes, assigning promoters to non-overlapping genes
             if self.genome_positions[gene.start as usize].genes.len() > 1 {
                 continue;
+            } else if gene.start == 0 {
+                // Catch edge case of gene starting at genome index 0
+                // this couldn't have a promoter so mark as such
+                gene.promoter_start = -1;
             } else {
-                if gene.start == 0 {
-                    // Catch edge case of gene starting at genome index 0
-                    // this couldn't have a promoter so mark as such
-                    gene.promoter_start = -1;
-                } else {
-                    gene.promoter_start = gene.start;
-                }
+                gene.promoter_start = gene.start;
             }
         }
 
@@ -267,10 +263,9 @@ impl Genome {
                 {
                     continue;
                 }
-                if self.genome_positions[(gene.promoter_start + expanding) as usize]
+                if !self.genome_positions[(gene.promoter_start + expanding) as usize]
                     .genes
-                    .len()
-                    > 0
+                    .is_empty()
                 {
                     // Pre-existing gene at this position so ignore expanding!
                     continue;
@@ -335,16 +330,17 @@ impl Genome {
             }
         }
 
-        return Gene::new(
+        // I hate implicit returns, but appease clippy
+        Gene::new(
             gene_def,
             nucleotide_sequence,
             nucleotide_index,
             genome_positions,
-        );
+        )
     }
 
     /// Build all genes in the genome, storing them in the genes hashmap
-    pub fn build_all_genes(&mut self) -> () {
+    pub fn build_all_genes(&mut self) {
         for gene_name in self.gene_names.iter() {
             let gene = self.build_gene(gene_name.clone());
             self.genes.insert(gene_name.clone(), gene);
@@ -370,11 +366,11 @@ impl Genome {
     /// GenomePosition at the given index
     pub fn at_genome_index(&self, index: i64) -> GenomePosition {
         // 1-indexed genome index
-        return self.genome_positions[(index + 1) as usize].clone();
+        self.genome_positions[(index + 1) as usize].clone()
     }
 
     fn __add__(&self, other: VCFFile) -> Genome {
-        return mutate(&self, other);
+        mutate(self, other)
     }
 }
 
@@ -421,7 +417,7 @@ pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome {
                     || call.call_type == AltType::NULL
                 {
                     // Update nucleotide for SNP/het/null
-                    let base = call.clone().alt.chars().nth(0).unwrap();
+                    let base = call.clone().alt.chars().next().unwrap();
                     position.reference = base;
                     new_genome
                         .nucleotide_sequence
@@ -466,5 +462,6 @@ pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome {
     // Reset the gene hashmap as the nucleotide sequence has changed
     new_genome.genes = HashMap::new();
 
-    return new_genome;
+    // I hate implicit returns, but appease clippy
+    new_genome
 }
