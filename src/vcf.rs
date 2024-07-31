@@ -1287,9 +1287,8 @@ mod tests {
         }
         assert_eq!(vcf.calls.keys().len(), expected_calls.len());
 
-        let expected_minor_calls = [
-            vec![
-                Evidence {
+        let expected_minor_calls = [vec![
+            Evidence {
                 cov: Some(99),
                 frs: Some(ordered_float::OrderedFloat(0.495)),
                 genotype: "1/2".to_string(),
@@ -1312,10 +1311,8 @@ mod tests {
                 genome_index: 4730,
                 is_minor: true,
                 vcf_idx: Some(2),
-            }
-            ]
-        ];
-
+            },
+        ]];
 
         for calls in expected_minor_calls.iter() {
             let actual = vcf.minor_calls.get(&calls[0].genome_index).unwrap();
