@@ -423,6 +423,11 @@ impl VCFFile {
             return (calls, minor_calls);
         }
 
+        if call_type == AltType::HET {
+            // HET calls need to make sure we aren't skipping the first alt
+            alt_idx = -1;
+        }
+
         // Now we've got the main call, we need to figure out the minor calls
         // So check all possible values of COV for threshold to be considered a minor call
         let mut idx = 0;
@@ -1265,11 +1270,8 @@ mod tests {
             }],
         ];
 
-        for (row_idx, calls) in expected_calls.iter().enumerate() {
-            println!("{} --> {}", row_idx, &calls[0].genome_index);
-            println!("{:?}", vcf.calls.keys());
+        for calls in expected_calls.iter() {
             let actual = vcf.calls.get(&calls[0].genome_index).unwrap();
-            println!("{:?}\n", actual);
             for (idx, call) in calls.iter().enumerate() {
                 assert_eq!(call.cov, actual[idx].cov);
                 assert_eq!(call.frs, actual[idx].frs);
@@ -1283,7 +1285,52 @@ mod tests {
                 assert_eq!(call.vcf_idx, actual[idx].vcf_idx);
             }
         }
-        println!("{:?}", vcf.calls.get(&13148).unwrap());
         assert_eq!(vcf.calls.keys().len(), expected_calls.len());
+
+        let expected_minor_calls = [
+            vec![
+                Evidence {
+                cov: Some(99),
+                frs: Some(ordered_float::OrderedFloat(0.495)),
+                genotype: "1/2".to_string(),
+                call_type: AltType::SNP,
+                vcf_row: expected_records[2].clone(),
+                reference: "c".to_string(),
+                alt: "t".to_string(),
+                genome_index: 4730,
+                is_minor: true,
+                vcf_idx: Some(1),
+            },
+            Evidence {
+                cov: Some(100),
+                frs: Some(ordered_float::OrderedFloat(0.5)),
+                genotype: "1/2".to_string(),
+                call_type: AltType::SNP,
+                vcf_row: expected_records[2].clone(),
+                reference: "c".to_string(),
+                alt: "g".to_string(),
+                genome_index: 4730,
+                is_minor: true,
+                vcf_idx: Some(2),
+            }
+            ]
+        ];
+
+
+        for calls in expected_minor_calls.iter() {
+            let actual = vcf.minor_calls.get(&calls[0].genome_index).unwrap();
+            for (idx, call) in calls.iter().enumerate() {
+                assert_eq!(call.cov, actual[idx].cov);
+                assert_eq!(call.frs, actual[idx].frs);
+                assert_eq!(call.genotype, actual[idx].genotype);
+                assert_eq!(call.call_type, actual[idx].call_type);
+                assert_eq!(call.vcf_row, actual[idx].vcf_row);
+                assert_eq!(call.reference, actual[idx].reference);
+                assert_eq!(call.alt, actual[idx].alt);
+                assert_eq!(call.genome_index, actual[idx].genome_index);
+                assert_eq!(call.is_minor, actual[idx].is_minor);
+                assert_eq!(call.vcf_idx, actual[idx].vcf_idx);
+            }
+        }
     }
 }
