@@ -112,7 +112,7 @@ impl Evidence {
 }
 
 #[pyclass]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 /// Struct to hold the information to construct a gene
 pub struct GeneDef {
     #[pyo3(get, set)]

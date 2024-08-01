@@ -2,6 +2,7 @@
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::string::String;
+use std::usize;
 use std::vec::Vec;
 
 use crate::common::{Alt, AltType, Evidence, GeneDef};
@@ -290,7 +291,11 @@ impl Gene {
         // Figure out the nucelotide number for each position
         // Promoter first
         if gene_def.promoter_start != -1 {
-            for (nc_idx, i) in ((-(gene_def.promoter_size + 1))..0).enumerate() {
+            let mut promoter = -(gene_def.promoter_size + 1);
+            if gene_def.reverse_complement || gene_def.promoter_start == 0 {
+                promoter = -(gene_def.promoter_size);
+            }
+            for (nc_idx, i) in ((promoter)..0).enumerate() {
                 nucleotide_number.push(i);
                 gene_number.push(i);
                 gene_positions.push(GenePosition {
@@ -549,6 +554,72 @@ impl Gene {
                 }
             }
         }
+    }
+
+    pub fn at_promoter<'a, T>(&self, arr: &'a [T]) -> &'a [T] {
+        if arr.len() == self.nucleotide_number.len() {
+            // We're fetching something which is indexed by nucleotide number
+            let mut promoter_end_idx = usize::MAX;
+            for (idx, nc_num) in self.nucleotide_number.iter().enumerate() {
+                if *nc_num == 1 {
+                    promoter_end_idx = idx;
+                    break;
+                }
+            }
+            if promoter_end_idx == usize::MAX {
+                panic!("Promoter end not found in gene {}", self.name)
+            }
+            return &arr[0..promoter_end_idx];
+        }
+        if arr.len() == self.gene_number.len() {
+            // We're fetching something which is indexed by gene number
+            let mut promoter_end_idx = usize::MAX;
+            for (idx, gene_num) in self.gene_number.iter().enumerate() {
+                if *gene_num == 1 {
+                    promoter_end_idx = idx;
+                    break;
+                }
+            }
+            if promoter_end_idx == usize::MAX {
+                panic!("Promoter end not found in gene {}", self.name)
+            }
+            return &arr[0..promoter_end_idx];
+        }
+
+        panic!("Invalid array length for promoter check!")
+    }
+
+    pub fn not_promoter<'a, T>(&self, arr: &'a [T]) -> &'a [T] {
+        if arr.len() == self.nucleotide_number.len() {
+            // We're fetching something which is indexed by nucleotide number
+            let mut promoter_end_idx = usize::MAX;
+            for (idx, nc_num) in self.nucleotide_number.iter().enumerate() {
+                if *nc_num == 1 {
+                    promoter_end_idx = idx;
+                    break;
+                }
+            }
+            if promoter_end_idx == usize::MAX {
+                panic!("Promoter end not found in gene {}", self.name)
+            }
+            return &arr[promoter_end_idx..arr.len()];
+        }
+        if arr.len() == self.gene_number.len() {
+            // We're fetching something which is indexed by gene number
+            let mut promoter_end_idx = usize::MAX;
+            for (idx, gene_num) in self.gene_number.iter().enumerate() {
+                if *gene_num == 1 {
+                    promoter_end_idx = idx;
+                    break;
+                }
+            }
+            if promoter_end_idx == usize::MAX {
+                panic!("Promoter end not found in gene {}", self.name)
+            }
+            return &arr[promoter_end_idx..arr.len()];
+        }
+
+        panic!("Invalid array length for promoter check!")
     }
 }
 

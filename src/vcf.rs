@@ -128,8 +128,6 @@ impl VCFFile {
                 passed = true;
             }
 
-            // println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
-
             records.push(VCFRow {
                 position: record.position as i64,
                 reference: String::from_utf8_lossy(&record.reference)
@@ -143,8 +141,6 @@ impl VCFFile {
 
             let (record_calls, mut record_minor_calls) =
                 VCFFile::parse_record_for_calls(records[records.len() - 1].clone(), min_dp);
-            // println!("Calls {:?}", record_calls);
-            // println!("Minor calls {:?}\n", record_minor_calls);
 
             for call in record_calls.iter() {
                 let mut added = false;
@@ -232,11 +228,8 @@ impl VCFFile {
             //     println!("\n\n");
             // }
 
-            // minor_calls.extend(record_minor_calls);
-
             // Get the next record
             more_records = reader.next_record(&mut record);
-            // break;
         }
 
         // I hate implict returns, but appease clippy
