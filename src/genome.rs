@@ -243,12 +243,10 @@ impl Genome {
                 // Catch edge case of gene starting at genome index 0
                 // this couldn't have a promoter so mark as such
                 gene.promoter_start = -1;
+            } else if gene.reverse_complement {
+                gene.promoter_start = gene.start - 1;
             } else {
-                if gene.reverse_complement {
-                    gene.promoter_start = gene.start -1;
-                } else {
-                    gene.promoter_start = gene.start;
-                }
+                gene.promoter_start = gene.start;
             }
         }
 
@@ -283,7 +281,6 @@ impl Genome {
                         .genes
                         .push(gene.name.clone());
                     this_complete = false;
-                    
                 }
             }
             complete = this_complete;
@@ -552,7 +549,7 @@ mod tests {
         assert_eq!(genome.nucleotide_sequence, "aaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccc");
         let mut offset = 0;
         for (idx, pos) in genome.genome_positions.iter().enumerate() {
-            if idx - offset < 10{
+            if idx - offset < 10 {
                 assert_eq!(pos.reference, 'a')
             } else if idx - offset < 20 {
                 assert_eq!(pos.reference, 'c');
@@ -584,15 +581,24 @@ mod tests {
         assert_eq!(gene_a.name, "A");
         assert_eq!(gene_a.nucleotide_sequence, "aaaaaaaaaaccccccccccgggggggggg");
         assert_eq!(gene_a.amino_acid_sequence, "KKTPPPGGG".to_string());
-        assert_eq!(gene_a.codons, vec!["aaa", "aaa", "acc", "ccc", "ccc", "ccg", "ggg", "ggg", "ggg"]);
+        assert_eq!(
+            gene_a.codons,
+            vec!["aaa", "aaa", "acc", "ccc", "ccc", "ccg", "ggg", "ggg", "ggg"]
+        );
         assert!(gene_a.coding);
         assert!(!gene_a.reverse_complement);
 
         let gene_b = genome.get_gene("B".to_string());
         assert_eq!(gene_b.name, "B");
-        assert_eq!(gene_b.nucleotide_sequence, "gggttttttttttaaaaaaaaaacccccccccc");
+        assert_eq!(
+            gene_b.nucleotide_sequence,
+            "gggttttttttttaaaaaaaaaacccccccccc"
+        );
         assert_eq!(gene_b.amino_acid_sequence, "GFFF!KKNPPP".to_string());
-        assert_eq!(gene_b.codons, vec!["ggg", "ttt", "ttt", "ttt", "taa", "aaa", "aaa", "aac", "ccc", "ccc", "ccc"]);
+        assert_eq!(
+            gene_b.codons,
+            vec!["ggg", "ttt", "ttt", "ttt", "taa", "aaa", "aaa", "aac", "ccc", "ccc", "ccc"]
+        );
         assert!(gene_b.coding);
         assert!(!gene_b.reverse_complement);
 
@@ -605,4 +611,3 @@ mod tests {
         assert!(gene_c.reverse_complement);
     }
 }
-

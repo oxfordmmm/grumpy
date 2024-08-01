@@ -2,7 +2,6 @@
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::string::String;
-use std::usize;
 use std::vec::Vec;
 
 use crate::common::{Alt, AltType, Evidence, GeneDef};
