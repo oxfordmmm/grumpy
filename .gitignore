@@ -15,3 +15,5 @@ Cargo.lock
 
 massif.out.*
 perf.data*
+tarpaulin-*.html
+edge-cases.md

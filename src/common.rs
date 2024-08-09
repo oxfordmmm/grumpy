@@ -96,7 +96,8 @@ pub struct Evidence {
 
     #[pyo3(get, set)]
     /// Index of the COV field in the VCF row which this call originated from
-    pub vcf_idx: i64,
+    /// None if not applicable (e.g het and null calls)
+    pub vcf_idx: Option<i64>,
 }
 
 #[pymethods]
@@ -111,7 +112,7 @@ impl Evidence {
 }
 
 #[pyclass]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 /// Struct to hold the information to construct a gene
 pub struct GeneDef {
     #[pyo3(get, set)]
