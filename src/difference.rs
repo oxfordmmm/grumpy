@@ -1024,8 +1024,9 @@ impl GeneDifference {
 /// # Returns
 /// - Trimmed string
 fn trim_float_string(mut float_string: String) -> String {
-    while float_string.chars().last() == Some('0') {
+    while float_string.ends_with('0') {
         float_string.pop();
     }
-    return float_string;
+    // I hate implicit returns, but appease clippy
+    float_string
 }
