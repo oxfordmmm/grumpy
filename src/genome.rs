@@ -4525,7 +4525,6 @@ mod tests {
         }];
 
         for (idx, mutation) in b_diff.minor_mutations.iter().enumerate() {
-            println!("{} --> {:?}", idx, mutation);
             assert_eq!(mutation, &expected_b_minor_mutations[idx])
         }
 
@@ -4537,5 +4536,387 @@ mod tests {
 
         assert_eq!(c_diff.mutations.len(), 0);
         assert_eq!(c_diff.minor_mutations.len(), 0);
+    }
+
+    #[test]
+    fn test_large_deletions() {
+        let mut reference = Genome::new("reference/TEST-DNA.gbk");
+        let vcf = VCFFile::new("test/TEST-DNA-4.vcf".to_string(), false, 3);
+
+        let mut sample = mutate(&reference, vcf);
+
+        let diff = GenomeDifference::new(reference.clone(), sample.clone(), MinorType::COV);
+
+        let expected_genome_variants = vec![
+            Variant {
+                variant: "3_del_aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
+                nucleotide_index: 3,
+                evidence: VCFRow {
+                    position: 2,
+                    reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
+                    alternative: vec!["a".to_string()],
+                    filter: vec!["PASS".to_string()],
+                    fields: HashMap::from([
+                        ("GT".to_string(), vec!["1/1".to_string()]),
+                        ("DP".to_string(), vec!["4".to_string()]),
+                        ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
+                        ("GT_CONF".to_string(), vec!["2.05".to_string()]),
+                    ]),
+                    is_filter_pass: true,
+                },
+                vcf_idx: Some(1),
+                indel_length: -91,
+                indel_nucleotides: Some("aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string()),
+                gene_position: Some(-1),
+                codon_idx: None,
+                gene_name: Some("A".to_string()),
+            },
+        ];
+
+        for (idx, variant) in diff.variants.iter().enumerate() {
+            assert_eq!(variant, &expected_genome_variants[idx]);
+        }
+
+        assert_eq!(diff.minor_variants.len(), 0);
+
+        // This deletion should cover large deletions in A and B, as well as partial deletions in C
+        let expected_a_mutations = vec![
+            Mutation {
+                mutation: "-1_del_aaaaaaaaccccccccccgggggggggg".to_string(),
+                gene: "A".to_string(),
+                evidence: vec![Evidence {
+                    cov: Some(3),
+                    frs: Some(OrderedFloat(0.75)),
+                    genotype: "1/1".to_string(),
+                    call_type: AltType::DEL,
+                    vcf_row: VCFRow {
+                        position: 2,
+                        reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
+                        alternative: vec!["a".to_string()],
+                        filter: vec!["PASS".to_string()],
+                        fields: HashMap::from([
+                            ("GT".to_string(), vec!["1/1".to_string()]),
+                            ("DP".to_string(), vec!["4".to_string()]),
+                            ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
+                            ("GT_CONF".to_string(), vec!["2.05".to_string()]),
+                        ]),
+                        is_filter_pass: true,
+                    },
+                    reference: "a".to_string(),
+                    alt: "aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
+                    genome_index: 3,
+                    is_minor: false,
+                    vcf_idx: Some(1),
+                }],
+                gene_position: Some(-1),
+                codes_protein: Some(false),
+                ref_nucleotides: None,
+                alt_nucleotides: None,
+                nucleotide_number: Some(-1),
+                nucleotide_index: Some(3),
+                indel_length: Some(-28),
+                indel_nucleotides: Some("aaaaaaaaccccccccccgggggggggg".to_string()),
+                amino_acid_number: None,
+                amino_acid_sequence: None,
+            },
+            Mutation {
+                mutation: "del_0.93".to_string(),
+                gene: "A".to_string(),
+                evidence: vec![],
+                gene_position: None,
+                codes_protein: None,
+                ref_nucleotides: None,
+                alt_nucleotides: None,
+                nucleotide_number: None,
+                nucleotide_index: None,
+                indel_length: None,
+                indel_nucleotides: None,
+                amino_acid_number: None,
+                amino_acid_sequence: None,
+            },
+        ];
+
+        let a_diff = GeneDifference::new(
+            reference.get_gene("A".to_string()),
+            sample.get_gene("A".to_string()),
+            MinorType::COV,
+        );
+
+        for (idx, mutation) in a_diff.mutations.iter().enumerate() {
+            assert_eq!(mutation, &expected_a_mutations[idx]);
+        }
+
+        assert_eq!(a_diff.minor_mutations.len(), 0);
+
+        let b_diff = GeneDifference::new(
+            reference.get_gene("B".to_string()),
+            sample.get_gene("B".to_string()),
+            MinorType::COV,
+        );
+
+        let expected_b_mutations = vec![
+            Mutation {
+                mutation: "1_del_gggttttttttttaaaaaaaaaacccccccccc".to_string(),
+                gene: "B".to_string(),
+                evidence: vec![Evidence {
+                    cov: Some(3),
+                    frs: Some(OrderedFloat(0.75)),
+                    genotype: "1/1".to_string(),
+                    call_type: AltType::DEL,
+                    vcf_row: VCFRow {
+                        position: 2,
+                        reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
+                        alternative: vec!["a".to_string()],
+                        filter: vec!["PASS".to_string()],
+                        fields: HashMap::from([
+                            ("GT".to_string(), vec!["1/1".to_string()]),
+                            ("DP".to_string(), vec!["4".to_string()]),
+                            ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
+                            ("GT_CONF".to_string(), vec!["2.05".to_string()]),
+                        ]),
+                        is_filter_pass: true,
+                    },
+                    reference: "a".to_string(),
+                    alt: "gggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
+                    genome_index: 28,
+                    is_minor: false,
+                    vcf_idx: Some(1),
+                }],
+                gene_position: Some(1),
+                codes_protein: Some(true),
+                ref_nucleotides: None,
+                alt_nucleotides: None,
+                nucleotide_number: None,
+                nucleotide_index: None,
+                indel_length: Some(-33),
+                indel_nucleotides: Some("gggttttttttttaaaaaaaaaacccccccccc".to_string()),
+                amino_acid_number: None,
+                amino_acid_sequence: None,
+            },
+            Mutation {
+                mutation: "del_1.0".to_string(),
+                gene: "B".to_string(),
+                evidence: vec![],
+                gene_position: None,
+                codes_protein: None,
+                ref_nucleotides: None,
+                alt_nucleotides: None,
+                nucleotide_number: None,
+                nucleotide_index: None,
+                indel_length: None,
+                indel_nucleotides: None,
+                amino_acid_number: None,
+                amino_acid_sequence: None,
+            },
+        ];
+
+        for (idx, mutation) in b_diff.mutations.iter().enumerate() {
+            assert_eq!(mutation, &expected_b_mutations[idx]);
+        }
+
+        assert_eq!(b_diff.minor_mutations.len(), 0);
+
+        let c_diff = GeneDifference::new(
+            reference.get_gene("C".to_string()),
+            sample.get_gene("C".to_string()),
+            MinorType::COV,
+        );
+
+        let expected_c_mutations = vec![
+            Mutation {
+                mutation: "4_del_ggg".to_string(),
+                gene: "C".to_string(),
+                evidence: vec![Evidence {
+                    cov: Some(3),
+                    frs: Some(OrderedFloat(0.75)),
+                    genotype: "1/1".to_string(),
+                    call_type: AltType::DEL,
+                    vcf_row: VCFRow {
+                        position: 2,
+                        reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
+                        alternative: vec!["a".to_string()],
+                        filter: vec!["PASS".to_string()],
+                        fields: HashMap::from([
+                            ("GT".to_string(), vec!["1/1".to_string()]),
+                            ("DP".to_string(), vec!["4".to_string()]),
+                            ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
+                            ("GT_CONF".to_string(), vec!["2.05".to_string()]),
+                        ]),
+                        is_filter_pass: true,
+                    },
+                    reference: "g".to_string(),
+                    alt: "ggg".to_string(),
+                    genome_index: 94,
+                    is_minor: false,
+                    vcf_idx: Some(1),
+                }],
+                gene_position: Some(4),
+                codes_protein: Some(true),
+                ref_nucleotides: None,
+                alt_nucleotides: None,
+                nucleotide_number: None,
+                nucleotide_index: None,
+                indel_length: Some(-3),
+                indel_nucleotides: Some("ggg".to_string()),
+                amino_acid_number: None,
+                amino_acid_sequence: None,
+            },
+        ];
+
+        for (idx, mutation) in c_diff.mutations.iter().enumerate() {
+            assert_eq!(mutation, &expected_c_mutations[idx]);
+        }
+
+        assert_eq!(c_diff.minor_mutations.len(), 0);
+    }
+
+    #[test]
+    fn test_revcomp_minor_population() {
+        let mut reference = Genome::new("reference/NC_000962.3.gbk");
+        let vcf = VCFFile::new("test/minor-populations-revcomp.vcf".to_string(), false, 3);
+        let mut samples = mutate(&reference, vcf);
+
+        let kat_g_diff = GeneDifference::new(
+            reference.get_gene("katG".to_string()),
+            samples.get_gene("katG".to_string()),
+            MinorType::COV,
+        );
+        assert_eq!(kat_g_diff.mutations.len(), 0);
+
+        let expected_katg_minor_mutations = vec![
+            Mutation {
+                mutation: "1710_del_cc:25".to_string(),
+                gene: "katG".to_string(),
+                evidence: vec![Evidence {
+                    cov: Some(25),
+                    frs: Some(OrderedFloat(25.0 / 100.0)),
+                    genotype: "0/0".to_string(),
+                    call_type: AltType::DEL,
+                    vcf_row: VCFRow {
+                        position: 2154400,
+                        reference: "cgg".to_string(),
+                        alternative: vec!["c".to_string()],
+                        filter: vec!["MIN_FRS".to_string()],
+                        fields: HashMap::from([
+                            ("GT".to_string(), vec!["0/0".to_string()]),
+                            ("DP".to_string(), vec!["100".to_string()]),
+                            (
+                                "ALLELE_DP".to_string(),
+                                vec!["75".to_string(), "25".to_string()],
+                            ),
+                            ("FRS".to_string(), vec!["0.75".to_string()]),
+                            ("COV_TOTAL".to_string(), vec!["100".to_string()]),
+                            ("COV".to_string(), vec!["75".to_string(), "25".to_string()]),
+                            ("GT_CONF".to_string(), vec!["731.8".to_string()]),
+                            ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
+                        ]),
+                        is_filter_pass: false,
+                    },
+                    reference: "g".to_string(),
+                    alt: "gg".to_string(),
+                    genome_index: 2154401,
+                    is_minor: true,
+                    vcf_idx: Some(1),
+                }],
+                gene_position: Some(1710),
+                codes_protein: Some(true),
+                ref_nucleotides: None,
+                alt_nucleotides: None,
+                nucleotide_number: None,
+                nucleotide_index: None,
+                indel_length: Some(-2),
+                indel_nucleotides: Some("cc".to_string()),
+                amino_acid_number: None,
+                amino_acid_sequence: None,
+            },
+            Mutation {
+                mutation: "T572Z:15".to_string(),
+                gene: "katG".to_string(),
+                evidence: vec![
+                    Evidence {
+                        cov: Some(15),
+                        frs: Some(OrderedFloat(15.0 / 100.0)),
+                        genotype: "0/0".to_string(),
+                        call_type: AltType::SNP,
+                        vcf_row: VCFRow {
+                            position: 2154397,
+                            reference: "g".to_string(),
+                            alternative: vec!["t".to_string(), "c".to_string()],
+                            filter: vec!["MIN_FRS".to_string()],
+                            fields: HashMap::from([
+                                ("GT".to_string(), vec!["0/0".to_string()]),
+                                ("DP".to_string(), vec!["100".to_string()]),
+                                (
+                                    "ALLELE_DP".to_string(),
+                                    vec!["75".to_string(), "15".to_string(), "10".to_string()],
+                                ),
+                                ("FRS".to_string(), vec!["0.75".to_string()]),
+                                ("COV_TOTAL".to_string(), vec!["100".to_string()]),
+                                (
+                                    "COV".to_string(),
+                                    vec!["75".to_string(), "15".to_string(), "10".to_string()],
+                                ),
+                                ("GT_CONF".to_string(), vec!["731.8".to_string()]),
+                                ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
+                            ]),
+                            is_filter_pass: false,
+                        },
+                        reference: "g".to_string(),
+                        alt: "t".to_string(),
+                        genome_index: 2154397,
+                        is_minor: true,
+                        vcf_idx: Some(1),
+                    },
+                    Evidence {
+                        cov: Some(10),
+                        frs: Some(OrderedFloat(10.0 / 100.0)),
+                        genotype: "0/0".to_string(),
+                        call_type: AltType::SNP,
+                        vcf_row: VCFRow {
+                            position: 2154397,
+                            reference: "g".to_string(),
+                            alternative: vec!["t".to_string(), "c".to_string()],
+                            filter: vec!["MIN_FRS".to_string()],
+                            fields: HashMap::from([
+                                ("GT".to_string(), vec!["0/0".to_string()]),
+                                ("DP".to_string(), vec!["100".to_string()]),
+                                (
+                                    "ALLELE_DP".to_string(),
+                                    vec!["75".to_string(), "15".to_string(), "10".to_string()],
+                                ),
+                                ("FRS".to_string(), vec!["0.75".to_string()]),
+                                ("COV_TOTAL".to_string(), vec!["100".to_string()]),
+                                (
+                                    "COV".to_string(),
+                                    vec!["75".to_string(), "15".to_string(), "10".to_string()],
+                                ),
+                                ("GT_CONF".to_string(), vec!["731.8".to_string()]),
+                                ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
+                            ]),
+                            is_filter_pass: false,
+                        },
+                        reference: "g".to_string(),
+                        alt: "c".to_string(),
+                        genome_index: 2154397,
+                        is_minor: true,
+                        vcf_idx: Some(2),
+                    },
+                ],
+                gene_position: Some(572),
+                codes_protein: Some(true),
+                ref_nucleotides: Some("acg".to_string()),
+                alt_nucleotides: Some("azg".to_string()),
+                nucleotide_number: None,
+                nucleotide_index: None,
+                indel_length: None,
+                indel_nucleotides: None,
+                amino_acid_number: Some(572),
+                amino_acid_sequence: Some('Z'),
+            },
+        ];
+
+        for (idx, mutation) in kat_g_diff.minor_mutations.iter().enumerate() {
+            assert_eq!(mutation, &expected_katg_minor_mutations[idx]);
+        }
     }
 }

@@ -548,7 +548,7 @@ impl Gene {
                     && position.genome_idx + (alt.base.len() as i64) > last_pos
                 {
                     let bases_to_trim =
-                        (position.genome_idx + alt.base.len() as i64 - last_pos) as usize;
+                        (position.genome_idx + alt.base.len() as i64 - last_pos - 1) as usize;
                     alt.base = alt.base[0..alt.base.len() - bases_to_trim].to_string();
                 }
             }

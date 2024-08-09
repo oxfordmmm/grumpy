@@ -1026,6 +1026,10 @@ impl GeneDifference {
 fn trim_float_string(mut float_string: String) -> String {
     while float_string.ends_with('0') {
         float_string.pop();
+        if float_string.ends_with("1.0") {
+            // Keep trailing 0 for 1.0
+            return float_string;
+        }
     }
     // I hate implicit returns, but appease clippy
     float_string
