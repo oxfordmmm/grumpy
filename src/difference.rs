@@ -8,7 +8,7 @@ use crate::gene::{codon_to_aa, Gene, GenePos};
 use crate::genome::Genome;
 
 #[pyclass]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 /// Genome level variant
 pub struct Variant {
     #[pyo3(get, set)]
@@ -49,7 +49,7 @@ pub struct Variant {
 }
 
 #[pyclass]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 /// Gene level mutation
 pub struct Mutation {
     #[pyo3(get, set)]
@@ -217,7 +217,9 @@ impl GenomeDifference {
                             garc = garc + ":" + &alt.evidence.cov.unwrap().to_string();
                         }
                         if minor_type == MinorType::FRS {
-                            garc = garc + ":" + &format!("{:.3}", alt.evidence.frs.unwrap());
+                            garc = garc
+                                + ":"
+                                + &trim_float_string(format!("{:.3}", alt.evidence.frs.unwrap()));
                         }
                     }
                     let variant = Variant {
@@ -530,26 +532,25 @@ impl GeneDifference {
                                         indel_nucleotides = Some(e.base.clone());
                                         evidence = vec![e.evidence.clone()];
                                     }
-
-                                    if _mutation != *"" {
-                                        // We picked up a mutation so lets append it
-                                        mutations.push(Mutation {
-                                            mutation: _mutation.clone(),
-                                            gene: gene_name.clone(),
-                                            evidence: evidence.clone(),
-                                            gene_position: Some(alt_cd.nucleotide_number),
-                                            codes_protein: Some(codes_protein),
-                                            ref_nucleotides: _ref_nucleotides.clone(),
-                                            alt_nucleotides: _alt_nucleotides.clone(),
-                                            nucleotide_number,
-                                            nucleotide_index,
-                                            indel_length,
-                                            indel_nucleotides: indel_nucleotides.clone(),
-                                            amino_acid_number: _amino_acid_number,
-                                            amino_acid_sequence: _amino_acid_sequence,
-                                        });
-                                    }
                                 }
+                            }
+                            if _mutation != *"" {
+                                // We picked up a mutation so lets append it
+                                mutations.push(Mutation {
+                                    mutation: _mutation.clone(),
+                                    gene: gene_name.clone(),
+                                    evidence: evidence.clone(),
+                                    gene_position: Some(alt_cd.nucleotide_number),
+                                    codes_protein: Some(codes_protein),
+                                    ref_nucleotides: _ref_nucleotides.clone(),
+                                    alt_nucleotides: _alt_nucleotides.clone(),
+                                    nucleotide_number,
+                                    nucleotide_index,
+                                    indel_length,
+                                    indel_nucleotides: indel_nucleotides.clone(),
+                                    amino_acid_number: _amino_acid_number,
+                                    amino_acid_sequence: _amino_acid_sequence,
+                                });
                             }
                             if !these_minor_indels.is_empty() && !these_minor_snps.is_empty() {
                                 // Mix of indel and SNP at this position
@@ -615,7 +616,10 @@ impl GeneDifference {
                                         if minor_type == MinorType::FRS {
                                             _mutation = _mutation
                                                 + ":"
-                                                + &format!("{:.3}", e.evidence.frs.unwrap());
+                                                + &trim_float_string(format!(
+                                                    "{:.3}",
+                                                    e.evidence.frs.unwrap()
+                                                ));
                                         }
                                         minor_mutations.push(Mutation {
                                             mutation: _mutation.clone(),
@@ -712,7 +716,7 @@ impl GeneDifference {
                                     + &ref_pos.gene_position.to_string()
                                     + &aa.to_string()
                                     + ":"
-                                    + &format!("{:.3}", minor_frs);
+                                    + &trim_float_string(format!("{:.3}", minor_frs));
                             }
                             minor_mutations.push(Mutation {
                                 mutation,
@@ -792,7 +796,10 @@ impl GeneDifference {
                                 if minor_type == MinorType::FRS {
                                     mutation = mutation
                                         + ":"
-                                        + &format!("{:.3}", alt.evidence.frs.unwrap());
+                                        + &trim_float_string(format!(
+                                            "{:.3}",
+                                            alt.evidence.frs.unwrap()
+                                        ));
                                 }
                                 if alt.alt_type == AltType::DEL {
                                     if alt.evidence.cov.unwrap() > minor_deleted_cov {
@@ -840,7 +847,8 @@ impl GeneDifference {
             minor_deleted_bases as f64 / ref_gene.nucleotide_number.len() as f64;
         if deleted_percent >= 0.5 {
             mutations.push(Mutation {
-                mutation: "del_".to_string() + format!("{:.2}", deleted_percent).as_str(),
+                mutation: "del_".to_string()
+                    + trim_float_string(format!("{:.2}", deleted_percent)).as_str(),
                 gene: gene_name.clone(),
                 evidence: Vec::new(),
                 gene_position: None,
@@ -856,13 +864,13 @@ impl GeneDifference {
             });
         }
         if minor_deleted_percent >= 0.5 {
-            let mut mutation =
-                "del_".to_string() + format!("{:.2}", minor_deleted_percent).as_str();
+            let mut mutation = "del_".to_string()
+                + trim_float_string(format!("{:.2}", minor_deleted_percent)).as_str();
             if minor_type == MinorType::COV {
                 mutation = mutation + ":" + &minor_deleted_cov.to_string();
             }
             if minor_type == MinorType::FRS {
-                mutation = mutation + ":" + &format!("{:.3}", minor_deleted_frs);
+                mutation = mutation + ":" + &trim_float_string(format!("{:.3}", minor_deleted_frs));
             }
             minor_mutations.push(Mutation {
                 mutation,
@@ -971,14 +979,14 @@ impl GeneDifference {
                 .to_string();
         }
         if minor_type == MinorType::FRS {
-            min_coverage = format!(
+            min_coverage = trim_float_string(format!(
                 "{:.3}",
                 these_minors
                     .iter()
                     .filter_map(|x| x.evidence.frs)
                     .max()
                     .unwrap()
-            );
+            ));
         }
         let mutation = nc_num.to_string() + "_" + &mutation_name + ":" + &min_coverage;
         let evidence = these_minors.iter().map(|x| x.evidence.clone()).collect();
@@ -1005,4 +1013,19 @@ impl GeneDifference {
             amino_acid_sequence: None,
         }
     }
+}
+
+#[pyfunction]
+/// Given a string of a float, trim trailling `0` chars
+///
+/// # Arguments
+/// - `float_string` - String representation of a float
+///
+/// # Returns
+/// - Trimmed string
+fn trim_float_string(mut float_string: String) -> String {
+    while float_string.chars().last() == Some('0') {
+        float_string.pop();
+    }
+    return float_string;
 }

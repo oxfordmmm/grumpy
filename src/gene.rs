@@ -341,9 +341,9 @@ impl Gene {
             // Now figure out the amino acid sequence from the nucleotide sequence
             let mut codon = "".to_string();
             let mut codon_idx = 1;
-            for i in prom_end..nucleotide_sequence.len() {
+            for (nc_num, i) in (prom_end..nucleotide_sequence.len()).enumerate() {
                 codon.push(nucleotide_sequence.chars().nth(i).unwrap());
-                genome_idx_map.insert(nucleotide_index[i], (codon_idx, Some((i % 3) as i64)));
+                genome_idx_map.insert(nucleotide_index[i], (codon_idx, Some((nc_num % 3) as i64)));
                 if codon.len() == 3 {
                     // Codon is complete
                     amino_acid_sequence.push(codon_to_aa(codon.clone()));
@@ -555,6 +555,13 @@ impl Gene {
         }
     }
 
+    /// Fetch the part of a given iterable which lies within the promoter.
+    ///
+    /// # Arguments
+    /// - `arr`: Iterable to fetch from
+    ///
+    /// # Returns
+    /// - Iterable containing only the data which comprises the promoter
     pub fn at_promoter<'a, T>(&self, arr: &'a [T]) -> &'a [T] {
         if arr.len() == self.nucleotide_number.len() {
             // We're fetching something which is indexed by nucleotide number
@@ -588,6 +595,13 @@ impl Gene {
         panic!("Invalid array length for promoter check!")
     }
 
+    /// Fetch the part of a given iterable which is not part of the promoter
+    ///
+    /// # Arguments
+    /// - `arr`: Iterable to fetch from
+    ///
+    /// # Returns
+    /// - Iterable containing only the data which is not part of the promoter
     pub fn not_promoter<'a, T>(&self, arr: &'a [T]) -> &'a [T] {
         if arr.len() == self.nucleotide_number.len() {
             // We're fetching something which is indexed by nucleotide number

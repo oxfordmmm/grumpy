@@ -217,15 +217,15 @@ impl VCFFile {
             }
 
             // if record.position == 1474466{
-            //     println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
-            //     for call in record_calls.iter(){
-            //         println!("{:?}\n", call);
-            //     }
-            //     println!("--");
-            //     for call in record_minor_calls.iter(){
-            //         println!("{:?}\n", call);
-            //     }
-            //     println!("\n\n");
+            // println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
+            // for call in record_calls.iter(){
+            //     println!("{:?}\n", call);
+            // }
+            // println!("--");
+            // for call in record_minor_calls.iter(){
+            //     println!("{:?}\n", call);
+            // }
+            // println!("\n\n");
             // }
 
             // Get the next record
@@ -282,10 +282,10 @@ impl VCFFile {
 
         let mut call_type = AltType::NULL;
 
-        println!(
-            "{:?}\t{:?}\t{:?}\t{:?}\t{:?}",
-            record.position, record.reference, record.alternative, record.filter, record.fields
-        );
+        // println!(
+        //     "{:?}\t{:?}\t{:?}\t{:?}\t{:?}",
+        //     record.position, record.reference, record.alternative, record.filter, record.fields
+        // );
         let first = genotype[0];
         // Adjust for 1-indexed VCF
         let mut alt_idx = 0;
@@ -361,15 +361,19 @@ impl VCFFile {
                     _alt_type = AltType::NULL;
                     _base = "x".to_string();
                 }
+                let mut reference = "".to_string();
+                if offset >= 0 {
+                    reference = ref_allele.chars().nth(offset as usize).unwrap().to_string();
+                }
                 calls.push(Evidence {
                     cov: Some(call_cov),
                     frs: Some(ordered_float::OrderedFloat(call_cov as f32 / dp as f32)),
                     genotype: genotype.join("/"),
                     call_type: _alt_type,
                     vcf_row: record.clone(),
-                    reference: ref_allele.chars().nth(offset).unwrap().to_string(),
+                    reference,
                     alt: _base,
-                    genome_index: record.position + offset as i64,
+                    genome_index: record.position + offset,
                     is_minor: false,
                     vcf_idx: Some((alt_idx + 1) as i64),
                 });
@@ -396,19 +400,20 @@ impl VCFFile {
                     vcf_idx = Some((alt_idx + 1) as i64);
                 }
             }
-
-            calls.push(Evidence {
-                cov: call_cov,
-                frs,
-                genotype: genotype.join("/"),
-                call_type: call_type.clone(),
-                vcf_row: record.clone(),
-                reference: ref_allele.clone(),
-                alt: alt_allele.clone(),
-                genome_index: record.position,
-                is_minor: false,
-                vcf_idx,
-            });
+            for (offset, r) in ref_allele.chars().enumerate() {
+                calls.push(Evidence {
+                    cov: call_cov,
+                    frs,
+                    genotype: genotype.join("/"),
+                    call_type: call_type.clone(),
+                    vcf_row: record.clone(),
+                    reference: r.to_string(),
+                    alt: alt_allele.clone(),
+                    genome_index: record.position + offset as i64,
+                    is_minor: false,
+                    vcf_idx,
+                });
+            }
         }
 
         if call_type == AltType::NULL {
@@ -435,15 +440,19 @@ impl VCFFile {
                 let call = VCFFile::simplify_call(ref_allele.clone(), alt_allele.clone());
                 let call_cov = *coverage;
                 for (offset, alt_type, base) in call {
+                    let mut reference = "".to_string();
+                    if offset >= 0 {
+                        reference = ref_allele.chars().nth(offset as usize).unwrap().to_string();
+                    }
                     minor_calls.push(Evidence {
                         cov: Some(call_cov),
                         frs: Some(ordered_float::OrderedFloat(call_cov as f32 / dp as f32)),
                         genotype: genotype.join("/"), // This is a minor call so the row's genotype is the same
                         call_type: alt_type,
                         vcf_row: record.clone(),
-                        reference: ref_allele.chars().nth(offset).unwrap().to_string(),
+                        reference,
                         alt: base,
-                        genome_index: record.position + offset as i64,
+                        genome_index: record.position + offset,
                         is_minor: true,
                         vcf_idx: Some(idx as i64),
                     });
@@ -470,14 +479,16 @@ impl VCFFile {
     ///    - `usize`: Offset of the call from row's genome index
     ///    - `AltType`: Type of call
     ///    - `String`: Base(s) of the call. If SNP/HET/NULL this will be a single base. If INS/DEL this will be the sequence inserted/deleted
-    pub fn simplify_call(reference: String, alternate: String) -> Vec<(usize, AltType, String)> {
-        let mut calls: Vec<(usize, AltType, String)> = Vec::new();
+    pub fn simplify_call(reference: String, alternate: String) -> Vec<(i64, AltType, String)> {
+        // Note that the offset of a call can be negative in annoying edge cases
+        // e.g insertion of "gg" --> "cagg" is a -1 offset as "ca" is inserted before the reference
+        let mut calls: Vec<(i64, AltType, String)> = Vec::new();
         if reference.len() == alternate.len() {
             // Simple set of SNPs
             for i in 0..reference.len() {
                 if reference.chars().nth(i).unwrap() != alternate.chars().nth(i).unwrap() {
                     calls.push((
-                        i,
+                        i as i64,
                         AltType::SNP,
                         alternate.chars().nth(i).unwrap().to_string(),
                     ));
@@ -515,7 +526,7 @@ impl VCFFile {
         let padding = "N".repeat(length as usize);
         let mut current = "".to_string();
         let mut current_dist = i64::MAX;
-        let mut indel_start = 0;
+        let mut indel_start: i64 = 0;
         for i in 0.._x.len() + 1 {
             let x1 = _x[0..i].to_string() + &padding + &_x[i.._x.len()];
             // println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", reference, alternate, x, y, x1);
@@ -523,7 +534,7 @@ impl VCFFile {
             if dist <= current_dist {
                 current = x1.clone();
                 current_dist = dist;
-                indel_start = i;
+                indel_start = i as i64;
             }
         }
 
@@ -548,7 +559,7 @@ impl VCFFile {
         let mut indel_left = length;
         let mut offset = 0;
         for i in 0.._y.len() {
-            if i == indel_start {
+            if i as i64 == indel_start {
                 // Pad where the indel is to ensure we get all calls
                 if indel_left > 0 {
                     indel_left -= 1;
@@ -561,9 +572,9 @@ impl VCFFile {
             let a = _x.chars().nth(i - offset).unwrap();
             if r != 'N' && a != 'N' && r != a {
                 if _indel_type == AltType::DEL {
-                    calls.push((i, AltType::SNP, a.to_string()));
+                    calls.push((i as i64, AltType::SNP, a.to_string()));
                 } else {
-                    calls.push((i, AltType::SNP, r.to_string()));
+                    calls.push((i as i64, AltType::SNP, r.to_string()));
                 }
             }
         }
@@ -995,10 +1006,6 @@ mod tests {
             assert_eq!(calls[1].frs, Some(ordered_float::OrderedFloat(57.0 / 70.0)));
             assert!(!calls[1].is_minor);
             assert_eq!(calls[1].vcf_idx, Some(1));
-
-            for call in minor_calls.iter() {
-                println!("{:?}", call);
-            }
 
             assert_eq!(minor_calls[0].genome_index, 2);
             assert_eq!(minor_calls[0].reference, "t".to_string());
