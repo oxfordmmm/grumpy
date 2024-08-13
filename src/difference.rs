@@ -432,11 +432,7 @@ impl GeneDifference {
                                 for ev in alt_codon.codon.clone() {
                                     if !ev.alts.is_empty() {
                                         for e in ev.alts.iter() {
-                                            if !e.evidence.is_minor
-                                                && (e.alt_type == AltType::SNP
-                                                    || e.alt_type == AltType::HET
-                                                    || e.alt_type == AltType::NULL)
-                                            {
+                                            if !e.evidence.is_minor && e.alt_type == AltType::SNP {
                                                 evidence.push(e.evidence.clone());
                                             }
                                         }
@@ -772,7 +768,7 @@ impl GeneDifference {
                                     + &ref_nc.nucleotide_number.to_string()
                                     + &alt.base;
                                 ref_nucleotides = Some(ref_nc.reference.to_string());
-                                alt_nucleotides = Some(alt_nc.reference.to_string());
+                                alt_nucleotides = Some(alt.base.to_string());
                             }
                             if alt.alt_type == AltType::INS {
                                 mutation =

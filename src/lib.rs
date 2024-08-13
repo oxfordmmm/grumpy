@@ -41,6 +41,7 @@ pub mod gene;
 pub mod genome;
 pub mod vcf;
 
+#[cfg(not(tarpaulin_include))]
 #[pymodule]
 /// Grumpy, genetic analysis in Rust.
 ///

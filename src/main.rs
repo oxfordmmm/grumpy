@@ -14,6 +14,7 @@ use genome::mutate;
 use genome::Genome;
 use vcf::VCFFile;
 
+#[cfg(not(tarpaulin_include))]
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() != 3 {

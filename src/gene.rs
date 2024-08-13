@@ -74,7 +74,7 @@ pub struct GenePosition {
 }
 
 #[pyclass]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 /// A gene is a collection of gene positions, along with some metadata
 pub struct Gene {
     #[pyo3(get, set)]
@@ -577,20 +577,21 @@ impl Gene {
             }
             return &arr[0..promoter_end_idx];
         }
-        if arr.len() == self.gene_number.len() {
-            // We're fetching something which is indexed by gene number
-            let mut promoter_end_idx = usize::MAX;
-            for (idx, gene_num) in self.gene_number.iter().enumerate() {
-                if *gene_num == 1 {
-                    promoter_end_idx = idx;
-                    break;
-                }
-            }
-            if promoter_end_idx == usize::MAX {
-                panic!("Promoter end not found in gene {}", self.name)
-            }
-            return &arr[0..promoter_end_idx];
-        }
+        // Commenting out for now as this is essentially only used for testing and is not needed
+        // if arr.len() == self.gene_number.len() {
+        //     // We're fetching something which is indexed by gene number
+        //     let mut promoter_end_idx = usize::MAX;
+        //     for (idx, gene_num) in self.gene_number.iter().enumerate() {
+        //         if *gene_num == 1 {
+        //             promoter_end_idx = idx;
+        //             break;
+        //         }
+        //     }
+        //     if promoter_end_idx == usize::MAX {
+        //         panic!("Promoter end not found in gene {}", self.name)
+        //     }
+        //     return &arr[0..promoter_end_idx];
+        // }
 
         panic!("Invalid array length for promoter check!")
     }
@@ -617,20 +618,21 @@ impl Gene {
             }
             return &arr[promoter_end_idx..arr.len()];
         }
-        if arr.len() == self.gene_number.len() {
-            // We're fetching something which is indexed by gene number
-            let mut promoter_end_idx = usize::MAX;
-            for (idx, gene_num) in self.gene_number.iter().enumerate() {
-                if *gene_num == 1 {
-                    promoter_end_idx = idx;
-                    break;
-                }
-            }
-            if promoter_end_idx == usize::MAX {
-                panic!("Promoter end not found in gene {}", self.name)
-            }
-            return &arr[promoter_end_idx..arr.len()];
-        }
+        // Commenting out for now as this is essentially only used for testing and is not needed
+        // if arr.len() == self.gene_number.len() {
+        //     // We're fetching something which is indexed by gene number
+        //     let mut promoter_end_idx = usize::MAX;
+        //     for (idx, gene_num) in self.gene_number.iter().enumerate() {
+        //         if *gene_num == 1 {
+        //             promoter_end_idx = idx;
+        //             break;
+        //         }
+        //     }
+        //     if promoter_end_idx == usize::MAX {
+        //         panic!("Promoter end not found in gene {}", self.name)
+        //     }
+        //     return &arr[promoter_end_idx..arr.len()];
+        // }
 
         panic!("Invalid array length for promoter check!")
     }

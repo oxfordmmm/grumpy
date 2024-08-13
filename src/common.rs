@@ -100,6 +100,7 @@ pub struct Evidence {
     pub vcf_idx: Option<i64>,
 }
 
+#[cfg(not(tarpaulin_include))]
 #[pymethods]
 impl Evidence {
     #[getter]

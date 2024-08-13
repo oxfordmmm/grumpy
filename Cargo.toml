@@ -22,3 +22,7 @@ debug = 1
 [lib]
 name = "grumpy"
 crate-type = ["cdylib", "rlib"]
+
+[lints.rust]
+# Used for ignoring boilerplate parts of py03 bindings + main function
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
