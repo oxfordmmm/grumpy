@@ -1,7 +1,7 @@
 //! Module for handling VCF files
 use pyo3::prelude::*;
 
-use std::collections::HashMap;
+use std::collections::{hash_map, HashMap};
 use std::fs::File;
 use std::io::BufReader;
 use std::string::String;
@@ -46,16 +46,13 @@ impl VCFFile {
         let mut record = reader.empty_record();
         let mut more_records = reader.next_record(&mut record);
 
-        let required_fields = vec!["GT"];
+        let required_fields = ["GT"];
         let mut records: Vec<VCFRow> = Vec::new();
 
         // For ease of access, we'll store the calls in a hashmap indexed on genome index
         let mut calls_map: HashMap<i64, Vec<Evidence>> = HashMap::new();
         let mut minor_calls_map: HashMap<i64, Vec<Evidence>> = HashMap::new();
-        while match more_records {
-            Ok(true) => true,
-            _ => false,
-        } {
+        while matches!(more_records, Ok(true)) {
             // Parse fields of the record to pull out data
             // For whatever reason non of these fields are strings, so we need to convert them
             let mut alts = Vec::new(); // One string per alt
@@ -64,7 +61,7 @@ impl VCFFile {
             }
             let mut filters = Vec::new(); // String per filter
             for filter in record.filter.iter() {
-                for f in String::from_utf8_lossy(filter).to_string().split(";") {
+                for f in String::from_utf8_lossy(filter).split(";") {
                     filters.push(f.to_string());
                 }
             }
@@ -127,11 +124,9 @@ impl VCFFile {
 
             // Check if this record has passed the filters
             let mut passed = false;
-            if filters.len() == 0 || filters == vec!["PASS"] {
+            if filters == vec!["PASS"] {
                 passed = true;
             }
-
-            // println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
 
             records.push(VCFRow {
                 position: record.position as i64,
@@ -146,17 +141,16 @@ impl VCFFile {
 
             let (record_calls, mut record_minor_calls) =
                 VCFFile::parse_record_for_calls(records[records.len() - 1].clone(), min_dp);
-            // println!("Calls {:?}", record_calls);
-            // println!("Minor calls {:?}\n", record_minor_calls);
 
             for call in record_calls.iter() {
                 let mut added = false;
                 if call.call_type == AltType::NULL {
+                    // Null calls need some nudging...
                     if passed || ignore_filter {
                         added = true;
                     } else if !passed {
                         // Not passed filter, so check if all filters are in allowed filters
-                        let allowed_filters = vec![
+                        let allowed_filters = [
                             "MIN_FRS".to_string(),
                             "MIN_DP".to_string(),
                             "MIN_GCP".to_string(),
@@ -179,7 +173,15 @@ impl VCFFile {
                 } else if ignore_filter || passed {
                     added = true;
                 }
-                if calls_map.contains_key(&call.genome_index) {
+
+                // Check if calls are already in the map,
+                // if they are, warn the user about multiple calls at the same position and add to vector
+                // if they aren't, add to the map
+                if let hash_map::Entry::Vacant(e) = calls_map.entry(call.genome_index) {
+                    if added {
+                        e.insert(vec![call.clone()]);
+                    }
+                } else {
                     println!(
                         "Multiple calls at genome position {}! {:?}\n",
                         call.genome_index,
@@ -191,11 +193,8 @@ impl VCFFile {
                             .unwrap()
                             .push(call.clone());
                     }
-                } else {
-                    if added {
-                        calls_map.insert(call.genome_index, vec![call.clone()]);
-                    }
                 }
+
                 if !added {
                     // Call skipped due to filter fail, so add as a minor call
                     let mut c = call.clone();
@@ -204,44 +203,42 @@ impl VCFFile {
                 }
             }
             // Add minor calls if the filter is passed or ignored, or specifcally just the MIN_FRS has failed
-            if (ignore_filter || passed) || (!passed && filters.contains(&"MIN_FRS".to_string())) {
+            if ignore_filter || passed || filters.contains(&"MIN_FRS".to_string()) {
                 for call in record_minor_calls.iter() {
-                    if minor_calls_map.contains_key(&call.genome_index) {
+                    if let hash_map::Entry::Vacant(e) = minor_calls_map.entry(call.genome_index) {
+                        e.insert(vec![call.clone()]);
+                    } else {
                         minor_calls_map
                             .get_mut(&call.genome_index)
                             .unwrap()
                             .push(call.clone());
-                    } else {
-                        minor_calls_map.insert(call.genome_index, vec![call.clone()]);
                     }
                 }
             }
 
             // if record.position == 1474466{
-            //     println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
-            //     for call in record_calls.iter(){
-            //         println!("{:?}\n", call);
-            //     }
-            //     println!("--");
-            //     for call in record_minor_calls.iter(){
-            //         println!("{:?}\n", call);
-            //     }
-            //     println!("\n\n");
+            // println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
+            // for call in record_calls.iter(){
+            //     println!("{:?}\n", call);
             // }
-
-            // minor_calls.extend(record_minor_calls);
+            // println!("--");
+            // for call in record_minor_calls.iter(){
+            //     println!("{:?}\n", call);
+            // }
+            // println!("\n\n");
+            // }
 
             // Get the next record
             more_records = reader.next_record(&mut record);
-            // break;
         }
 
-        return VCFFile {
+        // I hate implict returns, but appease clippy
+        VCFFile {
             header: Vec::new(),
             records,
             calls: calls_map,
             minor_calls: minor_calls_map,
-        };
+        }
     }
 
     #[staticmethod]
@@ -285,6 +282,10 @@ impl VCFFile {
 
         let mut call_type = AltType::NULL;
 
+        // println!(
+        //     "{:?}\t{:?}\t{:?}\t{:?}\t{:?}",
+        //     record.position, record.reference, record.alternative, record.filter, record.fields
+        // );
         let first = genotype[0];
         // Adjust for 1-indexed VCF
         let mut alt_idx = 0;
@@ -293,10 +294,12 @@ impl VCFFile {
         }
         if cov.len() == 1 {
             // Just 1 item in the call so santiy check if it's a null call
+            let mut vcf_idx = None;
             if genotype == &vec!["0", "0"] && cov[0] >= min_dp {
                 // Ref call
                 call_type = AltType::REF;
                 alt_allele = ref_allele.clone();
+                vcf_idx = Some(0);
             } else if genotype[0] != genotype[1] && cov[0] >= min_dp {
                 // Het call
                 call_type = AltType::HET;
@@ -307,7 +310,7 @@ impl VCFFile {
                 alt_allele = "x".to_string();
             }
             calls.push(Evidence {
-                cov: Some(cov[0 as usize]),
+                cov: Some(cov[0_usize]),
                 frs: Some(ordered_float::OrderedFloat(1.0)),
                 genotype: genotype.join("/"),
                 call_type,
@@ -316,13 +319,13 @@ impl VCFFile {
                 alt: alt_allele.clone(),
                 genome_index: record.position,
                 is_minor: false,
-                vcf_idx: 0 as i64,
+                vcf_idx,
             });
             return (calls, minor_calls);
         }
 
-        for i in 1..genotype.len() {
-            if genotype[i] != first {
+        for gt in genotype.iter().skip(1) {
+            if *gt != first {
                 call_type = AltType::HET;
                 alt_allele = "z".to_string();
                 break;
@@ -337,6 +340,9 @@ impl VCFFile {
                 // Could actually be an indel instead but that can't be inferred from just the genotype
                 call_type = AltType::SNP;
             }
+        }
+        if *genotype == vec![".", "."] {
+            call_type = AltType::NULL;
         }
         if call_type == AltType::NULL {
             alt_allele = "x".to_string();
@@ -355,44 +361,69 @@ impl VCFFile {
                     _alt_type = AltType::NULL;
                     _base = "x".to_string();
                 }
+                let mut reference = "".to_string();
+                if offset >= 0 {
+                    reference = ref_allele.chars().nth(offset as usize).unwrap().to_string();
+                }
                 calls.push(Evidence {
                     cov: Some(call_cov),
                     frs: Some(ordered_float::OrderedFloat(call_cov as f32 / dp as f32)),
                     genotype: genotype.join("/"),
                     call_type: _alt_type,
                     vcf_row: record.clone(),
-                    reference: ref_allele.chars().nth(offset).unwrap().to_string(),
+                    reference,
                     alt: _base,
-                    genome_index: record.position + offset as i64,
+                    genome_index: record.position + offset,
                     is_minor: false,
-                    vcf_idx: (alt_idx + 1) as i64,
+                    vcf_idx: Some((alt_idx + 1) as i64),
                 });
             }
-            // println!("Parsed calls {:?}\n", c);
         } else {
-            let call_cov = cov[(alt_idx + 1) as usize]; // COV should be [ref, alt1, alt2..]
-            if call_cov < min_dp {
-                // Override calls with null if the coverage is too low
-                call_type = AltType::NULL;
-                alt_allele = "x".to_string();
+            let mut call_cov = None;
+            let mut frs = None;
+            let mut vcf_idx = None;
+            if call_type != AltType::HET {
+                if genotype == &vec![".", "."] {
+                    // Explicit null GT can't point to a coverage so null
+                    call_type = AltType::NULL;
+                    alt_allele = "x".to_string();
+                } else {
+                    call_cov = Some(cov[(alt_idx + 1) as usize]); // COV should be [ref, alt1, alt2..]
+                    if call_cov.unwrap() < min_dp {
+                        // Override calls with null if the coverage is too low
+                        call_type = AltType::NULL;
+                        alt_allele = "x".to_string();
+                    }
+                    frs = Some(ordered_float::OrderedFloat(
+                        call_cov.unwrap() as f32 / dp as f32,
+                    ));
+                    vcf_idx = Some((alt_idx + 1) as i64);
+                }
             }
-            calls.push(Evidence {
-                cov: Some(call_cov),
-                frs: Some(ordered_float::OrderedFloat(call_cov as f32 / dp as f32)),
-                genotype: genotype.join("/"),
-                call_type: call_type.clone(),
-                vcf_row: record.clone(),
-                reference: ref_allele.clone(),
-                alt: alt_allele.clone(),
-                genome_index: record.position,
-                is_minor: false,
-                vcf_idx: (alt_idx + 1) as i64,
-            });
+            for (offset, r) in ref_allele.chars().enumerate() {
+                calls.push(Evidence {
+                    cov: call_cov,
+                    frs,
+                    genotype: genotype.join("/"),
+                    call_type: call_type.clone(),
+                    vcf_row: record.clone(),
+                    reference: r.to_string(),
+                    alt: alt_allele.clone(),
+                    genome_index: record.position + offset as i64,
+                    is_minor: false,
+                    vcf_idx,
+                });
+            }
         }
 
         if call_type == AltType::NULL {
             // Don't check for minor calls if the call is null
             return (calls, minor_calls);
+        }
+
+        if call_type == AltType::HET {
+            // HET calls need to make sure we aren't skipping the first alt
+            alt_idx = -1;
         }
 
         // Now we've got the main call, we need to figure out the minor calls
@@ -404,32 +435,34 @@ impl VCFFile {
                 idx += 1;
                 continue;
             }
-            // if *coverage >= min_dp{
-            if *coverage >= 2 {
-                alt_allele = record.alternative[(idx - 1) as usize]
-                    .clone()
-                    .to_lowercase();
+            if *coverage >= min_dp {
+                alt_allele = record.alternative[idx - 1].clone().to_lowercase();
                 let call = VCFFile::simplify_call(ref_allele.clone(), alt_allele.clone());
                 let call_cov = *coverage;
                 for (offset, alt_type, base) in call {
+                    let mut reference = "".to_string();
+                    if offset >= 0 {
+                        reference = ref_allele.chars().nth(offset as usize).unwrap().to_string();
+                    }
                     minor_calls.push(Evidence {
                         cov: Some(call_cov),
                         frs: Some(ordered_float::OrderedFloat(call_cov as f32 / dp as f32)),
                         genotype: genotype.join("/"), // This is a minor call so the row's genotype is the same
                         call_type: alt_type,
                         vcf_row: record.clone(),
-                        reference: ref_allele.chars().nth(offset).unwrap().to_string(),
+                        reference,
                         alt: base,
-                        genome_index: record.position + offset as i64,
+                        genome_index: record.position + offset,
                         is_minor: true,
-                        vcf_idx: idx as i64,
+                        vcf_idx: Some(idx as i64),
                     });
                 }
             }
             idx += 1;
         }
 
-        return (calls, minor_calls);
+        // I hate implict returns, but appease clippy
+        (calls, minor_calls)
     }
 
     #[staticmethod]
@@ -446,14 +479,16 @@ impl VCFFile {
     ///    - `usize`: Offset of the call from row's genome index
     ///    - `AltType`: Type of call
     ///    - `String`: Base(s) of the call. If SNP/HET/NULL this will be a single base. If INS/DEL this will be the sequence inserted/deleted
-    pub fn simplify_call(reference: String, alternate: String) -> Vec<(usize, AltType, String)> {
-        let mut calls: Vec<(usize, AltType, String)> = Vec::new();
+    pub fn simplify_call(reference: String, alternate: String) -> Vec<(i64, AltType, String)> {
+        // Note that the offset of a call can be negative in annoying edge cases
+        // e.g insertion of "gg" --> "cagg" is a -1 offset as "ca" is inserted before the reference
+        let mut calls: Vec<(i64, AltType, String)> = Vec::new();
         if reference.len() == alternate.len() {
             // Simple set of SNPs
             for i in 0..reference.len() {
                 if reference.chars().nth(i).unwrap() != alternate.chars().nth(i).unwrap() {
                     calls.push((
-                        i,
+                        i as i64,
                         AltType::SNP,
                         alternate.chars().nth(i).unwrap().to_string(),
                     ));
@@ -491,15 +526,15 @@ impl VCFFile {
         let padding = "N".repeat(length as usize);
         let mut current = "".to_string();
         let mut current_dist = i64::MAX;
-        let mut indel_start = 0;
+        let mut indel_start: i64 = 0;
         for i in 0.._x.len() + 1 {
-            let x1 = _x[0..i].to_string() + &padding + &_x[i.._x.len()].to_string();
+            let x1 = _x[0..i].to_string() + &padding + &_x[i.._x.len()];
             // println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", reference, alternate, x, y, x1);
             let dist = snp_dist(&x1, &_y);
             if dist <= current_dist {
                 current = x1.clone();
                 current_dist = dist;
-                indel_start = i;
+                indel_start = i as i64;
             }
         }
 
@@ -515,28 +550,52 @@ impl VCFFile {
             }
         }
 
-        calls.push((indel_start as usize, _indel_type, indel_str));
+        calls.push((indel_start, _indel_type.clone(), indel_str));
 
-        for i in 0.._x.len() {
+        if _indel_type == AltType::INS {
+            // Return to vector index now the call has been constructed
+            indel_start += 1;
+        }
+        let mut indel_left = length;
+        let mut offset = 0;
+        for i in 0.._y.len() {
+            if i as i64 == indel_start {
+                // Pad where the indel is to ensure we get all calls
+                if indel_left > 0 {
+                    indel_left -= 1;
+                    indel_start += 1;
+                    offset += 1;
+                }
+                continue;
+            }
             let r = _y.chars().nth(i).unwrap();
-            let a = _x.chars().nth(i).unwrap();
+            let a = _x.chars().nth(i - offset).unwrap();
             if r != 'N' && a != 'N' && r != a {
-                calls.push((i, AltType::SNP, a.to_string()));
+                if _indel_type == AltType::DEL {
+                    calls.push((i as i64, AltType::SNP, a.to_string()));
+                } else {
+                    calls.push((i as i64, AltType::SNP, r.to_string()));
+                }
             }
         }
-        return calls;
+
+        // I hate implict returns, but appease clippy
+        calls
     }
 }
 
 /// Calculate the distance between two strings ignoring N characters
 ///
 /// # Arguments
-/// - `reference`: &String - Reference sequence
-/// - `alternate`: &String - Alternate sequence
+/// - `reference`: &str - Reference sequence
+/// - `alternate`: &str - Alternate sequence
 ///
 /// # Returns
 /// SNP distance between the two strings
-fn snp_dist(reference: &String, alternate: &String) -> i64 {
+fn snp_dist(reference: &str, alternate: &str) -> i64 {
+    if reference.len() != alternate.len() {
+        panic!("Reference and alternate strings are not the same length!");
+    }
     let mut dist = 0;
     for i in 0..reference.len() {
         let r = reference.chars().nth(i).unwrap();
@@ -545,5 +604,730 @@ fn snp_dist(reference: &String, alternate: &String) -> i64 {
             dist += 1;
         }
     }
-    return dist;
+
+    // I hate implict returns, but appease clippy
+    dist
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    macro_rules! assert_panics {
+        ($expression:expr) => {
+            let result = std::panic::catch_unwind(|| $expression);
+            assert!(result.is_err());
+        };
+    }
+
+    #[test]
+    fn test_snp_dist() {
+        // Some trivial cases
+        assert_eq!(snp_dist("ACGT", "ACGT"), 0);
+        assert_eq!(snp_dist("AAAAA", "AAAAA"), 0);
+        assert_eq!(snp_dist("ACGTACGT", "ACGTACGT"), 0);
+        assert_eq!(snp_dist("ACGT", "AAGT"), 1);
+        assert_eq!(snp_dist("ACGT", "AAAT"), 2);
+        assert_eq!(snp_dist("ACGT", "AAAA"), 3);
+        assert_eq!(snp_dist("ACGT", "NNNN"), 0);
+        assert_eq!(snp_dist("ACGT", "NAGT"), 1);
+
+        // Should panic
+        assert_panics!(snp_dist("ACGT", "ACG"));
+        assert_panics!(snp_dist("", "ACGT"));
+        assert_panics!(snp_dist("ACGT", ""));
+    }
+
+    #[test]
+    fn test_simplify_call() {
+        // Some trivial cases
+        assert_eq!(
+            VCFFile::simplify_call("ACGT".to_string(), "ACGT".to_string()),
+            vec![]
+        );
+        assert_eq!(
+            VCFFile::simplify_call("AAAAA".to_string(), "AAAAA".to_string()),
+            vec![]
+        );
+        assert_eq!(
+            VCFFile::simplify_call("ACGTACGT".to_string(), "ACGTACGT".to_string()),
+            vec![]
+        );
+        assert_eq!(
+            VCFFile::simplify_call("ACGT".to_string(), "AAGT".to_string()),
+            vec![(1, AltType::SNP, "A".to_string())]
+        );
+        assert_eq!(
+            VCFFile::simplify_call("ACGT".to_string(), "AAAT".to_string()),
+            vec![
+                (1, AltType::SNP, "A".to_string()),
+                (2, AltType::SNP, "A".to_string()),
+            ]
+        );
+        assert_eq!(
+            VCFFile::simplify_call("ACGT".to_string(), "AAAA".to_string()),
+            vec![
+                (1, AltType::SNP, "A".to_string()),
+                (2, AltType::SNP, "A".to_string()),
+                (3, AltType::SNP, "A".to_string()),
+            ]
+        );
+        // Some more complex cases
+        assert_eq!(
+            VCFFile::simplify_call("ACGT".to_string(), "ACG".to_string()),
+            vec![(3, AltType::DEL, "T".to_string())]
+        );
+        assert_eq!(
+            VCFFile::simplify_call("ACG".to_string(), "ACGT".to_string()),
+            vec![(2, AltType::INS, "T".to_string())]
+        );
+        assert_eq!(
+            VCFFile::simplify_call("ACGT".to_string(), "AGT".to_string()),
+            vec![(1, AltType::DEL, "C".to_string()),]
+        );
+
+        // Somewhat pathological cases
+        assert_eq!(
+            VCFFile::simplify_call("AAAAA".to_string(), "CCC".to_string()),
+            vec![
+                (3, AltType::DEL, "AA".to_string()),
+                (0, AltType::SNP, "C".to_string()),
+                (1, AltType::SNP, "C".to_string()),
+                (2, AltType::SNP, "C".to_string()),
+            ]
+        );
+
+        assert_eq!(
+            VCFFile::simplify_call("CCC".to_string(), "AAAAA".to_string()),
+            vec![
+                (2, AltType::INS, "AA".to_string()),
+                (0, AltType::SNP, "A".to_string()),
+                (1, AltType::SNP, "A".to_string()),
+                (2, AltType::SNP, "A".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_record_for_calls() {
+        // Note the use of blocks to allow collapsing in vscode.
+        // Not necessary but makes it easier to read as this is a long test
+
+        // There's an almost infinite number of edge cases here, so we'll just test a few
+
+        // Ref call
+        {
+            let record = VCFRow {
+                position: 1,
+                reference: "A".to_string(),
+                alternative: vec!["T".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["0/0".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string()]),
+                ]),
+                is_filter_pass: true,
+            };
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 1);
+            assert_eq!(calls.len(), 1);
+            assert_eq!(minor_calls.len(), 0);
+            assert_eq!(calls[0].genome_index, 1);
+            assert_eq!(calls[0].reference, "a".to_string());
+            assert_eq!(calls[0].alt, "a".to_string());
+            assert_eq!(calls[0].call_type, AltType::REF);
+            assert_eq!(calls[0].cov, Some(1));
+            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(1.0)));
+            assert!(!calls[0].is_minor);
+            assert_eq!(calls[0].vcf_idx, Some(0));
+        }
+
+        // Alt call
+        {
+            let record = VCFRow {
+                position: 1,
+                reference: "A".to_string(),
+                alternative: vec!["T".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "2".to_string()]),
+                ]),
+                is_filter_pass: true,
+            };
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 1);
+            assert_eq!(calls.len(), 1);
+            assert_eq!(minor_calls.len(), 0);
+            assert_eq!(calls[0].genome_index, 1);
+            assert_eq!(calls[0].reference, "a".to_string());
+            assert_eq!(calls[0].alt, "t".to_string());
+            assert_eq!(calls[0].call_type, AltType::SNP);
+            assert_eq!(calls[0].cov, Some(2));
+            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(2.0 / 3.0)));
+            assert!(!calls[0].is_minor);
+            assert_eq!(calls[0].vcf_idx, Some(1));
+        }
+
+        // Het call (including minor call)
+        {
+            let record = VCFRow {
+                position: 1,
+                reference: "A".to_string(),
+                alternative: vec!["T".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["0/1".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
+                ]),
+                is_filter_pass: true,
+            };
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 2);
+            assert_eq!(calls.len(), 1);
+            assert_eq!(minor_calls.len(), 1);
+
+            assert_eq!(calls[0].genome_index, 1);
+            assert_eq!(calls[0].reference, "a".to_string());
+            assert_eq!(calls[0].alt, "z".to_string());
+            assert_eq!(calls[0].call_type, AltType::HET);
+            assert_eq!(calls[0].cov, None);
+            assert_eq!(calls[0].frs, None);
+            assert!(!calls[0].is_minor);
+            assert_eq!(calls[0].vcf_idx, None);
+
+            assert_eq!(minor_calls[0].genome_index, 1);
+            assert_eq!(minor_calls[0].reference, "a".to_string());
+            assert_eq!(minor_calls[0].alt, "t".to_string());
+            assert_eq!(minor_calls[0].call_type, AltType::SNP);
+            assert_eq!(minor_calls[0].cov, Some(3));
+            assert_eq!(minor_calls[0].frs, Some(ordered_float::OrderedFloat(0.75)));
+            assert!(minor_calls[0].is_minor);
+            assert_eq!(minor_calls[0].vcf_idx, Some(1));
+        }
+
+        // Null call (in a few forms)
+        // Null call due to low coverage
+        {
+            let record = VCFRow {
+                position: 1,
+                reference: "A".to_string(),
+                alternative: vec!["T".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string()]),
+                ]),
+                is_filter_pass: true,
+            };
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 2);
+            assert_eq!(calls.len(), 1);
+            assert_eq!(minor_calls.len(), 0);
+            assert_eq!(calls[0].genome_index, 1);
+            assert_eq!(calls[0].reference, "a".to_string());
+            assert_eq!(calls[0].alt, "x".to_string());
+            assert_eq!(calls[0].call_type, AltType::NULL);
+            assert_eq!(calls[0].cov, Some(1));
+            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(1.0)));
+            assert!(!calls[0].is_minor);
+            assert_eq!(calls[0].vcf_idx, None);
+        }
+
+        // Null call due calling null
+        {
+            let record = VCFRow {
+                position: 1,
+                reference: "A".to_string(),
+                alternative: vec!["T".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["./.".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string()]),
+                ]),
+                is_filter_pass: true,
+            };
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 1);
+            assert_eq!(calls.len(), 1);
+            assert_eq!(minor_calls.len(), 0);
+            assert_eq!(calls[0].genome_index, 1);
+            assert_eq!(calls[0].reference, "a".to_string());
+            assert_eq!(calls[0].alt, "x".to_string());
+            assert_eq!(calls[0].call_type, AltType::NULL);
+            assert_eq!(calls[0].cov, Some(1));
+            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(1.0)));
+            assert!(!calls[0].is_minor);
+            assert_eq!(calls[0].vcf_idx, None);
+        }
+
+        // Null call due to low coverage and filter fail (should still make it)
+        {
+            let record = VCFRow {
+                position: 1,
+                reference: "A".to_string(),
+                alternative: vec!["T".to_string()],
+                filter: vec!["MIN_DP".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string()]),
+                ]),
+                is_filter_pass: false,
+            };
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 2);
+            assert_eq!(calls.len(), 1);
+            assert_eq!(minor_calls.len(), 0);
+            assert_eq!(calls[0].genome_index, 1);
+            assert_eq!(calls[0].reference, "a".to_string());
+            assert_eq!(calls[0].alt, "x".to_string());
+            assert_eq!(calls[0].call_type, AltType::NULL);
+            assert_eq!(calls[0].cov, Some(1));
+            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(1.0)));
+            assert!(!calls[0].is_minor);
+            assert_eq!(calls[0].vcf_idx, None);
+        }
+
+        // Ins call
+        {
+            let record = VCFRow {
+                position: 1,
+                reference: "A".to_string(),
+                alternative: vec!["AT".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "5".to_string()]),
+                ]),
+                is_filter_pass: true,
+            };
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 3);
+            assert_eq!(calls.len(), 1);
+            assert_eq!(minor_calls.len(), 0);
+            assert_eq!(calls[0].genome_index, 1);
+            assert_eq!(calls[0].reference, "a".to_string());
+            assert_eq!(calls[0].alt, "t".to_string());
+            assert_eq!(calls[0].call_type, AltType::INS);
+            assert_eq!(calls[0].cov, Some(5));
+            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(5.0 / 6.0)));
+            assert!(!calls[0].is_minor);
+            assert_eq!(calls[0].vcf_idx, Some(1));
+        }
+
+        // Del call
+        {
+            let record = VCFRow {
+                position: 1,
+                reference: "AT".to_string(),
+                alternative: vec!["A".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "5".to_string()]),
+                ]),
+                is_filter_pass: true,
+            };
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 3);
+            assert_eq!(calls.len(), 1);
+            assert_eq!(minor_calls.len(), 0);
+            assert_eq!(calls[0].genome_index, 2);
+            assert_eq!(calls[0].reference, "t".to_string());
+            assert_eq!(calls[0].alt, "t".to_string());
+            assert_eq!(calls[0].call_type, AltType::DEL);
+            assert_eq!(calls[0].cov, Some(5));
+            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(5.0 / 6.0)));
+            assert!(!calls[0].is_minor);
+            assert_eq!(calls[0].vcf_idx, Some(1));
+        }
+
+        // Del call with SNP
+        {
+            let record = VCFRow {
+                position: 1,
+                reference: "AT".to_string(),
+                alternative: vec!["C".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "5".to_string()]),
+                ]),
+                is_filter_pass: true,
+            };
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 3);
+            assert_eq!(calls.len(), 2);
+            assert_eq!(minor_calls.len(), 0);
+            assert_eq!(calls[0].genome_index, 2);
+            assert_eq!(calls[0].reference, "t".to_string());
+            assert_eq!(calls[0].alt, "t".to_string());
+            assert_eq!(calls[0].call_type, AltType::DEL);
+            assert_eq!(calls[0].cov, Some(5));
+            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(5.0 / 6.0)));
+            assert!(!calls[0].is_minor);
+            assert_eq!(calls[0].vcf_idx, Some(1));
+
+            assert_eq!(calls[1].genome_index, 1);
+            assert_eq!(calls[1].reference, "a".to_string());
+            assert_eq!(calls[1].alt, "c".to_string());
+            assert_eq!(calls[1].call_type, AltType::SNP);
+            assert_eq!(calls[1].cov, Some(5));
+            assert_eq!(calls[1].frs, Some(ordered_float::OrderedFloat(5.0 / 6.0)));
+            assert!(!calls[1].is_minor);
+            assert_eq!(calls[1].vcf_idx, Some(1));
+        }
+
+        // More complex mix of SNP and indel minors
+        {
+            let record = VCFRow {
+                position: 1,
+                reference: "AT".to_string(),
+                alternative: vec!["C".to_string(), "GCC".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec!["1".to_string(), "57".to_string(), "12".to_string()],
+                    ),
+                ]),
+                is_filter_pass: true,
+            };
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 3);
+            assert_eq!(calls.len(), 2);
+            assert_eq!(minor_calls.len(), 3);
+
+            assert_eq!(calls[0].genome_index, 2);
+            assert_eq!(calls[0].reference, "t".to_string());
+            assert_eq!(calls[0].alt, "t".to_string());
+            assert_eq!(calls[0].call_type, AltType::DEL);
+            assert_eq!(calls[0].cov, Some(57));
+            assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(57.0 / 70.0)));
+            assert!(!calls[0].is_minor);
+            assert_eq!(calls[0].vcf_idx, Some(1));
+
+            assert_eq!(calls[1].genome_index, 1);
+            assert_eq!(calls[1].reference, "a".to_string());
+            assert_eq!(calls[1].alt, "c".to_string());
+            assert_eq!(calls[1].call_type, AltType::SNP);
+            assert_eq!(calls[1].cov, Some(57));
+            assert_eq!(calls[1].frs, Some(ordered_float::OrderedFloat(57.0 / 70.0)));
+            assert!(!calls[1].is_minor);
+            assert_eq!(calls[1].vcf_idx, Some(1));
+
+            assert_eq!(minor_calls[0].genome_index, 2);
+            assert_eq!(minor_calls[0].reference, "t".to_string());
+            assert_eq!(minor_calls[0].alt, "c".to_string());
+            assert_eq!(minor_calls[0].call_type, AltType::INS);
+            assert_eq!(minor_calls[0].cov, Some(12));
+            assert_eq!(
+                minor_calls[0].frs,
+                Some(ordered_float::OrderedFloat(12.0 / 70.0))
+            );
+            assert!(minor_calls[0].is_minor);
+            assert_eq!(minor_calls[0].vcf_idx, Some(2));
+
+            assert_eq!(minor_calls[1].genome_index, 1);
+            assert_eq!(minor_calls[1].reference, "a".to_string());
+            assert_eq!(minor_calls[1].alt, "g".to_string());
+            assert_eq!(minor_calls[1].call_type, AltType::SNP);
+            assert_eq!(minor_calls[1].cov, Some(12));
+            assert_eq!(
+                minor_calls[1].frs,
+                Some(ordered_float::OrderedFloat(12.0 / 70.0))
+            );
+            assert!(minor_calls[1].is_minor);
+            assert_eq!(minor_calls[1].vcf_idx, Some(2));
+
+            assert_eq!(minor_calls[2].genome_index, 2);
+            assert_eq!(minor_calls[2].reference, "t".to_string());
+            assert_eq!(minor_calls[2].alt, "c".to_string());
+            assert_eq!(minor_calls[2].call_type, AltType::SNP);
+            assert_eq!(minor_calls[2].cov, Some(12));
+            assert_eq!(
+                minor_calls[2].frs,
+                Some(ordered_float::OrderedFloat(12.0 / 70.0))
+            );
+            assert!(minor_calls[2].is_minor);
+            assert_eq!(minor_calls[2].vcf_idx, Some(2));
+        }
+    }
+
+    #[test]
+    fn test_instanciate_vcffile() {
+        let vcf = VCFFile::new("test/dummy.vcf".to_string(), false, 3);
+        let expected_records = vec![
+            VCFRow {
+                position: 4687,
+                reference: "t".to_string(),
+                alternative: vec!["c".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["68".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                position: 4725,
+                reference: "t".to_string(),
+                alternative: vec!["c".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["68".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+            VCFRow {
+                position: 4730,
+                reference: "c".to_string(),
+                alternative: vec!["t".to_string(), "g".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/2".to_string()]),
+                    ("DP".to_string(), vec!["200".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec!["1".to_string(), "99".to_string(), "100".to_string()],
+                    ),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                position: 4735,
+                reference: "g".to_string(),
+                alternative: vec!["gcc".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["68".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["63.77".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                position: 4740,
+                reference: "c".to_string(),
+                alternative: vec!["gtt".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["68".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["63.77".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+            VCFRow {
+                position: 13148,
+                reference: "t".to_string(),
+                alternative: vec!["g".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["./.".to_string()]),
+                    ("DP".to_string(), vec!["68".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+            VCFRow {
+                position: 13149,
+                reference: "g".to_string(),
+                alternative: vec!["t".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["./.".to_string()]),
+                    ("DP".to_string(), vec!["68".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                position: 13150,
+                reference: "a".to_string(),
+                alternative: vec!["tcg".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["./.".to_string()]),
+                    ("DP".to_string(), vec!["68".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                position: 13333,
+                reference: "c".to_string(),
+                alternative: vec!["a".to_string(), "g".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/2".to_string()]),
+                    ("DP".to_string(), vec!["100".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec!["2".to_string(), "50".to_string(), "48".to_string()],
+                    ),
+                    ("GT_CONF".to_string(), vec!["613".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+            VCFRow {
+                position: 13335,
+                reference: "t".to_string(),
+                alternative: vec!["a".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["68".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["3.77".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+        ];
+        for (idx, record) in expected_records.iter().enumerate() {
+            assert_eq!(record.position, vcf.records[idx].position);
+            assert_eq!(record.reference, vcf.records[idx].reference);
+            assert_eq!(record.alternative, vcf.records[idx].alternative);
+            assert_eq!(record.filter, vcf.records[idx].filter);
+            assert_eq!(record.fields, vcf.records[idx].fields);
+            assert_eq!(record.is_filter_pass, vcf.records[idx].is_filter_pass);
+        }
+
+        let expected_calls = [
+            vec![Evidence {
+                cov: Some(68),
+                frs: Some(ordered_float::OrderedFloat(1.0)),
+                genotype: "1/1".to_string(),
+                call_type: AltType::SNP,
+                vcf_row: expected_records[0].clone(),
+                reference: "t".to_string(),
+                alt: "c".to_string(),
+                genome_index: 4687,
+                is_minor: false,
+                vcf_idx: Some(1),
+            }],
+            vec![Evidence {
+                cov: None,
+                frs: None,
+                genotype: "1/2".to_string(),
+                call_type: AltType::HET,
+                vcf_row: expected_records[2].clone(),
+                reference: "c".to_string(),
+                alt: "z".to_string(),
+                genome_index: 4730,
+                is_minor: false,
+                vcf_idx: None,
+            }],
+            vec![Evidence {
+                cov: Some(68),
+                frs: Some(ordered_float::OrderedFloat(1.0)),
+                genotype: "1/1".to_string(),
+                call_type: AltType::INS,
+                vcf_row: expected_records[3].clone(),
+                reference: "g".to_string(),
+                alt: "cc".to_string(),
+                genome_index: 4735,
+                is_minor: false,
+                vcf_idx: Some(1),
+            }],
+            vec![Evidence {
+                cov: None,
+                frs: None,
+                genotype: "./.".to_string(),
+                call_type: AltType::NULL,
+                vcf_row: expected_records[5].clone(),
+                reference: "t".to_string(),
+                alt: "x".to_string(),
+                genome_index: 13148,
+                is_minor: false,
+                vcf_idx: None,
+            }],
+            vec![Evidence {
+                cov: None,
+                frs: None,
+                genotype: "./.".to_string(),
+                call_type: AltType::NULL,
+                vcf_row: expected_records[6].clone(),
+                reference: "g".to_string(),
+                alt: "x".to_string(),
+                genome_index: 13149,
+                is_minor: false,
+                vcf_idx: None,
+            }],
+            vec![Evidence {
+                cov: None,
+                frs: None,
+                genotype: "./.".to_string(),
+                call_type: AltType::NULL,
+                vcf_row: expected_records[7].clone(),
+                reference: "a".to_string(),
+                alt: "x".to_string(),
+                genome_index: 13150,
+                is_minor: false,
+                vcf_idx: None,
+            }],
+        ];
+
+        for calls in expected_calls.iter() {
+            let actual = vcf.calls.get(&calls[0].genome_index).unwrap();
+            for (idx, call) in calls.iter().enumerate() {
+                assert_eq!(call.cov, actual[idx].cov);
+                assert_eq!(call.frs, actual[idx].frs);
+                assert_eq!(call.genotype, actual[idx].genotype);
+                assert_eq!(call.call_type, actual[idx].call_type);
+                assert_eq!(call.vcf_row, actual[idx].vcf_row);
+                assert_eq!(call.reference, actual[idx].reference);
+                assert_eq!(call.alt, actual[idx].alt);
+                assert_eq!(call.genome_index, actual[idx].genome_index);
+                assert_eq!(call.is_minor, actual[idx].is_minor);
+                assert_eq!(call.vcf_idx, actual[idx].vcf_idx);
+            }
+        }
+        assert_eq!(vcf.calls.keys().len(), expected_calls.len());
+
+        let expected_minor_calls = [vec![
+            Evidence {
+                cov: Some(99),
+                frs: Some(ordered_float::OrderedFloat(0.495)),
+                genotype: "1/2".to_string(),
+                call_type: AltType::SNP,
+                vcf_row: expected_records[2].clone(),
+                reference: "c".to_string(),
+                alt: "t".to_string(),
+                genome_index: 4730,
+                is_minor: true,
+                vcf_idx: Some(1),
+            },
+            Evidence {
+                cov: Some(100),
+                frs: Some(ordered_float::OrderedFloat(0.5)),
+                genotype: "1/2".to_string(),
+                call_type: AltType::SNP,
+                vcf_row: expected_records[2].clone(),
+                reference: "c".to_string(),
+                alt: "g".to_string(),
+                genome_index: 4730,
+                is_minor: true,
+                vcf_idx: Some(2),
+            },
+        ]];
+
+        for calls in expected_minor_calls.iter() {
+            let actual = vcf.minor_calls.get(&calls[0].genome_index).unwrap();
+            for (idx, call) in calls.iter().enumerate() {
+                assert_eq!(call.cov, actual[idx].cov);
+                assert_eq!(call.frs, actual[idx].frs);
+                assert_eq!(call.genotype, actual[idx].genotype);
+                assert_eq!(call.call_type, actual[idx].call_type);
+                assert_eq!(call.vcf_row, actual[idx].vcf_row);
+                assert_eq!(call.reference, actual[idx].reference);
+                assert_eq!(call.alt, actual[idx].alt);
+                assert_eq!(call.genome_index, actual[idx].genome_index);
+                assert_eq!(call.is_minor, actual[idx].is_minor);
+                assert_eq!(call.vcf_idx, actual[idx].vcf_idx);
+            }
+        }
+    }
 }
