@@ -489,6 +489,7 @@ mod tests {
     use crate::{
         common::{MinorType, VCFRow},
         difference::{GeneDifference, GenomeDifference, Mutation, Variant},
+        gene::{codon_to_aa, complement_base},
     };
 
     use super::*;
@@ -6060,6 +6061,56 @@ mod tests {
             assert_eq!(mutation, &expected_minor_mutations[idx]);
         }
 
+        // Additional ins in C to double check revcomp ins is handled as appropriate
+        let expected_minor_c_mutations = vec![Mutation {
+            mutation: "2_ins_g:4".to_string(),
+            gene: "C".to_string(),
+            evidence: vec![Evidence {
+                cov: Some(4),
+                frs: Some(OrderedFloat(4.0 / 10.0)),
+                genotype: "0/0".to_string(),
+                call_type: AltType::INS,
+                vcf_row: VCFRow {
+                    position: 94,
+                    reference: "c".to_string(),
+                    alternative: vec!["cc".to_string()],
+                    filter: vec!["PASS".to_string()],
+                    fields: HashMap::from([
+                        ("GT".to_string(), vec!["0/0".to_string()]),
+                        ("DP".to_string(), vec!["10".to_string()]),
+                        ("COV".to_string(), vec!["6".to_string(), "4".to_string()]),
+                        ("GT_CONF".to_string(), vec!["2.05".to_string()]),
+                    ]),
+                    is_filter_pass: true,
+                },
+                reference: "c".to_string(),
+                alt: "c".to_string(),
+                genome_index: 94,
+                is_minor: true,
+                vcf_idx: Some(1),
+            }],
+            gene_position: Some(2),
+            codes_protein: Some(true),
+            ref_nucleotides: None,
+            alt_nucleotides: None,
+            nucleotide_number: None,
+            nucleotide_index: None,
+            indel_length: Some(1),
+            indel_nucleotides: Some("g".to_string()),
+            amino_acid_number: None,
+            amino_acid_sequence: None,
+        }];
+
+        let gene_diff = GeneDifference::new(
+            genome.get_gene("C".to_string()),
+            sample.get_gene("C".to_string()),
+            MinorType::COV,
+        );
+
+        for (idx, mutation) in gene_diff.minor_mutations.iter().enumerate() {
+            assert_eq!(mutation, &expected_minor_c_mutations[idx]);
+        }
+
         // Hack A to make it non-coding to check that too
         let mut genome = Genome::new("reference/TEST-DNA.gbk");
         for gene in genome.gene_definitions.iter_mut() {
@@ -6234,5 +6285,71 @@ mod tests {
         assert_panics!(genome.at_genome_index(0));
         assert_panics!(genome.at_genome_index(-1));
         assert_panics!(genome.at_genome_index(1502263));
+
+        // Ensure that het and nulls don't get odd complements
+        assert_eq!(complement_base('z'), 'z');
+        assert_eq!(complement_base('x'), 'x');
+
+        // Ensure invalid codons cause panics
+        assert_panics!(codon_to_aa("a".to_string()));
+        assert_panics!(codon_to_aa("actg".to_string()));
+        assert_panics!(codon_to_aa("abc".to_string()));
+
+
+        let broken_alt = Alt {
+            alt_type: AltType::INS,
+            base: "aa".to_string(),
+            evidence: Evidence {
+                cov: Some(4),
+                frs: Some(OrderedFloat(4.0 / 10.0)),
+                genotype: "0/0".to_string(),
+                call_type: AltType::INS,
+                vcf_row: VCFRow {
+                    position: 94,
+                    reference: "c".to_string(),
+                    alternative: vec!["cc".to_string()],
+                    filter: vec!["PASS".to_string()],
+                    fields: HashMap::from([
+                        ("GT".to_string(), vec!["0/0".to_string()]),
+                        ("DP".to_string(), vec!["10".to_string()]),
+                        ("COV".to_string(), vec!["6".to_string(), "4".to_string()]),
+                        ("GT_CONF".to_string(), vec!["2.05".to_string()]),
+                    ]),
+                    is_filter_pass: true,
+                },
+                reference: "c".to_string(),
+                alt: "c".to_string(),
+                genome_index: 94,
+                is_minor: true,
+                vcf_idx: Some(1),
+            }
+        };
+        assert_eq!(GenomeDifference::get_nucleotide_number(&genome.build_gene("A".to_string()), &broken_alt), None);
+
+        // Testing misc gene difference panics
+        let a = genome.get_gene("A".to_string());
+        let b = genome.get_gene("B".to_string());
+        assert_panics!(GeneDifference::new(
+            a.clone(),
+            b.clone(),
+            MinorType::COV
+        ));
+
+        for gene in genome.gene_definitions.iter_mut() {
+            if gene.name == "A" {
+                gene.coding = false;
+            }
+        }
+        let a_non_coding = genome.build_gene("A".to_string());
+        assert_panics!(GeneDifference::new(
+            a.clone(),
+            a_non_coding.clone(),
+            MinorType::COV
+        ));
+        assert_panics!(GeneDifference::new(
+            a_non_coding.clone(),
+            a.clone(),
+            MinorType::COV
+        ));
     }
 }

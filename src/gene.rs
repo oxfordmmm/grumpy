@@ -679,7 +679,7 @@ pub fn codon_to_aa(codon: String) -> char {
 }
 
 /// Complements a base
-fn complement_base(base: char) -> char {
+pub fn complement_base(base: char) -> char {
     match base {
         'a' => 't',
         't' => 'a',
