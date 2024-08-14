@@ -6295,7 +6295,6 @@ mod tests {
         assert_panics!(codon_to_aa("actg".to_string()));
         assert_panics!(codon_to_aa("abc".to_string()));
 
-
         let broken_alt = Alt {
             alt_type: AltType::INS,
             base: "aa".to_string(),
@@ -6322,18 +6321,20 @@ mod tests {
                 genome_index: 94,
                 is_minor: true,
                 vcf_idx: Some(1),
-            }
+            },
         };
-        assert_eq!(GenomeDifference::get_nucleotide_number(&genome.build_gene("A".to_string()), &broken_alt), None);
+        assert_eq!(
+            GenomeDifference::get_nucleotide_number(
+                &genome.build_gene("A".to_string()),
+                &broken_alt
+            ),
+            None
+        );
 
         // Testing misc gene difference panics
         let a = genome.get_gene("A".to_string());
         let b = genome.get_gene("B".to_string());
-        assert_panics!(GeneDifference::new(
-            a.clone(),
-            b.clone(),
-            MinorType::COV
-        ));
+        assert_panics!(GeneDifference::new(a.clone(), b.clone(), MinorType::COV));
 
         for gene in genome.gene_definitions.iter_mut() {
             if gene.name == "A" {
