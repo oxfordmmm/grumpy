@@ -162,9 +162,6 @@ impl GenomeDifference {
                     let mut garc = "".to_string();
                     let mut indel_bases = None;
                     let mut indel_length = 0;
-                    let mut gene_name = None;
-                    let mut gene_position = None;
-                    let mut codon_idx = None;
 
                     if alt.alt_type == AltType::REF {
                         // Skip ref calls
@@ -172,23 +169,29 @@ impl GenomeDifference {
                     }
 
                     // Only annotate with gene information if there is a single gene at this position
-                    if alt_pos.genes.len() == 1 {
-                        gene_name = Some(alt_pos.genes[0].clone());
-                        let gene = alt_genome.get_gene(alt_pos.genes[0].clone());
+                    let mut gene_names = Vec::new();
+                    let mut gene_positions = Vec::new();
+                    let mut codon_idxs = Vec::new();
+                    for gene in alt_pos.genes.iter() {
+                        let gene_name = Some(gene.clone());
+                        let gene = alt_genome.get_gene(gene.clone());
+                        let mut __gene_position = None;
                         let (_gene_position, _codon_idx) =
                             gene.genome_idx_map.get(&alt_pos.genome_idx).unwrap();
-                        codon_idx = *_codon_idx;
+                        codon_idxs.push(*_codon_idx);
                         if alt.alt_type == AltType::SNP
                             || alt.alt_type == AltType::HET
                             || alt.alt_type == AltType::NULL
                             || _gene_position < &0
                         {
                             // Use gene position for these as it should cover cases of being the codon index
-                            gene_position = Some(*_gene_position);
+                            __gene_position = Some(*_gene_position);
                         } else {
                             // Use nucleotide number for indels as they shouldn't be construed as codon indices
-                            gene_position = GenomeDifference::get_nucleotide_number(&gene, alt);
+                            __gene_position = GenomeDifference::get_nucleotide_number(&gene, alt);
                         }
+                        gene_names.push(gene_name.clone());
+                        gene_positions.push(__gene_position);
                     }
 
                     if alt.alt_type == AltType::SNP
@@ -222,22 +225,31 @@ impl GenomeDifference {
                                 + &trim_float_string(format!("{:.3}", alt.evidence.frs.unwrap()));
                         }
                     }
-                    let variant = Variant {
-                        variant: garc,
-                        nucleotide_index: ref_pos.genome_idx,
-                        evidence: alt.evidence.vcf_row.clone(),
-                        vcf_idx: alt.evidence.vcf_idx,
-                        indel_length,
-                        indel_nucleotides: indel_bases,
-                        gene_position,
-                        codon_idx,
-                        gene_name,
-                    };
 
-                    if alt.evidence.is_minor {
-                        minor_variants.push(variant);
-                    } else {
-                        variants.push(variant);
+                    if gene_names.is_empty() {
+                        gene_names.push(None);
+                        gene_positions.push(None);
+                        codon_idxs.push(None);
+                    }
+
+                    for ((gene_name, gene_position), codon_idx) in gene_names.iter().zip(gene_positions.iter()).zip(codon_idxs.iter()) {
+                        let variant = Variant {
+                            variant: garc.clone(),
+                            nucleotide_index: ref_pos.genome_idx,
+                            evidence: alt.evidence.vcf_row.clone(),
+                            vcf_idx: alt.evidence.vcf_idx,
+                            indel_length,
+                            indel_nucleotides: indel_bases.clone(),
+                            gene_position: *gene_position,
+                            codon_idx: *codon_idx,
+                            gene_name: gene_name.clone(),
+                        };
+
+                        if alt.evidence.is_minor {
+                            minor_variants.push(variant);
+                        } else {
+                            variants.push(variant);
+                        }
                     }
                 }
             }
