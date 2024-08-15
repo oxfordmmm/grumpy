@@ -1853,7 +1853,7 @@ mod tests {
                 indel_nucleotides: None,
                 gene_position: Some(1),
                 codon_idx: Some(1),
-                gene_name: Some("B".to_string())
+                gene_name: Some("B".to_string()),
             },
             Variant {
                 variant: "33_ins_tt".to_string(),

@@ -232,7 +232,11 @@ impl GenomeDifference {
                         codon_idxs.push(None);
                     }
 
-                    for ((gene_name, gene_position), codon_idx) in gene_names.iter().zip(gene_positions.iter()).zip(codon_idxs.iter()) {
+                    for ((gene_name, gene_position), codon_idx) in gene_names
+                        .iter()
+                        .zip(gene_positions.iter())
+                        .zip(codon_idxs.iter())
+                    {
                         let variant = Variant {
                             variant: garc.clone(),
                             nucleotide_index: ref_pos.genome_idx,
