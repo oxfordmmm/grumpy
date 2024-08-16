@@ -73,6 +73,10 @@ pub struct Genome {
     pub gene_names: Vec<String>,
 
     #[pyo3(get, set)]
+    /// HashMap of gene names to definitions
+    pub gene_name_to_def: HashMap<String, GeneDef>,
+
+    #[pyo3(get, set)]
     /// HashMap of genes which have been built
     pub genes: HashMap<String, Gene>,
 
@@ -207,6 +211,7 @@ impl Genome {
             genes: HashMap::new(),
             gene_names,
             genes_with_mutations: HashSet::new(),
+            gene_name_to_def: HashMap::new(),
         };
         genome.assign_promoters();
 
@@ -284,6 +289,12 @@ impl Genome {
                 }
             }
             complete = this_complete;
+        }
+
+        // Add gene definitions to hashmap for easy lookup
+        for gene in self.gene_definitions.iter() {
+            self.gene_name_to_def
+                .insert(gene.name.clone(), gene.clone());
         }
     }
 
@@ -491,6 +502,7 @@ mod tests {
         difference::{GeneDifference, GenomeDifference, Mutation, Variant},
         gene::{codon_to_aa, complement_base},
     };
+    use pretty_assertions::assert_eq;
 
     use super::*;
 
@@ -5053,6 +5065,52 @@ mod tests {
                 codon_idx: None,
                 gene_name: Some("A".to_string()),
             },
+            Variant {
+                variant: "3_del_aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
+                nucleotide_index: 3,
+                evidence: VCFRow {
+                    position: 2,
+                    reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
+                    alternative: vec!["a".to_string()],
+                    filter: vec!["PASS".to_string()],
+                    fields: HashMap::from([
+                        ("GT".to_string(), vec!["1/1".to_string()]),
+                        ("DP".to_string(), vec!["4".to_string()]),
+                        ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
+                        ("GT_CONF".to_string(), vec!["2.05".to_string()]),
+                    ]),
+                    is_filter_pass: true,
+                },
+                vcf_idx: Some(1),
+                indel_length: -91,
+                indel_nucleotides: Some("aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string()),
+                gene_position: Some(1),
+                codon_idx: Some(0),
+                gene_name: Some("B".to_string()),
+            },
+            Variant {
+                variant: "3_del_aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
+                nucleotide_index: 3,
+                evidence: VCFRow {
+                    position: 2,
+                    reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
+                    alternative: vec!["a".to_string()],
+                    filter: vec!["PASS".to_string()],
+                    fields: HashMap::from([
+                        ("GT".to_string(), vec!["1/1".to_string()]),
+                        ("DP".to_string(), vec!["4".to_string()]),
+                        ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
+                        ("GT_CONF".to_string(), vec!["2.05".to_string()]),
+                    ]),
+                    is_filter_pass: true,
+                },
+                vcf_idx: Some(1),
+                indel_length: -91,
+                indel_nucleotides: Some("aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string()),
+                gene_position: Some(4),
+                codon_idx: Some(0),
+                gene_name: Some("C".to_string()),
+            },
         ];
 
         for (idx, variant) in diff.variants.iter().enumerate() {
@@ -5285,6 +5343,52 @@ mod tests {
                 gene_position: Some(-1),
                 codon_idx: None,
                 gene_name: Some("A".to_string()),
+            },
+            Variant {
+                variant: "3_del_aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc:3".to_string(),
+                nucleotide_index: 3,
+                evidence: VCFRow {
+                    position: 2,
+                    reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
+                    alternative: vec!["a".to_string()],
+                    filter: vec!["PASS".to_string()],
+                    fields: HashMap::from([
+                        ("GT".to_string(), vec!["0/0".to_string()]),
+                        ("DP".to_string(), vec!["4".to_string()]),
+                        ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
+                        ("GT_CONF".to_string(), vec!["2.05".to_string()]),
+                    ]),
+                    is_filter_pass: true,
+                },
+                vcf_idx: Some(1),
+                indel_length: -91,
+                indel_nucleotides: Some("aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string()),
+                gene_position: Some(1),
+                codon_idx: Some(0),
+                gene_name: Some("B".to_string()),
+            },
+            Variant {
+                variant: "3_del_aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc:3".to_string(),
+                nucleotide_index: 3,
+                evidence: VCFRow {
+                    position: 2,
+                    reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
+                    alternative: vec!["a".to_string()],
+                    filter: vec!["PASS".to_string()],
+                    fields: HashMap::from([
+                        ("GT".to_string(), vec!["0/0".to_string()]),
+                        ("DP".to_string(), vec!["4".to_string()]),
+                        ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
+                        ("GT_CONF".to_string(), vec!["2.05".to_string()]),
+                    ]),
+                    is_filter_pass: true,
+                },
+                vcf_idx: Some(1),
+                indel_length: -91,
+                indel_nucleotides: Some("aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string()),
+                gene_position: Some(4),
+                codon_idx: Some(0),
+                gene_name: Some("C".to_string()),
             },
         ];
 

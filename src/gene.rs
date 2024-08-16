@@ -160,7 +160,7 @@ impl Gene {
         let mut genome_idx_map: HashMap<i64, (i64, Option<i64>)> = HashMap::new();
 
         // Ensure we pick up deletions upstream or downstream of the gene
-        Gene::adjust_dels(&mut genome_positions, gene_def.name.clone());
+        Gene::adjust_dels(&mut genome_positions, &gene_def);
 
         for pos in gene_def.ribosomal_shifts.iter() {
             // Figure out the index of the vectors to insert the ribosomal shift
@@ -201,14 +201,17 @@ impl Gene {
             // Genome positions are a bit more annoying here, specifically for indels
             // With revcomp, deletions start from their end position as well as being complemented
             // Insertions are also annoying. They need a position adjustment as they're starting on the other side now
-            genome_positions = Vec::new();
-            for pos in _genome_positions.iter().rev() {
-                genome_positions.push(pos.clone());
+            let mut _genome_positions = Vec::new();
+            for pos in genome_positions.iter().rev() {
+                _genome_positions.push(pos.clone());
             }
+            genome_positions = _genome_positions;
+
             let mut fixed_genome_positions = genome_positions.clone();
+
             // First figure out where the indels are
             let mut indel_positions: Vec<(usize, i64, bool)> = Vec::new();
-            for (i, genome_pos) in genome_positions.iter().enumerate() {
+            for (i, genome_pos) in genome_positions.iter_mut().enumerate() {
                 for alt in genome_pos.alts.iter() {
                     if alt.alt_type == AltType::INS {
                         indel_positions.push((i, alt.base.len() as i64, alt.evidence.is_minor));
@@ -468,7 +471,8 @@ impl Gene {
     /// # Arguments
     /// - `genome_positions`: Vec of genome positions for the gene
     /// - `gene_name`: Name of the gene
-    fn adjust_dels(genome_positions: &mut [GenomePosition], gene_name: String) {
+    fn adjust_dels(genome_positions: &mut [GenomePosition], gene_def: &GeneDef) {
+        let gene_name = &gene_def.name;
         // Adjust any deletions which may cross gene boundaries as required
         let mut first_pos = genome_positions[0].clone();
         if genome_positions[0].is_deleted {
@@ -498,8 +502,23 @@ impl Gene {
                 let new_deleted_bases =
                     del_evidence.alt[bases_to_trim..del_evidence.alt.len()].to_string();
 
-                fixed_del_evidence.alt = new_deleted_bases.clone();
-                fixed_del_evidence.genome_index = genome_positions[0].genome_idx;
+                if gene_def.reverse_complement {
+                    // Revcomp the ref/alt
+                    fixed_del_evidence.alt = new_deleted_bases
+                        .chars()
+                        .rev()
+                        .map(complement_base)
+                        .collect();
+                    fixed_del_evidence.reference =
+                        complement_base(genome_positions[0].reference).to_string();
+
+                    // Nudge the genome index back to the start of the deletion within this gene
+                    fixed_del_evidence.genome_index =
+                        genome_positions[0].genome_idx + (new_deleted_bases.len() as i64);
+                } else {
+                    fixed_del_evidence.alt = new_deleted_bases.clone();
+                    fixed_del_evidence.genome_index = genome_positions[0].genome_idx;
+                }
                 first_pos.alts.push(Alt {
                     alt_type: AltType::DEL,
                     base: new_deleted_bases.clone(),
@@ -527,8 +546,23 @@ impl Gene {
                 let new_deleted_bases =
                     del_evidence.alt[bases_to_trim..del_evidence.alt.len()].to_string();
 
-                fixed_del_evidence.alt = new_deleted_bases.clone();
-                fixed_del_evidence.genome_index = genome_positions[0].genome_idx;
+                if gene_def.reverse_complement {
+                    // Revcomp the ref/alt
+                    fixed_del_evidence.alt = new_deleted_bases
+                        .chars()
+                        .rev()
+                        .map(complement_base)
+                        .collect();
+                    fixed_del_evidence.reference =
+                        complement_base(genome_positions[0].reference).to_string();
+
+                    // Nudge the genome index back to the start of the deletion within this gene
+                    fixed_del_evidence.genome_index =
+                        genome_positions[0].genome_idx + (new_deleted_bases.len() as i64);
+                } else {
+                    fixed_del_evidence.alt = new_deleted_bases.clone();
+                    fixed_del_evidence.genome_index = genome_positions[0].genome_idx;
+                }
                 first_pos.alts.push(Alt {
                     alt_type: AltType::DEL,
                     base: new_deleted_bases.clone(),

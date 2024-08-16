@@ -1,4 +1,6 @@
 //! Module for handling differences between genomes and genes
+use std::collections::{HashMap, HashSet};
+
 use pyo3::prelude::*;
 
 use ordered_float::{Float, OrderedFloat};
@@ -168,16 +170,44 @@ impl GenomeDifference {
                         continue;
                     }
 
-                    // Only annotate with gene information if there is a single gene at this position
                     let mut gene_names = Vec::new();
                     let mut gene_positions = Vec::new();
                     let mut codon_idxs = Vec::new();
+                    let mut genes_to_check = HashSet::new();
+                    let mut gene_to_genome = HashMap::new();
+                    if alt.alt_type == AltType::DEL {
+                        // This is a deletion, so check for all genes within each base of this deletion
+                        for (i, _) in alt.base.chars().enumerate() {
+                            for g in alt_genome.genome_positions[idx + i].genes.clone() {
+                                let gene_def = alt_genome.gene_name_to_def.get(&g).unwrap();
+
+                                if !genes_to_check.contains(&g) {
+                                    genes_to_check.insert(g.clone());
+                                    // Get the genome index of the first base of the deletion
+                                    gene_to_genome.insert(g.clone(), (idx + i + 1) as i64);
+                                }
+
+                                if gene_def.reverse_complement {
+                                    // If this gene is reverse complemented, we want the last base rather than first
+                                    gene_to_genome.insert(g, (idx + i + 1) as i64);
+                                }
+                            }
+                        }
+                    }
                     for gene in alt_pos.genes.iter() {
+                        genes_to_check.insert(gene.clone());
+                        gene_to_genome.insert(gene.clone(), ref_pos.genome_idx);
+                    }
+                    let mut genes = genes_to_check.iter().cloned().collect::<Vec<String>>();
+                    genes.sort();
+                    for gene in genes.iter() {
                         let gene_name = Some(gene.clone());
-                        let gene = alt_genome.get_gene(gene.clone());
+                        let g = alt_genome.get_gene(gene.clone());
                         let mut __gene_position = None;
-                        let (_gene_position, _codon_idx) =
-                            gene.genome_idx_map.get(&alt_pos.genome_idx).unwrap();
+                        let (_gene_position, _codon_idx) = g
+                            .genome_idx_map
+                            .get(gene_to_genome.get(gene).unwrap())
+                            .unwrap();
                         codon_idxs.push(*_codon_idx);
                         if alt.alt_type == AltType::SNP
                             || alt.alt_type == AltType::HET
@@ -188,7 +218,7 @@ impl GenomeDifference {
                             __gene_position = Some(*_gene_position);
                         } else {
                             // Use nucleotide number for indels as they shouldn't be construed as codon indices
-                            __gene_position = GenomeDifference::get_nucleotide_number(&gene, alt);
+                            __gene_position = GenomeDifference::get_nucleotide_number(&g, alt);
                         }
                         gene_names.push(gene_name.clone());
                         gene_positions.push(__gene_position);
@@ -281,10 +311,12 @@ impl GenomeDifference {
                 GenePos::Codon(c) => {
                     for codon in c.codon.iter() {
                         for alt in codon.alts.iter() {
-                            // Match on evidence and base length
+                            // Match on evidence's VCF row and index
                             // This is to catch cases where a deletion starts outside of this gene
-                            if genome_alt.base.len() == alt.base.len()
-                                && genome_alt.evidence == alt.evidence
+                            if genome_alt.evidence.vcf_row == alt.evidence.vcf_row
+                                && genome_alt.evidence.vcf_idx == alt.evidence.vcf_idx
+                                && genome_alt.alt_type == alt.alt_type
+                                && genome_alt.evidence.is_minor == alt.evidence.is_minor
                             {
                                 return Some(codon.nucleotide_number);
                             }
@@ -293,10 +325,12 @@ impl GenomeDifference {
                 }
                 GenePos::Nucleotide(n) => {
                     for alt in n.alts.iter() {
-                        // Match on evidence and base length
+                        // Match on evidence's VCF row and index
                         // This is to catch cases where a deletion starts outside of this gene
-                        if genome_alt.base.len() == alt.base.len()
-                            && genome_alt.evidence == alt.evidence
+                        if genome_alt.evidence.vcf_row == alt.evidence.vcf_row
+                            && genome_alt.evidence.vcf_idx == alt.evidence.vcf_idx
+                            && genome_alt.alt_type == alt.alt_type
+                            && genome_alt.evidence.is_minor == alt.evidence.is_minor
                         {
                             return Some(n.nucleotide_number);
                         }
