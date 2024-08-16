@@ -706,6 +706,11 @@ mod tests {
                 (2, AltType::SNP, "A".to_string()),
             ]
         );
+
+        assert_eq!(
+            VCFFile::simplify_call("ACGT".to_string(), "ACGAGT".to_string()),
+            vec![(2, AltType::INS, "AG".to_string()),]
+        );
     }
 
     #[test]
@@ -1173,15 +1178,32 @@ mod tests {
                 is_filter_pass: false,
             },
             VCFRow {
+                // Edge case of using `RO` and `AO` for coverage
                 position: 13335,
                 reference: "t".to_string(),
                 alternative: vec!["a".to_string()],
-                filter: vec![],
+                filter: vec!["MAX_DP".to_string()],
                 fields: HashMap::from([
                     ("GT".to_string(), vec!["1/1".to_string()]),
                     ("DP".to_string(), vec!["68".to_string()]),
-                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("RO".to_string(), vec!["66".to_string()]),
+                    ("AO".to_string(), vec!["2".to_string()]),
+                    ("COV".to_string(), vec!["66".to_string(), "2".to_string()]),
                     ("GT_CONF".to_string(), vec!["3.77".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+            VCFRow {
+                // Odd edge case which is a valid VCF row where it's a het GT but single COV value
+                position: 13336,
+                reference: "c".to_string(),
+                alternative: vec!["a".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["0/1".to_string()]),
+                    ("DP".to_string(), vec!["50".to_string()]),
+                    ("COV".to_string(), vec!["50".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613".to_string()]),
                 ]),
                 is_filter_pass: false,
             },
