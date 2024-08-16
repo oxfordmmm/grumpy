@@ -483,6 +483,11 @@ pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome {
                 position.is_deleted = position.is_deleted || !ev.is_minor;
                 position.is_deleted_minor = position.is_deleted_minor || ev.is_minor;
             }
+            // Ensure that we mark all deleted positions as having mutations
+            // this ensures we pick up cases where a deletion starts in an upstream gene
+            for gene_name in position.genes.iter() {
+                new_genome.genes_with_mutations.insert(gene_name.clone());
+            }
         }
     }
 
