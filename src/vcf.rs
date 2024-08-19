@@ -572,9 +572,9 @@ impl VCFFile {
             let a = _x.chars().nth(i - offset).unwrap();
             if r != 'N' && a != 'N' && r != a {
                 if _indel_type == AltType::DEL {
-                    calls.push(((i-offset) as i64, AltType::SNP, a.to_string()));
+                    calls.push(((i - offset) as i64, AltType::SNP, a.to_string()));
                 } else {
-                    calls.push(((i-offset) as i64, AltType::SNP, r.to_string()));
+                    calls.push(((i - offset) as i64, AltType::SNP, r.to_string()));
                 }
             }
         }
