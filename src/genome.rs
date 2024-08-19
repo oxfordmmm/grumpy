@@ -6772,4 +6772,28 @@ mod tests {
             MinorType::COV
         ));
     }
+
+    #[test]
+    fn test_revcomp_first_base_del() {
+        // Test that a deletion of the first base is handled correctly
+        let mut genome = Genome::new("reference/NC_000962.3.gbk");
+        let vcf = VCFFile::new("test/revcomp-del-first-pos.vcf".to_string(), false, 3);
+        let mut sample = mutate(&genome, vcf);
+
+        let diff = GenomeDifference::new(genome.clone(), sample.clone(), MinorType::COV);
+
+        for variant in diff.variants.iter() {
+            assert_eq!(variant.variant, "2406843_del_c".to_string());
+        }
+        assert_eq!(diff.minor_variants.len(), 0);
+
+        let rv2147c_diff = GeneDifference::new(
+            genome.get_gene("Rv2147c".to_string()),
+            sample.get_gene("Rv2147c".to_string()),
+            MinorType::COV,
+        );
+
+        assert_eq!(rv2147c_diff.minor_mutations.len(), 0);
+        assert_eq!(rv2147c_diff.mutations[0].mutation, "1_del_g".to_string());
+    }
 }

@@ -255,6 +255,9 @@ impl Gene {
                     if indel_size.unsigned_abs() as usize > *pos {
                         // Deletion may start in this gene, but needs truncating to just the part in this gene
                         _max_del_length = *pos as i64;
+                        if _max_del_length == 0 {
+                            _max_del_length = 1;
+                        }
                     }
                     let mut new_pos = 0;
                     if _max_del_length == i64::MAX {
@@ -583,6 +586,9 @@ impl Gene {
                 {
                     let bases_to_trim =
                         (position.genome_idx + alt.base.len() as i64 - last_pos - 1) as usize;
+                    if bases_to_trim == 0 {
+                        continue;
+                    }
                     alt.base = alt.base[0..alt.base.len() - bases_to_trim].to_string();
                 }
             }
