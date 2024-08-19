@@ -1,3 +1,5 @@
+[![Tests](https://github.com/oxfordmmm/grumpy/actions/workflows/test.yaml/badge.svg)](https://github.com/oxfordmmm/grumpy/actions/workflows/test.yaml)
+
 # grumpy
 Re-implementation of [gumpy](https://github.com/oxfordmmm/gumpy) in Rust for speed
 

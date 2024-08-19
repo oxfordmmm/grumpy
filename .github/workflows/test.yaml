@@ -1,5 +1,5 @@
 # https://gist.github.com/domnikl/ccb8d0b82056fbe5cf7f4f145ac7f44b
-name: main
+name: Tests
 
 on:
   push:
