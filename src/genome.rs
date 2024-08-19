@@ -6783,7 +6783,7 @@ mod tests {
         let diff = GenomeDifference::new(genome.clone(), sample.clone(), MinorType::COV);
 
         // Just check the variants and mutations strings here (that's the part with the possible bugs)
-        let expected_variants = vec![
+        let expected_variants = [
             // This first variant lies in 2 genes, so gets 2 variants
             "2406843_del_c",
             "2406843_del_c",
