@@ -6815,6 +6815,5 @@ mod tests {
         );
         assert_eq!(mymt_diff.mutations.len(), 0);
         assert_eq!(mymt_diff.minor_mutations.len(), 0);
-
     }
 }
