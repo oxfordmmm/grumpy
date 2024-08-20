@@ -15,6 +15,7 @@ string_cache = "0.8.7"
 vcf = "0.6.1"
 pyo3 = { version = "0.22.1", features = ["extension-module"] }
 pretty_assertions = "1.4.0"
+rayon = "1.10.0"
 
 [profile.dev]
 opt-level = 3

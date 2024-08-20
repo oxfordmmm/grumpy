@@ -1,13 +1,26 @@
 //! Module for handling VCF files
 use pyo3::prelude::*;
+use rayon::prelude::*;
 
 use std::collections::{hash_map, HashMap};
 use std::fs::File;
 use std::io::BufReader;
 use std::string::String;
-use vcf::VCFReader;
+use vcf::{VCFReader, VCFRecord};
 
 use crate::common::{AltType, Evidence, VCFRow};
+
+#[pyclass]
+/// Dummy struct for wrapping VCFRecord
+/// 
+/// Required to make a valid pyclass to use as a function argument
+#[derive(Clone)]
+pub struct VCFRecordToParse{
+    pub record: VCFRecord,
+    pub min_dp: i32,
+    pub required_fields: Vec<String>,
+}
+
 #[pyclass]
 #[derive(Clone, Debug)]
 /// Struct to hold the information from a VCF file
@@ -39,109 +52,35 @@ impl VCFFile {
     /// - `ignore_filter`: bool - Whether to ignore the filter column
     /// - `min_dp`: i32 - Minimum depth to consider a call
     pub fn new(filename: String, ignore_filter: bool, min_dp: i32) -> Self {
+        rayon::ThreadPoolBuilder::new().num_threads(22).build_global().unwrap();
         let file = File::open(filename).unwrap();
         let buf = BufReader::new(file);
         let mut reader = VCFReader::new(buf).unwrap();
 
         let mut record = reader.empty_record();
         let mut more_records = reader.next_record(&mut record);
+        let mut reader_records = Vec::new();
 
-        let required_fields = ["GT"];
-        let mut records: Vec<VCFRow> = Vec::new();
+        let required_fields = vec!["GT".to_string()];
+        // Read data into memory
+        while matches!(more_records, Ok(true)) {
+            reader_records.push(record.clone());
+            more_records = reader.next_record(&mut record);
+        }
 
+        
+        // Parse records multithreaded
+        let parsed = reader_records.par_iter().map(|record| VCFFile::parse_record(VCFRecordToParse{record: record.clone(), min_dp, required_fields: required_fields.clone()})).collect::<Vec<(VCFRow, Vec<Evidence>, Vec<Evidence>)>>();
         // For ease of access, we'll store the calls in a hashmap indexed on genome index
         let mut calls_map: HashMap<i64, Vec<Evidence>> = HashMap::new();
         let mut minor_calls_map: HashMap<i64, Vec<Evidence>> = HashMap::new();
-        while matches!(more_records, Ok(true)) {
-            // Parse fields of the record to pull out data
-            // For whatever reason non of these fields are strings, so we need to convert them
-            let mut alts = Vec::new(); // One string per alt
-            for alt in record.alternative.iter() {
-                alts.push(String::from_utf8_lossy(alt).to_string().to_lowercase());
-            }
-            let mut filters = Vec::new(); // String per filter
-            for filter in record.filter.iter() {
-                for f in String::from_utf8_lossy(filter).split(";") {
-                    filters.push(f.to_string());
-                }
-            }
+        let mut records = Vec::new();
 
-            // Oddities of how this VCF library works...
-            // Format is a vector of bytes, but we need to convert it to a vector of strings
-            // Each of these strings corresponds to an item in the genotypes vector
-            let mut format: Vec<String> = Vec::new();
-            for f in record.format.iter() {
-                format.push(String::from_utf8_lossy(f).to_string());
-            }
-
-            let mut idx = 0;
-            let mut fields: HashMap<String, Vec<String>> = HashMap::new();
-            for s in record.genotype.iter() {
-                let mut item: Vec<Vec<String>> = Vec::new();
-                for i in s.iter() {
-                    let mut value: Vec<String> = Vec::new();
-                    for j in i.iter() {
-                        value.push(String::from_utf8_lossy(j).to_string());
-                    }
-                    item.push(value.clone());
-                    fields.insert(format[idx].clone(), value.clone());
-                    idx += 1;
-                }
-            }
-
-            // Validate that this record has the required fields
-            for field in required_fields.iter() {
-                if !format.contains(&field.to_string()) {
-                    panic!("Required field {} not found in record", field);
-                }
-            }
-
-            // Enforce that this record has a COV field
-            if !fields.contains_key("COV") {
-                let mut _cov_tag = "";
-                let mut cov = Vec::new();
-                if fields.contains_key("AD") {
-                    _cov_tag = "AD";
-                } else if fields.contains_key("RO") && fields.contains_key("AO") {
-                    // Annoying edge case where no single COV field exists but can be constructed
-                    _cov_tag = "RO";
-                } else {
-                    panic!("No COV tag found in record");
-                }
-                if _cov_tag != "RO" {
-                    for c in fields.get(_cov_tag).unwrap() {
-                        cov.push(c.to_string());
-                    }
-                } else {
-                    let ro = fields.get("RO").unwrap()[0].clone();
-                    let ao = fields.get("AO").unwrap()[0].clone();
-                    cov.push(ro.to_string());
-                    cov.push(ao.to_string());
-                }
-
-                fields.insert("COV".to_string(), cov);
-            }
-
-            // Check if this record has passed the filters
-            let mut passed = false;
-            if filters == vec!["PASS"] {
-                passed = true;
-            }
-
-            records.push(VCFRow {
-                position: record.position as i64,
-                reference: String::from_utf8_lossy(&record.reference)
-                    .to_string()
-                    .to_lowercase(),
-                alternative: alts.clone(),
-                filter: filters.clone(),
-                fields: fields.clone(),
-                is_filter_pass: passed,
-            });
-
-            let (record_calls, mut record_minor_calls) =
-                VCFFile::parse_record_for_calls(records[records.len() - 1].clone(), min_dp);
-
+        // Fetch data
+        for (record, record_calls, _record_minor_calls) in parsed.iter() {
+            let passed = record.is_filter_pass;
+            let mut record_minor_calls = _record_minor_calls.clone(); 
+            records.push(record.clone());
             for call in record_calls.iter() {
                 let mut added = false;
                 if call.call_type == AltType::NULL {
@@ -157,7 +96,7 @@ impl VCFFile {
                             "NO_DATA".to_string(),
                         ];
                         let mut all_allowed = true;
-                        for f in filters.iter() {
+                        for f in record.filter.iter() {
                             if !allowed_filters.contains(f) {
                                 all_allowed = false;
                                 break;
@@ -203,7 +142,7 @@ impl VCFFile {
                 }
             }
             // Add minor calls if the filter is passed or ignored, or specifcally just the MIN_FRS has failed
-            if ignore_filter || passed || filters.contains(&"MIN_FRS".to_string()) {
+            if ignore_filter || passed || record.filter.contains(&"MIN_FRS".to_string()) {
                 for call in record_minor_calls.iter() {
                     if let hash_map::Entry::Vacant(e) = minor_calls_map.entry(call.genome_index) {
                         e.insert(vec![call.clone()]);
@@ -229,7 +168,7 @@ impl VCFFile {
             // }
 
             // Get the next record
-            more_records = reader.next_record(&mut record);
+            // more_records = reader.next_record(&mut record);
         }
 
         // I hate implict returns, but appease clippy
@@ -239,6 +178,104 @@ impl VCFFile {
             calls: calls_map,
             minor_calls: minor_calls_map,
         }
+    }
+
+    #[staticmethod]
+    fn parse_record(rec: VCFRecordToParse) -> (VCFRow, Vec<Evidence>, Vec<Evidence>) {
+        let record = rec.record;
+        let min_dp = rec.min_dp;
+        let required_fields = rec.required_fields;
+
+        // Parse fields of the record to pull out data
+        // For whatever reason non of these fields are strings, so we need to convert them
+        let mut alts = Vec::new(); // One string per alt
+        for alt in record.alternative.iter() {
+            alts.push(String::from_utf8_lossy(alt).to_string().to_lowercase());
+        }
+        let mut filters = Vec::new(); // String per filter
+        for filter in record.filter.iter() {
+            for f in String::from_utf8_lossy(filter).split(";") {
+                filters.push(f.to_string());
+            }
+        }
+
+        // Oddities of how this VCF library works...
+        // Format is a vector of bytes, but we need to convert it to a vector of strings
+        // Each of these strings corresponds to an item in the genotypes vector
+        let mut format: Vec<String> = Vec::new();
+        for f in record.format.iter() {
+            format.push(String::from_utf8_lossy(f).to_string());
+        }
+
+        let mut idx = 0;
+        let mut fields: HashMap<String, Vec<String>> = HashMap::new();
+        for s in record.genotype.iter() {
+            let mut item: Vec<Vec<String>> = Vec::new();
+            for i in s.iter() {
+                let mut value: Vec<String> = Vec::new();
+                for j in i.iter() {
+                    value.push(String::from_utf8_lossy(j).to_string());
+                }
+                item.push(value.clone());
+                fields.insert(format[idx].clone(), value.clone());
+                idx += 1;
+            }
+        }
+
+        // Validate that this record has the required fields
+        for field in required_fields.iter() {
+            if !format.contains(&field.to_string()) {
+                panic!("Required field {} not found in record", field);
+            }
+        }
+
+        // Enforce that this record has a COV field
+        if !fields.contains_key("COV") {
+            let mut _cov_tag = "";
+            let mut cov = Vec::new();
+            if fields.contains_key("AD") {
+                _cov_tag = "AD";
+            } else if fields.contains_key("RO") && fields.contains_key("AO") {
+                // Annoying edge case where no single COV field exists but can be constructed
+                _cov_tag = "RO";
+            } else {
+                panic!("No COV tag found in record");
+            }
+            if _cov_tag != "RO" {
+                for c in fields.get(_cov_tag).unwrap() {
+                    cov.push(c.to_string());
+                }
+            } else {
+                let ro = fields.get("RO").unwrap()[0].clone();
+                let ao = fields.get("AO").unwrap()[0].clone();
+                cov.push(ro.to_string());
+                cov.push(ao.to_string());
+            }
+
+            fields.insert("COV".to_string(), cov);
+        }
+
+        // Check if this record has passed the filters
+        let mut passed = false;
+        if filters == vec!["PASS"] {
+            passed = true;
+        }
+
+        let row = VCFRow {
+            position: record.position as i64,
+            reference: String::from_utf8_lossy(&record.reference)
+                .to_string()
+                .to_lowercase(),
+            alternative: alts.clone(),
+            filter: filters.clone(),
+            fields: fields.clone(),
+            is_filter_pass: passed,
+        };
+
+        let (record_calls, record_minor_calls) =
+            VCFFile::parse_record_for_calls(row.clone(), min_dp);
+        
+        return (row, record_calls, record_minor_calls);
     }
 
     #[staticmethod]

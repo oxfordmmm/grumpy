@@ -165,3 +165,5 @@ pub struct Alt {
     /// Evidence associated with this call
     pub evidence: Evidence,
 }
+
+pub const THREADS: usize = 8;
