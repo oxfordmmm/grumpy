@@ -229,7 +229,7 @@ impl Gene {
                     if *pos == 0 {
                         // Warn the user about a missing insertion, and skip it
                         println!(
-                            "Insertion at start of gene {} is revcomp and cannot be adjusted",
+                            "Insertion at start of gene {} is revcomp and cannot be adjusted. Skipping!",
                             gene_def.name
                         );
 
