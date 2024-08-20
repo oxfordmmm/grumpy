@@ -6784,7 +6784,8 @@ mod tests {
 
         // Just check the variants and mutations strings here (that's the part with the possible bugs)
         let expected_variants = [
-            // This first variant lies in 2 genes, so gets 2 variants
+            "218628_ins_tacggg",
+            // This variant lies in 2 genes, so gets 2 variants
             "2406843_del_c",
             "2406843_del_c",
             "3820407a>g",
@@ -6804,5 +6805,15 @@ mod tests {
 
         assert_eq!(rv2147c_diff.minor_mutations.len(), 0);
         assert_eq!(rv2147c_diff.mutations[0].mutation, "1_del_g".to_string());
+
+        // Has insertion at first pos of revcomp gene so check it doesn't make it
+        // (because it doesn't make sense)
+        let mymt_diff = GeneDifference::new(
+            genome.get_gene("mymT".to_string()),
+            sample.get_gene("mymT".to_string()),
+            MinorType::COV,
+        );
+        assert_eq!(mymt_diff.mutations.len(), 0);
+        assert_eq!(mymt_diff.minor_mutations.len(), 0);
     }
 }

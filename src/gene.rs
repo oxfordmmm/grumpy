@@ -227,10 +227,23 @@ impl Gene {
                 if *indel_size > 0 {
                     // Insertion
                     if *pos == 0 {
-                        panic!(
-                            "Insertion at start of gene {} is revcomp and cannot be adjusted",
+                        // Warn the user about a missing insertion, and skip it
+                        println!(
+                            "Insertion at start of gene {} is revcomp and cannot be adjusted. Skipping!",
                             gene_def.name
                         );
+
+                        // Remove the insertion from the old position
+                        fixed_genome_positions[*pos].alts = genome_positions[*pos]
+                            .alts
+                            .iter()
+                            .filter(|x| {
+                                x.alt_type != AltType::INS && x.evidence.is_minor == *is_minor
+                            })
+                            .cloned()
+                            .collect::<Vec<Alt>>();
+
+                        continue;
                     }
                     let new_pos = *pos - 1;
                     let fixed_alts = genome_positions[*pos]
