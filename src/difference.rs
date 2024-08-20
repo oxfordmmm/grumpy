@@ -108,6 +108,7 @@ pub struct Mutation {
 }
 
 #[pyclass]
+#[derive(Debug)]
 /// Struct to hold the difference between two genomes
 pub struct GenomeDifference {
     #[pyo3(get, set)]
@@ -120,6 +121,7 @@ pub struct GenomeDifference {
 }
 
 #[pyclass]
+#[derive(Debug)]
 /// Struct to hold the difference between two genes
 pub struct GeneDifference {
     #[pyo3(get, set)]

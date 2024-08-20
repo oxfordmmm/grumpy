@@ -6782,8 +6782,17 @@ mod tests {
 
         let diff = GenomeDifference::new(genome.clone(), sample.clone(), MinorType::COV);
 
-        for variant in diff.variants.iter() {
-            assert_eq!(variant.variant, "2406843_del_c".to_string());
+        // Just check the variants and mutations strings here (that's the part with the possible bugs)
+        let expected_variants = [
+            // This first variant lies in 2 genes, so gets 2 variants
+            "2406843_del_c",
+            "2406843_del_c",
+            "3820407a>g",
+            "3820444_ins_ca",
+            "3820446g>c",
+        ];
+        for (idx, variant) in diff.variants.iter().enumerate() {
+            assert_eq!(variant.variant, expected_variants[idx]);
         }
         assert_eq!(diff.minor_variants.len(), 0);
 
