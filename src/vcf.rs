@@ -12,10 +12,10 @@ use crate::common::{AltType, Evidence, VCFRow};
 
 #[pyclass]
 /// Dummy struct for wrapping VCFRecord
-/// 
+///
 /// Required to make a valid pyclass to use as a function argument
 #[derive(Clone)]
-pub struct VCFRecordToParse{
+pub struct VCFRecordToParse {
     pub record: VCFRecord,
     pub min_dp: i32,
     pub required_fields: Vec<String>,
@@ -52,7 +52,10 @@ impl VCFFile {
     /// - `ignore_filter`: bool - Whether to ignore the filter column
     /// - `min_dp`: i32 - Minimum depth to consider a call
     pub fn new(filename: String, ignore_filter: bool, min_dp: i32) -> Self {
-        rayon::ThreadPoolBuilder::new().num_threads(22).build_global().unwrap();
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(22)
+            .build_global()
+            .unwrap();
         let file = File::open(filename).unwrap();
         let buf = BufReader::new(file);
         let mut reader = VCFReader::new(buf).unwrap();
@@ -68,9 +71,17 @@ impl VCFFile {
             more_records = reader.next_record(&mut record);
         }
 
-        
         // Parse records multithreaded
-        let parsed = reader_records.par_iter().map(|record| VCFFile::parse_record(VCFRecordToParse{record: record.clone(), min_dp, required_fields: required_fields.clone()})).collect::<Vec<(VCFRow, Vec<Evidence>, Vec<Evidence>)>>();
+        let parsed = reader_records
+            .par_iter()
+            .map(|record| {
+                VCFFile::parse_record(VCFRecordToParse {
+                    record: record.clone(),
+                    min_dp,
+                    required_fields: required_fields.clone(),
+                })
+            })
+            .collect::<Vec<(VCFRow, Vec<Evidence>, Vec<Evidence>)>>();
         // For ease of access, we'll store the calls in a hashmap indexed on genome index
         let mut calls_map: HashMap<i64, Vec<Evidence>> = HashMap::new();
         let mut minor_calls_map: HashMap<i64, Vec<Evidence>> = HashMap::new();
@@ -79,7 +90,7 @@ impl VCFFile {
         // Fetch data
         for (record, record_calls, _record_minor_calls) in parsed.iter() {
             let passed = record.is_filter_pass;
-            let mut record_minor_calls = _record_minor_calls.clone(); 
+            let mut record_minor_calls = _record_minor_calls.clone();
             records.push(record.clone());
             for call in record_calls.iter() {
                 let mut added = false;
@@ -274,8 +285,8 @@ impl VCFFile {
 
         let (record_calls, record_minor_calls) =
             VCFFile::parse_record_for_calls(row.clone(), min_dp);
-        
-        return (row, record_calls, record_minor_calls);
+
+        (row, record_calls, record_minor_calls)
     }
 
     #[staticmethod]
