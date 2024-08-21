@@ -52,10 +52,6 @@ impl VCFFile {
     /// - `ignore_filter`: bool - Whether to ignore the filter column
     /// - `min_dp`: i32 - Minimum depth to consider a call
     pub fn new(filename: String, ignore_filter: bool, min_dp: i32) -> Self {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(22)
-            .build_global()
-            .unwrap();
         let file = File::open(filename).unwrap();
         let buf = BufReader::new(file);
         let mut reader = VCFReader::new(buf).unwrap();
