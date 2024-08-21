@@ -43,3 +43,8 @@ for gene_name in sample.genes_with_mutations:
     for mutation in gene_diff.minor_mutations:
         print(mutation.mutation)
 ```
+
+## Threads
+By default, VCF parsing will run with the same number of threads as CPU cores. This can give significant speed improvements for complex VCF files
+
+To force single threading (or other number of threads), run `grumpy.thread_setup(<thread count>)`. Note that this should only be run exactly once per execution! 
