@@ -161,21 +161,6 @@ impl VCFFile {
                     }
                 }
             }
-
-            // if record.position == 1474466{
-            // println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
-            // for call in record_calls.iter(){
-            //     println!("{:?}\n", call);
-            // }
-            // println!("--");
-            // for call in record_minor_calls.iter(){
-            //     println!("{:?}\n", call);
-            // }
-            // println!("\n\n");
-            // }
-
-            // Get the next record
-            // more_records = reader.next_record(&mut record);
         }
 
         // I hate implict returns, but appease clippy
@@ -281,6 +266,18 @@ impl VCFFile {
 
         let (record_calls, record_minor_calls) =
             VCFFile::parse_record_for_calls(row.clone(), min_dp);
+
+        // if record.position == 1474466{
+        //     println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
+        //     for call in record_calls.iter(){
+        //         println!("{:?}\n", call);
+        //     }
+        //     println!("--");
+        //     for call in record_minor_calls.iter(){
+        //         println!("{:?}\n", call);
+        //     }
+        //     println!("\n\n");
+        // }
 
         (row, record_calls, record_minor_calls)
     }

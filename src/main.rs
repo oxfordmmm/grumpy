@@ -27,7 +27,6 @@ fn main() {
     let vcf_start = SystemTime::now();
     let vcf = VCFFile::new(vcf_path.to_string(), false, 3);
     let vcf_end = SystemTime::now();
-    println!("VCF took {:?}", vcf_end.duration_since(vcf_start).unwrap());
 
     let reference_start = SystemTime::now();
     let mut reference = Genome::new(reference_path);
