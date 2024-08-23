@@ -148,8 +148,31 @@ impl VCFFile {
                     record_minor_calls.push(c);
                 }
             }
-            // Add minor calls if the filter is passed or ignored, or specifcally just the MIN_FRS has failed
-            if ignore_filter || passed || record.filter.contains(&"MIN_FRS".to_string()) {
+            
+            // Add minor calls if the filter is passed or ignored, or if fails lie within allowed filters
+            let mut valid_filters = passed || ignore_filter;
+            if !valid_filters {
+                // Not passed filter and not ignored, so check if all filters are in allowed filters
+                let allowed_filters = [
+                    "MIN_FRS".to_string(),
+                    "MIN_DP".to_string(),
+                    "MIN_GCP".to_string(),
+                ];
+                let mut all_allowed = true;
+                if record.filter.len() == 0 {
+                    all_allowed = false;
+                }
+                for f in record.filter.iter() {
+                    if !allowed_filters.contains(f) {
+                        all_allowed = false;
+                        break;
+                    }
+                }
+                if all_allowed {
+                    valid_filters = true;
+                }
+            }
+            if valid_filters {
                 for call in record_minor_calls.iter() {
                     if let hash_map::Entry::Vacant(e) = minor_calls_map.entry(call.genome_index) {
                         e.insert(vec![call.clone()]);

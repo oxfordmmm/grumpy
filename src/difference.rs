@@ -248,13 +248,17 @@ impl GenomeDifference {
 
                     if alt.evidence.is_minor {
                         // Append coverage to the variant
-                        if minor_type == MinorType::COV {
+                        if minor_type == MinorType::COV && alt.evidence.cov.is_some() {
                             garc = garc + ":" + &alt.evidence.cov.unwrap().to_string();
                         }
-                        if minor_type == MinorType::FRS {
+                        else if minor_type == MinorType::FRS && alt.evidence.frs.is_some() {
                             garc = garc
                                 + ":"
                                 + &trim_float_string(format!("{:.3}", alt.evidence.frs.unwrap()));
+                        }
+                        else {
+                            println!("Missing evidence for minor allele: {}, skipping!", garc);
+                            continue;
                         }
                     }
 
@@ -656,18 +660,22 @@ impl GeneDifference {
                                             indel_nucleotides = Some(e.base.clone());
                                             evidence = vec![e.evidence.clone()];
                                         }
-                                        if minor_type == MinorType::COV {
+                                        if minor_type == MinorType::COV && e.evidence.cov.is_some(){
                                             _mutation = _mutation
                                                 + ":"
                                                 + &e.evidence.cov.unwrap().to_string();
                                         }
-                                        if minor_type == MinorType::FRS {
+                                        else if minor_type == MinorType::FRS && e.evidence.frs.is_some() {
                                             _mutation = _mutation
                                                 + ":"
                                                 + &trim_float_string(format!(
                                                     "{:.3}",
                                                     e.evidence.frs.unwrap()
                                                 ));
+                                        }
+                                        else {
+                                            println!("Missing evidence for minor allele: {}, skipping!", _mutation);
+                                            continue;
                                         }
                                         minor_mutations.push(Mutation {
                                             mutation: _mutation.clone(),
@@ -740,10 +748,10 @@ impl GeneDifference {
                                         for e in e.iter() {
                                             minor_evidence.push(e.clone());
                                         }
-                                        if cov.unwrap() > minor_cov {
+                                        if cov.is_some() && cov.unwrap() > minor_cov {
                                             minor_cov = cov.unwrap();
                                         }
-                                        if frs.unwrap() > minor_frs {
+                                        if frs.is_some() && frs.unwrap() > minor_frs {
                                             minor_frs = frs.unwrap();
                                         }
                                     }
@@ -837,11 +845,11 @@ impl GeneDifference {
 
                             if alt.evidence.is_minor {
                                 // Append coverage to the variant
-                                if minor_type == MinorType::COV {
+                                if minor_type == MinorType::COV && alt.evidence.cov.is_some() {
                                     mutation =
                                         mutation + ":" + &alt.evidence.cov.unwrap().to_string();
                                 }
-                                if minor_type == MinorType::FRS {
+                                else if minor_type == MinorType::FRS && alt.evidence.frs.is_some() {
                                     mutation = mutation
                                         + ":"
                                         + &trim_float_string(format!(
@@ -850,10 +858,10 @@ impl GeneDifference {
                                         ));
                                 }
                                 if alt.alt_type == AltType::DEL {
-                                    if alt.evidence.cov.unwrap() > minor_deleted_cov {
+                                    if alt.evidence.cov.is_some() && alt.evidence.cov.unwrap() > minor_deleted_cov {
                                         minor_deleted_cov = alt.evidence.cov.unwrap();
                                     }
-                                    if alt.evidence.frs.unwrap() > minor_deleted_frs {
+                                    if alt.evidence.frs.is_some() && alt.evidence.frs.unwrap() > minor_deleted_frs {
                                         minor_deleted_frs = alt.evidence.frs.unwrap();
                                     }
                                 }
