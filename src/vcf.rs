@@ -148,7 +148,7 @@ impl VCFFile {
                     record_minor_calls.push(c);
                 }
             }
-            
+
             // Add minor calls if the filter is passed or ignored, or if fails lie within allowed filters
             let mut valid_filters = passed || ignore_filter;
             if !valid_filters {
@@ -158,10 +158,8 @@ impl VCFFile {
                     "MIN_DP".to_string(),
                     "MIN_GCP".to_string(),
                 ];
-                let mut all_allowed = true;
-                if record.filter.len() == 0 {
-                    all_allowed = false;
-                }
+                // Auto-ignore if no filters are present (i.e filter = "." which is fail)
+                let mut all_allowed = !record.filter.is_empty();
                 for f in record.filter.iter() {
                     if !allowed_filters.contains(f) {
                         all_allowed = false;
