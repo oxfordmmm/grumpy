@@ -172,7 +172,9 @@ pub struct Alt {
 /// Set up the number of threads to use for parallel operations
 /// If None, use the default number of threads (usually the number of cores)
 ///
-/// Only call this function exactly once!! Subsequent calls will error
+/// Only call this function to use less cores than the default. Note that
+/// it should be called before **any** other function in the program, and 
+/// should not be called more than once.
 ///
 /// # Arguments
 /// * `num_threads` - Number of threads to use for parallel operations

@@ -47,4 +47,4 @@ for gene_name in sample.genes_with_mutations:
 ## Threads
 By default, VCF parsing will run with the same number of threads as CPU cores. This can give significant speed improvements for complex VCF files
 
-To force single threading (or other number of threads), run `grumpy.thread_setup(<thread count>)`. Note that this should only be run exactly once per execution! 
+To force single threading (or other number of threads), run `grumpy.thread_setup(<thread count>)`. Note that should be run before **any** other function in this library, and should not be called more than once! Not following this will cause errors!
