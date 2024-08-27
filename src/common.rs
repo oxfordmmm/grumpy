@@ -173,7 +173,7 @@ pub struct Alt {
 /// If None, use the default number of threads (usually the number of cores)
 ///
 /// Only call this function to use less cores than the default. Note that
-/// it should be called before **any** other function in the program, and 
+/// it should be called before **any** other function in the program, and
 /// should not be called more than once.
 ///
 /// # Arguments
