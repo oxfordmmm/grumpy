@@ -165,3 +165,28 @@ pub struct Alt {
     /// Evidence associated with this call
     pub evidence: Evidence,
 }
+
+#[cfg(not(tarpaulin_include))]
+#[pyfunction]
+#[pyo3(signature = (num_threads=None))]
+/// Set up the number of threads to use for parallel operations
+/// If None, use the default number of threads (usually the number of cores)
+///
+/// Only call this function to use less cores than the default. Note that
+/// it should be called before **any** other function in the program, and
+/// should not be called more than once.
+///
+/// # Arguments
+/// * `num_threads` - Number of threads to use for parallel operations
+pub fn thread_setup(num_threads: Option<usize>) {
+    let result = match num_threads {
+        Some(num) => rayon::ThreadPoolBuilder::new()
+            .num_threads(num)
+            .build_global(),
+        None => rayon::ThreadPoolBuilder::new().build_global(),
+    };
+    match result {
+        Ok(_) => (),
+        Err(e) => panic!("Error setting up threads: {}", e),
+    }
+}
