@@ -2617,7 +2617,7 @@ mod tests {
         let genome_diff = GenomeDifference::new(reference.clone(), sample.clone(), MinorType::FRS);
         let expected_minor_variants = vec![
             Variant {
-                variant: "16c>g:0.114".to_string(),
+                variant: "16c>g:0.105".to_string(),
                 nucleotide_index: 16,
                 evidence: VCFRow {
                     position: 16,
@@ -2643,7 +2643,7 @@ mod tests {
                 gene_name: Some("A".to_string()),
             },
             Variant {
-                variant: "17c>t:0.114".to_string(),
+                variant: "17c>t:0.105".to_string(),
                 nucleotide_index: 17,
                 evidence: VCFRow {
                     position: 16,
@@ -2669,7 +2669,7 @@ mod tests {
                 gene_name: Some("A".to_string()),
             },
             Variant {
-                variant: "18c>g:0.114".to_string(),
+                variant: "18c>g:0.105".to_string(),
                 nucleotide_index: 18,
                 evidence: VCFRow {
                     position: 16,
@@ -3497,7 +3497,7 @@ mod tests {
                 evidence: vec![
                     Evidence {
                         cov: Some(68),
-                        frs: Some(OrderedFloat(68.0 / 70.0)),
+                        frs: Some(OrderedFloat(68.0 / 76.0)),
                         genotype: "1/1".to_string(),
                         call_type: AltType::SNP,
                         vcf_row: VCFRow {
@@ -3524,7 +3524,7 @@ mod tests {
                     },
                     Evidence {
                         cov: Some(68),
-                        frs: Some(OrderedFloat(68.0 / 70.0)),
+                        frs: Some(OrderedFloat(68.0 / 76.0)),
                         genotype: "1/1".to_string(),
                         call_type: AltType::SNP,
                         vcf_row: VCFRow {
@@ -3819,7 +3819,7 @@ mod tests {
                 evidence: vec![
                     Evidence {
                         cov: Some(8),
-                        frs: Some(OrderedFloat(8.0 / 70.0)),
+                        frs: Some(OrderedFloat(8.0 / 76.0)),
                         genotype: "1/1".to_string(),
                         call_type: AltType::SNP,
                         vcf_row: VCFRow {
@@ -3846,7 +3846,7 @@ mod tests {
                     },
                     Evidence {
                         cov: Some(8),
-                        frs: Some(OrderedFloat(8.0 / 70.0)),
+                        frs: Some(OrderedFloat(8.0 / 76.0)),
                         genotype: "1/1".to_string(),
                         call_type: AltType::SNP,
                         vcf_row: VCFRow {
@@ -3873,7 +3873,7 @@ mod tests {
                     },
                     Evidence {
                         cov: Some(8),
-                        frs: Some(OrderedFloat(8.0 / 70.0)),
+                        frs: Some(OrderedFloat(8.0 / 76.0)),
                         genotype: "1/1".to_string(),
                         call_type: AltType::SNP,
                         vcf_row: VCFRow {
@@ -4254,12 +4254,12 @@ mod tests {
 
         let expected_a_minor_mutations_frs = vec![
             Mutation {
-                mutation: "P5V:0.114".to_string(),
+                mutation: "P5V:0.105".to_string(),
                 gene: "A".to_string(),
                 evidence: vec![
                     Evidence {
                         cov: Some(8),
-                        frs: Some(OrderedFloat(8.0 / 70.0)),
+                        frs: Some(OrderedFloat(8.0 / 76.0)),
                         genotype: "1/1".to_string(),
                         call_type: AltType::SNP,
                         vcf_row: VCFRow {
@@ -4286,7 +4286,7 @@ mod tests {
                     },
                     Evidence {
                         cov: Some(8),
-                        frs: Some(OrderedFloat(8.0 / 70.0)),
+                        frs: Some(OrderedFloat(8.0 / 76.0)),
                         genotype: "1/1".to_string(),
                         call_type: AltType::SNP,
                         vcf_row: VCFRow {
@@ -4313,7 +4313,7 @@ mod tests {
                     },
                     Evidence {
                         cov: Some(8),
-                        frs: Some(OrderedFloat(8.0 / 70.0)),
+                        frs: Some(OrderedFloat(8.0 / 76.0)),
                         genotype: "1/1".to_string(),
                         call_type: AltType::SNP,
                         vcf_row: VCFRow {
