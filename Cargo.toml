@@ -1,6 +1,6 @@
 [package]
 name = "grumpy"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "Genetic analysis in Rust."
 license-file = "LICENSE"
@@ -20,6 +20,12 @@ rayon = "1.10.0"
 [profile.dev]
 opt-level = 3
 debug = 1
+lto = true
+
+[profile.release]
+opt-level = 3
+debug-assertions = true # Required else lto gives no optimisations???
+lto = true
 
 [lib]
 name = "grumpy"

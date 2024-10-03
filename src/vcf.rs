@@ -330,14 +330,8 @@ impl VCFFile {
         }
 
         let mut dp = 0;
-        if record.fields.contains_key("DP")
-            && record.fields.get("DP").unwrap()[0].parse::<i32>().is_ok()
-        {
-            dp = record.fields.get("DP").unwrap()[0].parse::<i32>().unwrap();
-        } else {
-            // If there isn't a valid DP field defined then default to the sum of the COV field
-            cov.iter().for_each(|x| dp += x);
-        }
+        // As DP isn't always reliable, default to the sum of the COV field
+        cov.iter().for_each(|x| dp += x);
 
         let ref_allele = record.reference.clone().to_lowercase();
         let mut alt_allele = "".to_string();
