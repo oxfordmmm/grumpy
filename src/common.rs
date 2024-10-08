@@ -1,6 +1,6 @@
 //! Module of common structs and enums used throughout the program
 use pyo3::prelude::*;
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 use ordered_float::OrderedFloat;
 
@@ -53,6 +53,14 @@ pub struct VCFRow {
     pub is_filter_pass: bool,
 }
 
+#[pyclass]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VCFRowRef {
+    pub ptr: *const VCFRow
+}
+
+unsafe impl Send for VCFRowRef {}
+
 #[pyclass(eq)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Struct to hold the information parsed for a call
@@ -90,9 +98,8 @@ pub struct Evidence {
     /// Whether this is a minor call
     pub is_minor: bool,
 
-    #[pyo3(get, set)]
     /// VCF row which this call originated from
-    pub vcf_row: VCFRow,
+    pub vcf_row: VCFRowRef,
 
     #[pyo3(get, set)]
     /// Index of the COV field in the VCF row which this call originated from
@@ -109,6 +116,11 @@ impl Evidence {
             Some(frs) => Ok(frs.into_inner() as i32),
             None => Ok(0),
         }
+    }
+
+    #[getter]
+    unsafe fn vcf_row(&self) -> PyResult<VCFRow> {
+        Ok(self.vcf_row.ptr.read())
     }
 }
 

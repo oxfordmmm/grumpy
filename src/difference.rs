@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 
 use ordered_float::{Float, OrderedFloat};
 
-use crate::common::{Alt, AltType, Evidence, MinorType, VCFRow};
+use crate::common::{Alt, AltType, Evidence, MinorType, VCFRowRef};
 use crate::gene::{codon_to_aa, Gene, GenePos};
 use crate::genome::Genome;
 
@@ -23,7 +23,7 @@ pub struct Variant {
 
     #[pyo3(get, set)]
     /// Evidence for this variant
-    pub evidence: VCFRow,
+    pub evidence: VCFRowRef,
 
     #[pyo3(get, set)]
     /// Index of the VCF row. i.e COV at vcf_idx == coverage for this variant
