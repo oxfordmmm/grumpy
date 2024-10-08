@@ -1,6 +1,6 @@
 //! Module of common structs and enums used throughout the program
 use pyo3::prelude::*;
-use std::{collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
 use ordered_float::OrderedFloat;
 
@@ -56,7 +56,7 @@ pub struct VCFRow {
 #[pyclass]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VCFRowRef {
-    pub ptr: *const VCFRow
+    pub ptr: *const VCFRow,
 }
 
 unsafe impl Send for VCFRowRef {}

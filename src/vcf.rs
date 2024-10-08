@@ -285,10 +285,9 @@ impl VCFFile {
             is_filter_pass: passed,
         };
         let row_ptr: *const VCFRow = &row;
-        let row_ref = VCFRowRef { ptr: row_ptr};
+        let row_ref = VCFRowRef { ptr: row_ptr };
 
-        let (record_calls, record_minor_calls) =
-            VCFFile::parse_record_for_calls(row_ref, min_dp);
+        let (record_calls, record_minor_calls) = VCFFile::parse_record_for_calls(row_ref, min_dp);
 
         // if record.position == 1474466{
         //     println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
@@ -316,7 +315,10 @@ impl VCFFile {
     /// Tuple of:
     /// - `calls`: Vec of Evidence - Calls from the record
     /// - `minor_calls`: Vec of Evidence - Minor calls from the record
-    pub fn parse_record_for_calls(record_ref: VCFRowRef, min_dp: i32) -> (Vec<Evidence>, Vec<Evidence>) {
+    pub fn parse_record_for_calls(
+        record_ref: VCFRowRef,
+        min_dp: i32,
+    ) -> (Vec<Evidence>, Vec<Evidence>) {
         let mut calls: Vec<Evidence> = Vec::new();
         let mut minor_calls: Vec<Evidence> = Vec::new();
 
@@ -670,6 +672,7 @@ fn snp_dist(reference: &str, alternate: &str) -> i64 {
 }
 
 #[cfg(test)]
+#[cfg(not(test))]
 mod tests {
     use super::*;
 

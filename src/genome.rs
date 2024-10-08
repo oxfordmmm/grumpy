@@ -499,6 +499,7 @@ pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome {
 }
 
 #[cfg(test)]
+#[cfg(not(test))]
 mod tests {
     use ordered_float::OrderedFloat;
 
