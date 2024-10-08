@@ -8,7 +8,7 @@ use std::io::BufReader;
 use std::string::String;
 use vcf::{VCFReader, VCFRecord};
 
-use crate::common::{AltType, Evidence, VCFRow, VCFRowRef};
+use crate::common::{AltType, Evidence, VCFRow};
 
 #[pyclass]
 /// Dummy struct for wrapping VCFRecord
@@ -19,6 +19,7 @@ pub struct VCFRecordToParse {
     pub record: VCFRecord,
     pub min_dp: i32,
     pub required_fields: Vec<String>,
+    pub vcf_row_index: usize,
 }
 
 #[pyclass]
@@ -70,11 +71,13 @@ impl VCFFile {
         // Parse records multithreaded
         let parsed = reader_records
             .par_iter()
-            .map(|record| {
+            .enumerate()
+            .map(|(idx, record)| {
                 VCFFile::parse_record(VCFRecordToParse {
                     record: record.clone(),
                     min_dp,
                     required_fields: required_fields.clone(),
+                    vcf_row_index: idx,
                 })
             })
             .collect::<Vec<(VCFRow, Vec<Evidence>, Vec<Evidence>)>>();
@@ -198,6 +201,7 @@ impl VCFFile {
         let record = rec.record;
         let min_dp = rec.min_dp;
         let required_fields = rec.required_fields;
+        let vcf_row_index = rec.vcf_row_index;
 
         // Parse fields of the record to pull out data
         // For whatever reason non of these fields are strings, so we need to convert them
@@ -284,10 +288,11 @@ impl VCFFile {
             fields: fields.clone(),
             is_filter_pass: passed,
         };
-        let row_ptr: *const VCFRow = &row;
-        let row_ref = VCFRowRef { ptr: row_ptr };
+        // let row_ptr: *const VCFRow = &row;
+        // let row_ref = VCFRowRef { ptr: row_ptr };
 
-        let (record_calls, record_minor_calls) = VCFFile::parse_record_for_calls(row_ref, min_dp);
+        let (record_calls, record_minor_calls) =
+            VCFFile::parse_record_for_calls(row.clone(), min_dp, vcf_row_index);
 
         // if record.position == 1474466{
         //     println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
@@ -316,13 +321,12 @@ impl VCFFile {
     /// - `calls`: Vec of Evidence - Calls from the record
     /// - `minor_calls`: Vec of Evidence - Minor calls from the record
     pub fn parse_record_for_calls(
-        record_ref: VCFRowRef,
+        record: VCFRow,
         min_dp: i32,
+        vcf_row_index: usize,
     ) -> (Vec<Evidence>, Vec<Evidence>) {
         let mut calls: Vec<Evidence> = Vec::new();
         let mut minor_calls: Vec<Evidence> = Vec::new();
-
-        let record = unsafe { &*record_ref.ptr };
 
         // Dealing with the actual call here; should spit out possible minor calls afterwards
 
@@ -376,7 +380,7 @@ impl VCFFile {
                 frs: Some(ordered_float::OrderedFloat(1.0)),
                 genotype: genotype.join("/"),
                 call_type,
-                vcf_row: record_ref.clone(),
+                vcf_row: vcf_row_index,
                 reference: ref_allele.chars().nth(0).unwrap().to_string(),
                 alt: alt_allele.clone(),
                 genome_index: record.position,
@@ -432,7 +436,7 @@ impl VCFFile {
                     frs: Some(ordered_float::OrderedFloat(call_cov as f32 / dp as f32)),
                     genotype: genotype.join("/"),
                     call_type: _alt_type,
-                    vcf_row: record_ref.clone(),
+                    vcf_row: vcf_row_index,
                     reference,
                     alt: _base,
                     genome_index: record.position + offset,
@@ -468,7 +472,7 @@ impl VCFFile {
                     frs,
                     genotype: genotype.join("/"),
                     call_type: call_type.clone(),
-                    vcf_row: record_ref.clone(),
+                    vcf_row: vcf_row_index,
                     reference: r.to_string(),
                     alt: alt_allele.clone(),
                     genome_index: record.position + offset as i64,
@@ -511,7 +515,7 @@ impl VCFFile {
                         frs: Some(ordered_float::OrderedFloat(call_cov as f32 / dp as f32)),
                         genotype: genotype.join("/"), // This is a minor call so the row's genotype is the same
                         call_type: alt_type,
-                        vcf_row: record_ref.clone(),
+                        vcf_row: vcf_row_index,
                         reference,
                         alt: base,
                         genome_index: record.position + offset,

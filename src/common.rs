@@ -98,8 +98,9 @@ pub struct Evidence {
     /// Whether this is a minor call
     pub is_minor: bool,
 
-    /// VCF row which this call originated from
-    pub vcf_row: VCFRowRef,
+    #[pyo3(get, set)]
+    /// VCF row index which this call originated from
+    pub vcf_row: usize,
 
     #[pyo3(get, set)]
     /// Index of the COV field in the VCF row which this call originated from
@@ -116,11 +117,6 @@ impl Evidence {
             Some(frs) => Ok(frs.into_inner() as i32),
             None => Ok(0),
         }
-    }
-
-    #[getter]
-    unsafe fn vcf_row(&self) -> PyResult<VCFRow> {
-        Ok(self.vcf_row.ptr.read())
     }
 }
 

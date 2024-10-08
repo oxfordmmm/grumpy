@@ -9,7 +9,7 @@ use gb_io::seq::Location::Complement;
 use gb_io::seq::Location::Join;
 use gb_io::seq::Location::Range;
 
-use crate::common::{Alt, AltType, Evidence, GeneDef};
+use crate::common::{Alt, AltType, Evidence, GeneDef, VCFRow};
 use crate::gene::Gene;
 use crate::vcf::VCFFile;
 
@@ -83,6 +83,10 @@ pub struct Genome {
     #[pyo3(get, set)]
     /// Set of genes with mutations
     pub genes_with_mutations: HashSet<String>,
+
+    #[pyo3(get, set)]
+    /// List of the VCF records associated with this genome (if any)
+    pub vcf_records: Option<Vec<VCFRow>>,
 }
 
 #[pymethods]
@@ -212,6 +216,7 @@ impl Genome {
             gene_names,
             genes_with_mutations: HashSet::new(),
             gene_name_to_def: HashMap::new(),
+            vcf_records: None,
         };
         genome.assign_promoters();
 
@@ -389,6 +394,14 @@ impl Genome {
         }
         self.genome_positions[(index - 1) as usize].clone()
     }
+
+    /// Get the VCFRow associated with a given VCF row's index for this sample
+    pub fn get_vcf_row(&self, index: usize) -> VCFRow {
+        if self.vcf_records.is_none() {
+            panic!("No VCF records associated with this genome");
+        }
+        self.vcf_records.as_ref().unwrap()[index].clone()
+    }
 }
 
 #[pyfunction]
@@ -493,6 +506,9 @@ pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome {
 
     // Reset the gene hashmap as the nucleotide sequence has changed
     new_genome.genes = HashMap::new();
+
+    // Keep track of the VCF records for ease of pulling out VCF rows later
+    new_genome.vcf_records = Some(vcf.records.clone());
 
     // I hate implicit returns, but appease clippy
     new_genome
