@@ -53,14 +53,6 @@ pub struct VCFRow {
     pub is_filter_pass: bool,
 }
 
-#[pyclass]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct VCFRowRef {
-    pub ptr: *const VCFRow,
-}
-
-unsafe impl Send for VCFRowRef {}
-
 #[pyclass(eq)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Struct to hold the information parsed for a call

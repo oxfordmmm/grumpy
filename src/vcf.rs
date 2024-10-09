@@ -288,8 +288,6 @@ impl VCFFile {
             fields: fields.clone(),
             is_filter_pass: passed,
         };
-        // let row_ptr: *const VCFRow = &row;
-        // let row_ref = VCFRowRef { ptr: row_ptr };
 
         let (record_calls, record_minor_calls) =
             VCFFile::parse_record_for_calls(row.clone(), min_dp, vcf_row_index);
