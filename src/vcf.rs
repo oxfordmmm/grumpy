@@ -19,6 +19,7 @@ pub struct VCFRecordToParse {
     pub record: VCFRecord,
     pub min_dp: i32,
     pub required_fields: Vec<String>,
+    pub vcf_row_index: usize,
 }
 
 #[pyclass]
@@ -70,11 +71,13 @@ impl VCFFile {
         // Parse records multithreaded
         let parsed = reader_records
             .par_iter()
-            .map(|record| {
+            .enumerate()
+            .map(|(idx, record)| {
                 VCFFile::parse_record(VCFRecordToParse {
                     record: record.clone(),
                     min_dp,
                     required_fields: required_fields.clone(),
+                    vcf_row_index: idx,
                 })
             })
             .collect::<Vec<(VCFRow, Vec<Evidence>, Vec<Evidence>)>>();
@@ -198,6 +201,7 @@ impl VCFFile {
         let record = rec.record;
         let min_dp = rec.min_dp;
         let required_fields = rec.required_fields;
+        let vcf_row_index = rec.vcf_row_index;
 
         // Parse fields of the record to pull out data
         // For whatever reason non of these fields are strings, so we need to convert them
@@ -286,7 +290,7 @@ impl VCFFile {
         };
 
         let (record_calls, record_minor_calls) =
-            VCFFile::parse_record_for_calls(row.clone(), min_dp);
+            VCFFile::parse_record_for_calls(row.clone(), min_dp, vcf_row_index);
 
         // if record.position == 1474466{
         //     println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
@@ -314,7 +318,11 @@ impl VCFFile {
     /// Tuple of:
     /// - `calls`: Vec of Evidence - Calls from the record
     /// - `minor_calls`: Vec of Evidence - Minor calls from the record
-    pub fn parse_record_for_calls(record: VCFRow, min_dp: i32) -> (Vec<Evidence>, Vec<Evidence>) {
+    pub fn parse_record_for_calls(
+        record: VCFRow,
+        min_dp: i32,
+        vcf_row_index: usize,
+    ) -> (Vec<Evidence>, Vec<Evidence>) {
         let mut calls: Vec<Evidence> = Vec::new();
         let mut minor_calls: Vec<Evidence> = Vec::new();
 
@@ -370,7 +378,7 @@ impl VCFFile {
                 frs: Some(ordered_float::OrderedFloat(1.0)),
                 genotype: genotype.join("/"),
                 call_type,
-                vcf_row: record.clone(),
+                vcf_row: vcf_row_index,
                 reference: ref_allele.chars().nth(0).unwrap().to_string(),
                 alt: alt_allele.clone(),
                 genome_index: record.position,
@@ -426,7 +434,7 @@ impl VCFFile {
                     frs: Some(ordered_float::OrderedFloat(call_cov as f32 / dp as f32)),
                     genotype: genotype.join("/"),
                     call_type: _alt_type,
-                    vcf_row: record.clone(),
+                    vcf_row: vcf_row_index,
                     reference,
                     alt: _base,
                     genome_index: record.position + offset,
@@ -462,7 +470,7 @@ impl VCFFile {
                     frs,
                     genotype: genotype.join("/"),
                     call_type: call_type.clone(),
-                    vcf_row: record.clone(),
+                    vcf_row: vcf_row_index,
                     reference: r.to_string(),
                     alt: alt_allele.clone(),
                     genome_index: record.position + offset as i64,
@@ -505,7 +513,7 @@ impl VCFFile {
                         frs: Some(ordered_float::OrderedFloat(call_cov as f32 / dp as f32)),
                         genotype: genotype.join("/"), // This is a minor call so the row's genotype is the same
                         call_type: alt_type,
-                        vcf_row: record.clone(),
+                        vcf_row: vcf_row_index,
                         reference,
                         alt: base,
                         genome_index: record.position + offset,
@@ -789,7 +797,7 @@ mod tests {
                 ]),
                 is_filter_pass: true,
             };
-            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 1);
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 1, 0);
             assert_eq!(calls.len(), 1);
             assert_eq!(minor_calls.len(), 0);
             assert_eq!(calls[0].genome_index, 1);
@@ -800,6 +808,7 @@ mod tests {
             assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(1.0)));
             assert!(!calls[0].is_minor);
             assert_eq!(calls[0].vcf_idx, Some(0));
+            assert_eq!(calls[0].vcf_row, 0);
         }
 
         // Alt call
@@ -815,7 +824,7 @@ mod tests {
                 ]),
                 is_filter_pass: true,
             };
-            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 1);
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 1, 0);
             assert_eq!(calls.len(), 1);
             assert_eq!(minor_calls.len(), 0);
             assert_eq!(calls[0].genome_index, 1);
@@ -826,6 +835,7 @@ mod tests {
             assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(2.0 / 3.0)));
             assert!(!calls[0].is_minor);
             assert_eq!(calls[0].vcf_idx, Some(1));
+            assert_eq!(calls[0].vcf_row, 0);
         }
 
         // Het call (including minor call)
@@ -841,7 +851,7 @@ mod tests {
                 ]),
                 is_filter_pass: true,
             };
-            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 2);
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 2, 0);
             assert_eq!(calls.len(), 1);
             assert_eq!(minor_calls.len(), 1);
 
@@ -853,6 +863,7 @@ mod tests {
             assert_eq!(calls[0].frs, None);
             assert!(!calls[0].is_minor);
             assert_eq!(calls[0].vcf_idx, None);
+            assert_eq!(calls[0].vcf_row, 0);
 
             assert_eq!(minor_calls[0].genome_index, 1);
             assert_eq!(minor_calls[0].reference, "a".to_string());
@@ -862,6 +873,7 @@ mod tests {
             assert_eq!(minor_calls[0].frs, Some(ordered_float::OrderedFloat(0.75)));
             assert!(minor_calls[0].is_minor);
             assert_eq!(minor_calls[0].vcf_idx, Some(1));
+            assert_eq!(minor_calls[0].vcf_row, 0);
         }
 
         // Null call (in a few forms)
@@ -878,7 +890,7 @@ mod tests {
                 ]),
                 is_filter_pass: true,
             };
-            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 2);
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 2, 0);
             assert_eq!(calls.len(), 1);
             assert_eq!(minor_calls.len(), 0);
             assert_eq!(calls[0].genome_index, 1);
@@ -889,6 +901,7 @@ mod tests {
             assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(1.0)));
             assert!(!calls[0].is_minor);
             assert_eq!(calls[0].vcf_idx, None);
+            assert_eq!(calls[0].vcf_row, 0);
         }
 
         // Null call due calling null
@@ -904,7 +917,7 @@ mod tests {
                 ]),
                 is_filter_pass: true,
             };
-            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 1);
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 1, 0);
             assert_eq!(calls.len(), 1);
             assert_eq!(minor_calls.len(), 0);
             assert_eq!(calls[0].genome_index, 1);
@@ -915,6 +928,7 @@ mod tests {
             assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(1.0)));
             assert!(!calls[0].is_minor);
             assert_eq!(calls[0].vcf_idx, None);
+            assert_eq!(calls[0].vcf_row, 0);
         }
 
         // Null call due to low coverage and filter fail (should still make it)
@@ -930,7 +944,7 @@ mod tests {
                 ]),
                 is_filter_pass: false,
             };
-            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 2);
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 2, 0);
             assert_eq!(calls.len(), 1);
             assert_eq!(minor_calls.len(), 0);
             assert_eq!(calls[0].genome_index, 1);
@@ -941,6 +955,7 @@ mod tests {
             assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(1.0)));
             assert!(!calls[0].is_minor);
             assert_eq!(calls[0].vcf_idx, None);
+            assert_eq!(calls[0].vcf_row, 0);
         }
 
         // Ins call
@@ -956,7 +971,7 @@ mod tests {
                 ]),
                 is_filter_pass: true,
             };
-            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 3);
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 3, 123);
             assert_eq!(calls.len(), 1);
             assert_eq!(minor_calls.len(), 0);
             assert_eq!(calls[0].genome_index, 1);
@@ -967,6 +982,7 @@ mod tests {
             assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(5.0 / 6.0)));
             assert!(!calls[0].is_minor);
             assert_eq!(calls[0].vcf_idx, Some(1));
+            assert_eq!(calls[0].vcf_row, 123);
         }
 
         // Del call
@@ -982,7 +998,7 @@ mod tests {
                 ]),
                 is_filter_pass: true,
             };
-            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 3);
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 3, 0);
             assert_eq!(calls.len(), 1);
             assert_eq!(minor_calls.len(), 0);
             assert_eq!(calls[0].genome_index, 2);
@@ -993,6 +1009,7 @@ mod tests {
             assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(5.0 / 6.0)));
             assert!(!calls[0].is_minor);
             assert_eq!(calls[0].vcf_idx, Some(1));
+            assert_eq!(calls[0].vcf_row, 0);
         }
 
         // Del call with SNP
@@ -1008,7 +1025,7 @@ mod tests {
                 ]),
                 is_filter_pass: true,
             };
-            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 3);
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 3, 0);
             assert_eq!(calls.len(), 2);
             assert_eq!(minor_calls.len(), 0);
             assert_eq!(calls[0].genome_index, 2);
@@ -1028,6 +1045,7 @@ mod tests {
             assert_eq!(calls[1].frs, Some(ordered_float::OrderedFloat(5.0 / 6.0)));
             assert!(!calls[1].is_minor);
             assert_eq!(calls[1].vcf_idx, Some(1));
+            assert_eq!(calls[0].vcf_row, 0);
         }
 
         // More complex mix of SNP and indel minors
@@ -1046,7 +1064,7 @@ mod tests {
                 ]),
                 is_filter_pass: true,
             };
-            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 3);
+            let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 3, 0);
             assert_eq!(calls.len(), 2);
             assert_eq!(minor_calls.len(), 3);
 
@@ -1058,6 +1076,7 @@ mod tests {
             assert_eq!(calls[0].frs, Some(ordered_float::OrderedFloat(57.0 / 70.0)));
             assert!(!calls[0].is_minor);
             assert_eq!(calls[0].vcf_idx, Some(1));
+            assert_eq!(calls[0].vcf_row, 0);
 
             assert_eq!(calls[1].genome_index, 1);
             assert_eq!(calls[1].reference, "a".to_string());
@@ -1067,6 +1086,7 @@ mod tests {
             assert_eq!(calls[1].frs, Some(ordered_float::OrderedFloat(57.0 / 70.0)));
             assert!(!calls[1].is_minor);
             assert_eq!(calls[1].vcf_idx, Some(1));
+            assert_eq!(calls[1].vcf_row, 0);
 
             assert_eq!(minor_calls[0].genome_index, 2);
             assert_eq!(minor_calls[0].reference, "t".to_string());
@@ -1079,6 +1099,7 @@ mod tests {
             );
             assert!(minor_calls[0].is_minor);
             assert_eq!(minor_calls[0].vcf_idx, Some(2));
+            assert_eq!(minor_calls[0].vcf_row, 0);
 
             assert_eq!(minor_calls[1].genome_index, 1);
             assert_eq!(minor_calls[1].reference, "a".to_string());
@@ -1091,6 +1112,7 @@ mod tests {
             );
             assert!(minor_calls[1].is_minor);
             assert_eq!(minor_calls[1].vcf_idx, Some(2));
+            assert_eq!(minor_calls[1].vcf_row, 0);
 
             assert_eq!(minor_calls[2].genome_index, 2);
             assert_eq!(minor_calls[2].reference, "t".to_string());
@@ -1103,6 +1125,7 @@ mod tests {
             );
             assert!(minor_calls[2].is_minor);
             assert_eq!(minor_calls[2].vcf_idx, Some(2));
+            assert_eq!(minor_calls[2].vcf_row, 0);
         }
     }
 
@@ -1279,7 +1302,7 @@ mod tests {
                 frs: Some(ordered_float::OrderedFloat(1.0)),
                 genotype: "1/1".to_string(),
                 call_type: AltType::SNP,
-                vcf_row: expected_records[0].clone(),
+                vcf_row: 0,
                 reference: "t".to_string(),
                 alt: "c".to_string(),
                 genome_index: 4687,
@@ -1291,7 +1314,7 @@ mod tests {
                 frs: None,
                 genotype: "1/2".to_string(),
                 call_type: AltType::HET,
-                vcf_row: expected_records[2].clone(),
+                vcf_row: 2,
                 reference: "c".to_string(),
                 alt: "z".to_string(),
                 genome_index: 4730,
@@ -1303,7 +1326,7 @@ mod tests {
                 frs: Some(ordered_float::OrderedFloat(1.0)),
                 genotype: "1/1".to_string(),
                 call_type: AltType::INS,
-                vcf_row: expected_records[3].clone(),
+                vcf_row: 3,
                 reference: "g".to_string(),
                 alt: "cc".to_string(),
                 genome_index: 4735,
@@ -1315,7 +1338,7 @@ mod tests {
                 frs: None,
                 genotype: "./.".to_string(),
                 call_type: AltType::NULL,
-                vcf_row: expected_records[5].clone(),
+                vcf_row: 5,
                 reference: "t".to_string(),
                 alt: "x".to_string(),
                 genome_index: 13148,
@@ -1327,7 +1350,7 @@ mod tests {
                 frs: None,
                 genotype: "./.".to_string(),
                 call_type: AltType::NULL,
-                vcf_row: expected_records[6].clone(),
+                vcf_row: 6,
                 reference: "g".to_string(),
                 alt: "x".to_string(),
                 genome_index: 13149,
@@ -1339,7 +1362,7 @@ mod tests {
                 frs: None,
                 genotype: "./.".to_string(),
                 call_type: AltType::NULL,
-                vcf_row: expected_records[7].clone(),
+                vcf_row: 7,
                 reference: "a".to_string(),
                 alt: "x".to_string(),
                 genome_index: 13150,
@@ -1371,7 +1394,7 @@ mod tests {
                 frs: Some(ordered_float::OrderedFloat(0.495)),
                 genotype: "1/2".to_string(),
                 call_type: AltType::SNP,
-                vcf_row: expected_records[2].clone(),
+                vcf_row: 2,
                 reference: "c".to_string(),
                 alt: "t".to_string(),
                 genome_index: 4730,
@@ -1383,7 +1406,7 @@ mod tests {
                 frs: Some(ordered_float::OrderedFloat(0.5)),
                 genotype: "1/2".to_string(),
                 call_type: AltType::SNP,
-                vcf_row: expected_records[2].clone(),
+                vcf_row: 2,
                 reference: "c".to_string(),
                 alt: "g".to_string(),
                 genome_index: 4730,

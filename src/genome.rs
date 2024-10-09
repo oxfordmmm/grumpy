@@ -9,7 +9,7 @@ use gb_io::seq::Location::Complement;
 use gb_io::seq::Location::Join;
 use gb_io::seq::Location::Range;
 
-use crate::common::{Alt, AltType, Evidence, GeneDef};
+use crate::common::{Alt, AltType, Evidence, GeneDef, VCFRow};
 use crate::gene::Gene;
 use crate::vcf::VCFFile;
 
@@ -83,6 +83,10 @@ pub struct Genome {
     #[pyo3(get, set)]
     /// Set of genes with mutations
     pub genes_with_mutations: HashSet<String>,
+
+    #[pyo3(get, set)]
+    /// List of the VCF records associated with this genome (if any)
+    pub vcf_records: Option<Vec<VCFRow>>,
 }
 
 #[pymethods]
@@ -212,6 +216,7 @@ impl Genome {
             gene_names,
             genes_with_mutations: HashSet::new(),
             gene_name_to_def: HashMap::new(),
+            vcf_records: None,
         };
         genome.assign_promoters();
 
@@ -389,6 +394,20 @@ impl Genome {
         }
         self.genome_positions[(index - 1) as usize].clone()
     }
+
+    /// Get the VCFRow associated with a given VCF row's index for this sample
+    ///
+    /// # Arguments
+    /// - `index` - Index of the VCF row to retrieve (i.e row number of the records in a VCF)
+    ///
+    /// # Returns
+    /// VCFRow associated with the given index
+    pub fn get_vcf_row(&self, index: usize) -> VCFRow {
+        if self.vcf_records.is_none() {
+            panic!("No VCF records associated with this genome");
+        }
+        self.vcf_records.as_ref().unwrap()[index].clone()
+    }
 }
 
 #[pyfunction]
@@ -493,6 +512,9 @@ pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome {
 
     // Reset the gene hashmap as the nucleotide sequence has changed
     new_genome.genes = HashMap::new();
+
+    // Keep track of the VCF records for ease of pulling out VCF rows later
+    new_genome.vcf_records = Some(vcf.records.clone());
 
     // I hate implicit returns, but appease clippy
     new_genome
@@ -823,23 +845,133 @@ mod tests {
 
         let genome_diff = GenomeDifference::new(reference.clone(), sample.clone(), MinorType::COV);
 
+        let expected_vcf_rows = vec![
+            VCFRow {
+                // 0
+                position: 4687,
+                reference: "t".to_string(),
+                alternative: vec!["c".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["68".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 1
+                position: 4725,
+                reference: "t".to_string(),
+                alternative: vec!["c".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["68".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+            VCFRow {
+                // 2
+                position: 4730,
+                reference: "c".to_string(),
+                alternative: vec!["t".to_string(), "g".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/2".to_string()]),
+                    ("DP".to_string(), vec!["200".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec!["1".to_string(), "99".to_string(), "100".to_string()],
+                    ),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 3
+                position: 4735,
+                reference: "g".to_string(),
+                alternative: vec!["gcc".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["68".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["63.77".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 4
+                position: 4740,
+                reference: "c".to_string(),
+                alternative: vec!["gtt".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["68".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["63.77".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+            VCFRow {
+                // 5
+                position: 13148,
+                reference: "t".to_string(),
+                alternative: vec!["g".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["./.".to_string()]),
+                    ("DP".to_string(), vec!["68".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+            VCFRow {
+                // 6
+                position: 13149,
+                reference: "g".to_string(),
+                alternative: vec!["t".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["./.".to_string()]),
+                    ("DP".to_string(), vec!["68".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 7
+                position: 13150,
+                reference: "a".to_string(),
+                alternative: vec!["tcg".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["./.".to_string()]),
+                    ("DP".to_string(), vec!["68".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
+                ]),
+                is_filter_pass: true,
+            }, // Latter rows omitted as are all filter fails
+        ];
+
+        for (idx, row) in expected_vcf_rows.iter().enumerate() {
+            assert_eq!(*row, sample.get_vcf_row(idx));
+        }
+
         let expected_genome_variants = vec![
             Variant {
                 variant: "4687a>c".to_string(),
                 nucleotide_index: 4687,
-                evidence: VCFRow {
-                    position: 4687,
-                    reference: "t".to_string(),
-                    alternative: vec!["c".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["68".to_string()]),
-                        ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
-                        ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 0,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -850,22 +982,7 @@ mod tests {
             Variant {
                 variant: "4730t>z".to_string(),
                 nucleotide_index: 4730,
-                evidence: VCFRow {
-                    position: 4730,
-                    reference: "c".to_string(),
-                    alternative: vec!["t".to_string(), "g".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/2".to_string()]),
-                        ("DP".to_string(), vec!["200".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec!["1".to_string(), "99".to_string(), "100".to_string()],
-                        ),
-                        ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 2,
                 vcf_idx: None,
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -876,19 +993,7 @@ mod tests {
             Variant {
                 variant: "4735_ins_cc".to_string(),
                 nucleotide_index: 4735,
-                evidence: VCFRow {
-                    position: 4735,
-                    reference: "g".to_string(),
-                    alternative: vec!["gcc".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["68".to_string()]),
-                        ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
-                        ("GT_CONF".to_string(), vec!["63.77".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 3,
                 vcf_idx: Some(1),
                 indel_length: 2,
                 indel_nucleotides: Some("cc".to_string()),
@@ -899,19 +1004,7 @@ mod tests {
             Variant {
                 variant: "13148g>x".to_string(),
                 nucleotide_index: 13148,
-                evidence: VCFRow {
-                    position: 13148,
-                    reference: "t".to_string(),
-                    alternative: vec!["g".to_string()],
-                    filter: vec![],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["./.".to_string()]),
-                        ("DP".to_string(), vec!["68".to_string()]),
-                        ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
-                        ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                    ]),
-                    is_filter_pass: false,
-                },
+                evidence: 5,
                 vcf_idx: None,
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -922,19 +1015,7 @@ mod tests {
             Variant {
                 variant: "13149t>x".to_string(),
                 nucleotide_index: 13149,
-                evidence: VCFRow {
-                    position: 13149,
-                    reference: "g".to_string(),
-                    alternative: vec!["t".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["./.".to_string()]),
-                        ("DP".to_string(), vec!["68".to_string()]),
-                        ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
-                        ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 6,
                 vcf_idx: None,
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -945,19 +1026,7 @@ mod tests {
             Variant {
                 variant: "13150t>x".to_string(),
                 nucleotide_index: 13150,
-                evidence: VCFRow {
-                    position: 13150,
-                    reference: "a".to_string(),
-                    alternative: vec!["tcg".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["./.".to_string()]),
-                        ("DP".to_string(), vec!["68".to_string()]),
-                        ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
-                        ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 7,
                 vcf_idx: None,
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -970,27 +1039,13 @@ mod tests {
         for (idx, variant) in genome_diff.variants.iter().enumerate() {
             assert_eq!(*variant, expected_genome_variants[idx]);
         }
+
         let expected_genome_minor_variants = vec![
             Variant {
                 // Looks weird, but the reference in the genbank = 't' and in vcf is 'c'
                 variant: "4730t>t:99".to_string(),
                 nucleotide_index: 4730,
-                evidence: VCFRow {
-                    position: 4730,
-                    reference: "c".to_string(),
-                    alternative: vec!["t".to_string(), "g".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/2".to_string()]),
-                        ("DP".to_string(), vec!["200".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec!["1".to_string(), "99".to_string(), "100".to_string()],
-                        ),
-                        ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 2,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1001,22 +1056,7 @@ mod tests {
             Variant {
                 variant: "4730t>g:100".to_string(),
                 nucleotide_index: 4730,
-                evidence: VCFRow {
-                    position: 4730,
-                    reference: "c".to_string(),
-                    alternative: vec!["t".to_string(), "g".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/2".to_string()]),
-                        ("DP".to_string(), vec!["200".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec!["1".to_string(), "99".to_string(), "100".to_string()],
-                        ),
-                        ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 2,
                 vcf_idx: Some(2),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1044,19 +1084,7 @@ mod tests {
                     frs: Some(ordered_float::OrderedFloat(1.0)),
                     genotype: "1/1".to_string(),
                     call_type: AltType::SNP,
-                    vcf_row: VCFRow {
-                        position: 4687,
-                        reference: "t".to_string(),
-                        alternative: vec!["c".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["1/1".to_string()]),
-                            ("DP".to_string(), vec!["68".to_string()]),
-                            ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
-                            ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 0,
                     reference: "t".to_string(),
                     alt: "c".to_string(),
                     genome_index: 4687,
@@ -1082,19 +1110,7 @@ mod tests {
                     frs: Some(ordered_float::OrderedFloat(1.0)),
                     genotype: "1/1".to_string(),
                     call_type: AltType::SNP,
-                    vcf_row: VCFRow {
-                        position: 4687,
-                        reference: "t".to_string(),
-                        alternative: vec!["c".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["1/1".to_string()]),
-                            ("DP".to_string(), vec!["68".to_string()]),
-                            ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
-                            ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 0,
                     reference: "t".to_string(),
                     alt: "c".to_string(),
                     genome_index: 4687,
@@ -1120,22 +1136,7 @@ mod tests {
                     frs: None,
                     genotype: "1/2".to_string(),
                     call_type: AltType::HET,
-                    vcf_row: VCFRow {
-                        position: 4730,
-                        reference: "c".to_string(),
-                        alternative: vec!["t".to_string(), "g".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["1/2".to_string()]),
-                            ("DP".to_string(), vec!["200".to_string()]),
-                            (
-                                "COV".to_string(),
-                                vec!["1".to_string(), "99".to_string(), "100".to_string()],
-                            ),
-                            ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 2,
                     reference: "c".to_string(),
                     alt: "z".to_string(),
                     genome_index: 4730,
@@ -1161,19 +1162,7 @@ mod tests {
                     frs: Some(ordered_float::OrderedFloat(1.0)),
                     genotype: "1/1".to_string(),
                     call_type: AltType::INS,
-                    vcf_row: VCFRow {
-                        position: 4735,
-                        reference: "g".to_string(),
-                        alternative: vec!["gcc".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["1/1".to_string()]),
-                            ("DP".to_string(), vec!["68".to_string()]),
-                            ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
-                            ("GT_CONF".to_string(), vec!["63.77".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 3,
                     reference: "g".to_string(),
                     alt: "cc".to_string(),
                     genome_index: 4735,
@@ -1204,19 +1193,7 @@ mod tests {
                         alt: "x".to_string(),
                         genome_index: 13148,
                         is_minor: false,
-                        vcf_row: VCFRow {
-                            position: 13148,
-                            reference: "t".to_string(),
-                            alternative: vec!["g".to_string()],
-                            filter: vec![],
-                            fields: HashMap::from([
-                                ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                                ("DP".to_string(), vec!["68".to_string()]),
-                                ("GT".to_string(), vec!["./.".to_string()]),
-                                ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
-                            ]),
-                            is_filter_pass: false,
-                        },
+                        vcf_row: 5,
                         vcf_idx: None,
                     },
                     Evidence {
@@ -1228,19 +1205,7 @@ mod tests {
                         alt: "x".to_string(),
                         genome_index: 13149,
                         is_minor: false,
-                        vcf_row: VCFRow {
-                            position: 13149,
-                            reference: "g".to_string(),
-                            alternative: vec!["t".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["./.".to_string()]),
-                                ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
-                                ("DP".to_string(), vec!["68".to_string()]),
-                                ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 6,
                         vcf_idx: None,
                     },
                     Evidence {
@@ -1252,19 +1217,7 @@ mod tests {
                         alt: "x".to_string(),
                         genome_index: 13150,
                         is_minor: false,
-                        vcf_row: VCFRow {
-                            position: 13150,
-                            reference: "a".to_string(),
-                            alternative: vec!["tcg".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["./.".to_string()]),
-                                ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
-                                ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                                ("DP".to_string(), vec!["68".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 7,
                         vcf_idx: None,
                     },
                 ],
@@ -1299,22 +1252,7 @@ mod tests {
                     frs: Some(ordered_float::OrderedFloat(0.495)),
                     genotype: "1/2".to_string(),
                     call_type: AltType::SNP,
-                    vcf_row: VCFRow {
-                        position: 4730,
-                        reference: "c".to_string(),
-                        alternative: vec!["t".to_string(), "g".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["1/2".to_string()]),
-                            ("DP".to_string(), vec!["200".to_string()]),
-                            (
-                                "COV".to_string(),
-                                vec!["1".to_string(), "99".to_string(), "100".to_string()],
-                            ),
-                            ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 2,
                     reference: "c".to_string(),
                     alt: "t".to_string(),
                     genome_index: 4730,
@@ -1326,22 +1264,7 @@ mod tests {
                     frs: Some(ordered_float::OrderedFloat(0.5)),
                     genotype: "1/2".to_string(),
                     call_type: AltType::SNP,
-                    vcf_row: VCFRow {
-                        position: 4730,
-                        reference: "c".to_string(),
-                        alternative: vec!["t".to_string(), "g".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["1/2".to_string()]),
-                            ("DP".to_string(), vec!["200".to_string()]),
-                            (
-                                "COV".to_string(),
-                                vec!["1".to_string(), "99".to_string(), "100".to_string()],
-                            ),
-                            ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 2,
                     reference: "c".to_string(),
                     alt: "g".to_string(),
                     genome_index: 4730,
@@ -1376,23 +1299,298 @@ mod tests {
 
         let genome_diff = GenomeDifference::new(reference.clone(), sample.clone(), MinorType::COV);
 
+        let expected_vcf_rows = vec![
+            VCFRow {
+                // 0
+                position: 2,
+                reference: "a".to_string(),
+                alternative: vec!["g".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["./.".to_string()]),
+                    ("DP".to_string(), vec!["2".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "1".to_string()]),
+                    ("GT_CONF".to_string(), vec!["2.05".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 1
+                position: 4,
+                reference: "a".to_string(),
+                alternative: vec!["g".to_string(), "t".to_string()],
+                filter: vec![
+                    "MIN_GCP".to_string(),
+                    "MIN_DP".to_string(),
+                    "MIN_FRS".to_string(),
+                ],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["./.".to_string()]),
+                    ("DP".to_string(), vec!["4".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec!["1".to_string(), "2".to_string(), "1".to_string()],
+                    ),
+                    ("GT_CONF".to_string(), vec!["3.77".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+            VCFRow {
+                // 2
+                position: 6,
+                reference: "aaa".to_string(),
+                alternative: vec!["ggt".to_string(), "gta".to_string(), "ata".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["./.".to_string()]),
+                    ("DP".to_string(), vec!["4".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec![
+                            "1".to_string(),
+                            "1".to_string(),
+                            "1".to_string(),
+                            "1".to_string(),
+                        ],
+                    ),
+                    ("GT_CONF".to_string(), vec!["2.76".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 3
+                position: 12,
+                reference: "c".to_string(),
+                alternative: vec!["t".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["50".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "50".to_string()]),
+                    ("GT_CONF".to_string(), vec!["200.58".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 4
+                position: 14,
+                reference: "c".to_string(),
+                alternative: vec!["t".to_string(), "g".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["2/2".to_string()]),
+                    ("DP".to_string(), vec!["45".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec!["0".to_string(), "2".to_string(), "43".to_string()],
+                    ),
+                    ("GT_CONF".to_string(), vec!["155.58".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 5
+                position: 16,
+                reference: "ccc".to_string(),
+                alternative: vec!["tgc".to_string(), "gtg".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["70".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec!["0".to_string(), "68".to_string(), "8".to_string()],
+                    ),
+                    ("GT_CONF".to_string(), vec!["300.25".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 6
+                position: 22,
+                reference: "g".to_string(),
+                alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/2".to_string()]),
+                    ("DP".to_string(), vec!["202".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec![
+                            "1".to_string(),
+                            "99".to_string(),
+                            "100".to_string(),
+                            "2".to_string(),
+                        ],
+                    ),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 7
+                position: 24,
+                reference: "g".to_string(),
+                alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["0/2".to_string()]),
+                    ("DP".to_string(), vec!["202".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec![
+                            "99".to_string(),
+                            "1".to_string(),
+                            "100".to_string(),
+                            "2".to_string(),
+                        ],
+                    ),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 8
+                position: 26,
+                reference: "gg".to_string(),
+                alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/2".to_string()]),
+                    ("DP".to_string(), vec!["100".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec![
+                            "0".to_string(),
+                            "48".to_string(),
+                            "50".to_string(),
+                            "2".to_string(),
+                        ],
+                    ),
+                    ("GT_CONF".to_string(), vec!["475.54".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 9
+                position: 28,
+                reference: "gg".to_string(),
+                alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/3".to_string()]),
+                    ("DP".to_string(), vec!["100".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec![
+                            "0".to_string(),
+                            "48".to_string(),
+                            "2".to_string(),
+                            "50".to_string(),
+                        ],
+                    ),
+                    ("GT_CONF".to_string(), vec!["315.11".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 10
+                position: 33,
+                reference: "t".to_string(),
+                alternative: vec!["ttt".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["200".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "199".to_string()]),
+                    ("GT_CONF".to_string(), vec!["145.21".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 11
+                position: 36,
+                reference: "tt".to_string(),
+                alternative: vec!["t".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["200".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "199".to_string()]),
+                    ("GT_CONF".to_string(), vec!["145.21".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 12
+                position: 39,
+                reference: "tt".to_string(),
+                alternative: vec!["agt".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["200".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "199".to_string()]),
+                    ("GT_CONF".to_string(), vec!["145.21".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 13
+                position: 65,
+                reference: "gg".to_string(),
+                alternative: vec!["cagg".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["200".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "199".to_string()]),
+                    ("GT_CONF".to_string(), vec!["145.21".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 14
+                position: 69,
+                reference: "gg".to_string(),
+                alternative: vec!["gg".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["0/0".to_string()]),
+                    ("DP".to_string(), vec!["200".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "199".to_string()]),
+                    ("GT_CONF".to_string(), vec!["145.21".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 15
+                position: 73,
+                reference: "t".to_string(),
+                alternative: vec!["ta".to_string(), "at".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["200".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec!["1".to_string(), "198".to_string(), "1".to_string()],
+                    ),
+                    ("GT_CONF".to_string(), vec!["145.21".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+        ];
+
+        for (idx, row) in expected_vcf_rows.iter().enumerate() {
+            assert_eq!(*row, sample.get_vcf_row(idx));
+        }
+
         let expected_variants = vec![
             Variant {
                 variant: "2a>x".to_string(),
                 nucleotide_index: 2,
-                evidence: VCFRow {
-                    position: 2,
-                    reference: "a".to_string(),
-                    alternative: vec!["g".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["./.".to_string()]),
-                        ("DP".to_string(), vec!["2".to_string()]),
-                        ("COV".to_string(), vec!["1".to_string(), "1".to_string()]),
-                        ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 0,
                 vcf_idx: None,
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1403,26 +1601,7 @@ mod tests {
             Variant {
                 variant: "4a>x".to_string(),
                 nucleotide_index: 4,
-                evidence: VCFRow {
-                    position: 4,
-                    reference: "a".to_string(),
-                    alternative: vec!["g".to_string(), "t".to_string()],
-                    filter: vec![
-                        "MIN_GCP".to_string(),
-                        "MIN_DP".to_string(),
-                        "MIN_FRS".to_string(),
-                    ],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["./.".to_string()]),
-                        ("DP".to_string(), vec!["4".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec!["1".to_string(), "2".to_string(), "1".to_string()],
-                        ),
-                        ("GT_CONF".to_string(), vec!["3.77".to_string()]),
-                    ]),
-                    is_filter_pass: false,
-                },
+                evidence: 1,
                 vcf_idx: None,
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1433,27 +1612,7 @@ mod tests {
             Variant {
                 variant: "6a>x".to_string(),
                 nucleotide_index: 6,
-                evidence: VCFRow {
-                    position: 6,
-                    reference: "aaa".to_string(),
-                    alternative: vec!["ggt".to_string(), "gta".to_string(), "ata".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["./.".to_string()]),
-                        ("DP".to_string(), vec!["4".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "1".to_string(),
-                                "1".to_string(),
-                                "1".to_string(),
-                                "1".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["2.76".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 2,
                 vcf_idx: None,
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1464,27 +1623,7 @@ mod tests {
             Variant {
                 variant: "7a>x".to_string(),
                 nucleotide_index: 7,
-                evidence: VCFRow {
-                    position: 6,
-                    reference: "aaa".to_string(),
-                    alternative: vec!["ggt".to_string(), "gta".to_string(), "ata".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["./.".to_string()]),
-                        ("DP".to_string(), vec!["4".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "1".to_string(),
-                                "1".to_string(),
-                                "1".to_string(),
-                                "1".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["2.76".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 2,
                 vcf_idx: None,
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1495,27 +1634,7 @@ mod tests {
             Variant {
                 variant: "8a>x".to_string(),
                 nucleotide_index: 8,
-                evidence: VCFRow {
-                    position: 6,
-                    reference: "aaa".to_string(),
-                    alternative: vec!["ggt".to_string(), "gta".to_string(), "ata".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["./.".to_string()]),
-                        ("DP".to_string(), vec!["4".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "1".to_string(),
-                                "1".to_string(),
-                                "1".to_string(),
-                                "1".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["2.76".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 2,
                 vcf_idx: None,
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1526,19 +1645,7 @@ mod tests {
             Variant {
                 variant: "12c>t".to_string(),
                 nucleotide_index: 12,
-                evidence: VCFRow {
-                    position: 12,
-                    reference: "c".to_string(),
-                    alternative: vec!["t".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["50".to_string()]),
-                        ("COV".to_string(), vec!["0".to_string(), "50".to_string()]),
-                        ("GT_CONF".to_string(), vec!["200.58".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 3,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1549,22 +1656,7 @@ mod tests {
             Variant {
                 variant: "14c>g".to_string(),
                 nucleotide_index: 14,
-                evidence: VCFRow {
-                    position: 14,
-                    reference: "c".to_string(),
-                    alternative: vec!["t".to_string(), "g".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["2/2".to_string()]),
-                        ("DP".to_string(), vec!["45".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec!["0".to_string(), "2".to_string(), "43".to_string()],
-                        ),
-                        ("GT_CONF".to_string(), vec!["155.58".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 4,
                 vcf_idx: Some(2),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1575,22 +1667,7 @@ mod tests {
             Variant {
                 variant: "16c>t".to_string(),
                 nucleotide_index: 16,
-                evidence: VCFRow {
-                    position: 16,
-                    reference: "ccc".to_string(),
-                    alternative: vec!["tgc".to_string(), "gtg".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["70".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec!["0".to_string(), "68".to_string(), "8".to_string()],
-                        ),
-                        ("GT_CONF".to_string(), vec!["300.25".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 5,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1601,22 +1678,7 @@ mod tests {
             Variant {
                 variant: "17c>g".to_string(),
                 nucleotide_index: 17,
-                evidence: VCFRow {
-                    position: 16,
-                    reference: "ccc".to_string(),
-                    alternative: vec!["tgc".to_string(), "gtg".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["70".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec!["0".to_string(), "68".to_string(), "8".to_string()],
-                        ),
-                        ("GT_CONF".to_string(), vec!["300.25".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 5,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1627,27 +1689,7 @@ mod tests {
             Variant {
                 variant: "22g>z".to_string(),
                 nucleotide_index: 22,
-                evidence: VCFRow {
-                    position: 22,
-                    reference: "g".to_string(),
-                    alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/2".to_string()]),
-                        ("DP".to_string(), vec!["202".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "1".to_string(),
-                                "99".to_string(),
-                                "100".to_string(),
-                                "2".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 6,
                 vcf_idx: None,
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1658,27 +1700,7 @@ mod tests {
             Variant {
                 variant: "24g>z".to_string(),
                 nucleotide_index: 24,
-                evidence: VCFRow {
-                    position: 24,
-                    reference: "g".to_string(),
-                    alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["0/2".to_string()]),
-                        ("DP".to_string(), vec!["202".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "99".to_string(),
-                                "1".to_string(),
-                                "100".to_string(),
-                                "2".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 7,
                 vcf_idx: None,
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1689,27 +1711,7 @@ mod tests {
             Variant {
                 variant: "26g>z".to_string(),
                 nucleotide_index: 26,
-                evidence: VCFRow {
-                    position: 26,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/2".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "50".to_string(),
-                                "2".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 8,
                 vcf_idx: None,
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1720,27 +1722,7 @@ mod tests {
             Variant {
                 variant: "27g>z".to_string(),
                 nucleotide_index: 27,
-                evidence: VCFRow {
-                    position: 26,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/2".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "50".to_string(),
-                                "2".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 8,
                 vcf_idx: None,
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1751,27 +1733,7 @@ mod tests {
             Variant {
                 variant: "28g>z".to_string(),
                 nucleotide_index: 28,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: None,
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1782,27 +1744,7 @@ mod tests {
             Variant {
                 variant: "28g>z".to_string(),
                 nucleotide_index: 28,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: None,
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1813,27 +1755,7 @@ mod tests {
             Variant {
                 variant: "29g>z".to_string(),
                 nucleotide_index: 29,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: None,
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1844,27 +1766,7 @@ mod tests {
             Variant {
                 variant: "29g>z".to_string(),
                 nucleotide_index: 29,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: None,
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1875,19 +1777,7 @@ mod tests {
             Variant {
                 variant: "33_ins_tt".to_string(),
                 nucleotide_index: 33,
-                evidence: VCFRow {
-                    position: 33,
-                    reference: "t".to_string(),
-                    alternative: vec!["ttt".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["200".to_string()]),
-                        ("COV".to_string(), vec!["1".to_string(), "199".to_string()]),
-                        ("GT_CONF".to_string(), vec!["145.21".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 10,
                 vcf_idx: Some(1),
                 indel_length: 2,
                 indel_nucleotides: Some("tt".to_string()),
@@ -1898,19 +1788,7 @@ mod tests {
             Variant {
                 variant: "37_del_t".to_string(),
                 nucleotide_index: 37,
-                evidence: VCFRow {
-                    position: 36,
-                    reference: "tt".to_string(),
-                    alternative: vec!["t".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["200".to_string()]),
-                        ("COV".to_string(), vec!["1".to_string(), "199".to_string()]),
-                        ("GT_CONF".to_string(), vec!["145.21".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 11,
                 vcf_idx: Some(1),
                 indel_length: -1,
                 indel_nucleotides: Some("t".to_string()),
@@ -1921,19 +1799,7 @@ mod tests {
             Variant {
                 variant: "39_ins_g".to_string(),
                 nucleotide_index: 39,
-                evidence: VCFRow {
-                    position: 39,
-                    reference: "tt".to_string(),
-                    alternative: vec!["agt".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["200".to_string()]),
-                        ("COV".to_string(), vec!["1".to_string(), "199".to_string()]),
-                        ("GT_CONF".to_string(), vec!["145.21".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 12,
                 vcf_idx: Some(1),
                 indel_length: 1,
                 indel_nucleotides: Some("g".to_string()),
@@ -1944,19 +1810,7 @@ mod tests {
             Variant {
                 variant: "39t>a".to_string(),
                 nucleotide_index: 39,
-                evidence: VCFRow {
-                    position: 39,
-                    reference: "tt".to_string(),
-                    alternative: vec!["agt".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["200".to_string()]),
-                        ("COV".to_string(), vec!["1".to_string(), "199".to_string()]),
-                        ("GT_CONF".to_string(), vec!["145.21".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 12,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -1967,19 +1821,7 @@ mod tests {
             Variant {
                 variant: "64_ins_ca".to_string(),
                 nucleotide_index: 64,
-                evidence: VCFRow {
-                    position: 65,
-                    reference: "gg".to_string(),
-                    alternative: vec!["cagg".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["200".to_string()]),
-                        ("COV".to_string(), vec!["1".to_string(), "199".to_string()]),
-                        ("GT_CONF".to_string(), vec!["145.21".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 13,
                 vcf_idx: Some(1),
                 indel_length: 2,
                 indel_nucleotides: Some("ca".to_string()),
@@ -1990,19 +1832,7 @@ mod tests {
             Variant {
                 variant: "69g>x".to_string(),
                 nucleotide_index: 69,
-                evidence: VCFRow {
-                    position: 69,
-                    reference: "gg".to_string(),
-                    alternative: vec!["gg".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["0/0".to_string()]),
-                        ("DP".to_string(), vec!["200".to_string()]),
-                        ("COV".to_string(), vec!["1".to_string(), "199".to_string()]),
-                        ("GT_CONF".to_string(), vec!["145.21".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 14,
                 vcf_idx: Some(0),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2013,19 +1843,7 @@ mod tests {
             Variant {
                 variant: "70g>x".to_string(),
                 nucleotide_index: 70,
-                evidence: VCFRow {
-                    position: 69,
-                    reference: "gg".to_string(),
-                    alternative: vec!["gg".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["0/0".to_string()]),
-                        ("DP".to_string(), vec!["200".to_string()]),
-                        ("COV".to_string(), vec!["1".to_string(), "199".to_string()]),
-                        ("GT_CONF".to_string(), vec!["145.21".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 14,
                 vcf_idx: Some(0),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2036,22 +1854,7 @@ mod tests {
             Variant {
                 variant: "73_ins_a".to_string(),
                 nucleotide_index: 73,
-                evidence: VCFRow {
-                    position: 73,
-                    reference: "t".to_string(),
-                    alternative: vec!["ta".to_string(), "at".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["200".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec!["1".to_string(), "198".to_string(), "1".to_string()],
-                        ),
-                        ("GT_CONF".to_string(), vec!["145.21".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 15,
                 vcf_idx: Some(1),
                 indel_length: 1,
                 indel_nucleotides: Some("a".to_string()),
@@ -2069,22 +1872,7 @@ mod tests {
             Variant {
                 variant: "16c>g:8".to_string(),
                 nucleotide_index: 16,
-                evidence: VCFRow {
-                    position: 16,
-                    reference: "ccc".to_string(),
-                    alternative: vec!["tgc".to_string(), "gtg".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["70".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec!["0".to_string(), "68".to_string(), "8".to_string()],
-                        ),
-                        ("GT_CONF".to_string(), vec!["300.25".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 5,
                 vcf_idx: Some(2),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2095,22 +1883,7 @@ mod tests {
             Variant {
                 variant: "17c>t:8".to_string(),
                 nucleotide_index: 17,
-                evidence: VCFRow {
-                    position: 16,
-                    reference: "ccc".to_string(),
-                    alternative: vec!["tgc".to_string(), "gtg".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["70".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec!["0".to_string(), "68".to_string(), "8".to_string()],
-                        ),
-                        ("GT_CONF".to_string(), vec!["300.25".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 5,
                 vcf_idx: Some(2),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2121,22 +1894,7 @@ mod tests {
             Variant {
                 variant: "18c>g:8".to_string(),
                 nucleotide_index: 18,
-                evidence: VCFRow {
-                    position: 16,
-                    reference: "ccc".to_string(),
-                    alternative: vec!["tgc".to_string(), "gtg".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["70".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec!["0".to_string(), "68".to_string(), "8".to_string()],
-                        ),
-                        ("GT_CONF".to_string(), vec!["300.25".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 5,
                 vcf_idx: Some(2),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2147,27 +1905,7 @@ mod tests {
             Variant {
                 variant: "22g>t:99".to_string(),
                 nucleotide_index: 22,
-                evidence: VCFRow {
-                    position: 22,
-                    reference: "g".to_string(),
-                    alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/2".to_string()]),
-                        ("DP".to_string(), vec!["202".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "1".to_string(),
-                                "99".to_string(),
-                                "100".to_string(),
-                                "2".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 6,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2178,27 +1916,7 @@ mod tests {
             Variant {
                 variant: "22g>c:100".to_string(),
                 nucleotide_index: 22,
-                evidence: VCFRow {
-                    position: 22,
-                    reference: "g".to_string(),
-                    alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/2".to_string()]),
-                        ("DP".to_string(), vec!["202".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "1".to_string(),
-                                "99".to_string(),
-                                "100".to_string(),
-                                "2".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 6,
                 vcf_idx: Some(2),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2209,27 +1927,7 @@ mod tests {
             Variant {
                 variant: "24g>c:100".to_string(),
                 nucleotide_index: 24,
-                evidence: VCFRow {
-                    position: 24,
-                    reference: "g".to_string(),
-                    alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["0/2".to_string()]),
-                        ("DP".to_string(), vec!["202".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "99".to_string(),
-                                "1".to_string(),
-                                "100".to_string(),
-                                "2".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 7,
                 vcf_idx: Some(2),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2240,27 +1938,7 @@ mod tests {
             Variant {
                 variant: "26g>a:48".to_string(),
                 nucleotide_index: 26,
-                evidence: VCFRow {
-                    position: 26,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/2".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "50".to_string(),
-                                "2".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 8,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2271,27 +1949,7 @@ mod tests {
             Variant {
                 variant: "26g>c:50".to_string(),
                 nucleotide_index: 26,
-                evidence: VCFRow {
-                    position: 26,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/2".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "50".to_string(),
-                                "2".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 8,
                 vcf_idx: Some(2),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2302,27 +1960,7 @@ mod tests {
             Variant {
                 variant: "27g>a:48".to_string(),
                 nucleotide_index: 27,
-                evidence: VCFRow {
-                    position: 26,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/2".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "50".to_string(),
-                                "2".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 8,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2333,27 +1971,7 @@ mod tests {
             Variant {
                 variant: "27g>t:50".to_string(),
                 nucleotide_index: 27,
-                evidence: VCFRow {
-                    position: 26,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/2".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "50".to_string(),
-                                "2".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 8,
                 vcf_idx: Some(2),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2364,27 +1982,7 @@ mod tests {
             Variant {
                 variant: "28g>a:48".to_string(),
                 nucleotide_index: 28,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2395,27 +1993,7 @@ mod tests {
             Variant {
                 variant: "28g>a:48".to_string(),
                 nucleotide_index: 28,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2426,27 +2004,7 @@ mod tests {
             Variant {
                 variant: "28g>a:50".to_string(),
                 nucleotide_index: 28,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: Some(3),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2457,27 +2015,7 @@ mod tests {
             Variant {
                 variant: "28g>a:50".to_string(),
                 nucleotide_index: 28,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: Some(3),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2488,27 +2026,7 @@ mod tests {
             Variant {
                 variant: "29g>a:48".to_string(),
                 nucleotide_index: 29,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2519,27 +2037,7 @@ mod tests {
             Variant {
                 variant: "29g>a:48".to_string(),
                 nucleotide_index: 29,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2550,27 +2048,7 @@ mod tests {
             Variant {
                 variant: "29_del_g:50".to_string(),
                 nucleotide_index: 29,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: Some(3),
                 indel_length: -1,
                 indel_nucleotides: Some("g".to_string()),
@@ -2581,27 +2059,7 @@ mod tests {
             Variant {
                 variant: "29_del_g:50".to_string(),
                 nucleotide_index: 29,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: Some(3),
                 indel_length: -1,
                 indel_nucleotides: Some("g".to_string()),
@@ -2619,22 +2077,7 @@ mod tests {
             Variant {
                 variant: "16c>g:0.105".to_string(),
                 nucleotide_index: 16,
-                evidence: VCFRow {
-                    position: 16,
-                    reference: "ccc".to_string(),
-                    alternative: vec!["tgc".to_string(), "gtg".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["70".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec!["0".to_string(), "68".to_string(), "8".to_string()],
-                        ),
-                        ("GT_CONF".to_string(), vec!["300.25".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 5,
                 vcf_idx: Some(2),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2645,22 +2088,7 @@ mod tests {
             Variant {
                 variant: "17c>t:0.105".to_string(),
                 nucleotide_index: 17,
-                evidence: VCFRow {
-                    position: 16,
-                    reference: "ccc".to_string(),
-                    alternative: vec!["tgc".to_string(), "gtg".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["70".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec!["0".to_string(), "68".to_string(), "8".to_string()],
-                        ),
-                        ("GT_CONF".to_string(), vec!["300.25".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 5,
                 vcf_idx: Some(2),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2671,22 +2099,7 @@ mod tests {
             Variant {
                 variant: "18c>g:0.105".to_string(),
                 nucleotide_index: 18,
-                evidence: VCFRow {
-                    position: 16,
-                    reference: "ccc".to_string(),
-                    alternative: vec!["tgc".to_string(), "gtg".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["70".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec!["0".to_string(), "68".to_string(), "8".to_string()],
-                        ),
-                        ("GT_CONF".to_string(), vec!["300.25".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 5,
                 vcf_idx: Some(2),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2697,27 +2110,7 @@ mod tests {
             Variant {
                 variant: "22g>t:0.49".to_string(),
                 nucleotide_index: 22,
-                evidence: VCFRow {
-                    position: 22,
-                    reference: "g".to_string(),
-                    alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/2".to_string()]),
-                        ("DP".to_string(), vec!["202".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "1".to_string(),
-                                "99".to_string(),
-                                "100".to_string(),
-                                "2".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 6,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2728,27 +2121,7 @@ mod tests {
             Variant {
                 variant: "22g>c:0.495".to_string(),
                 nucleotide_index: 22,
-                evidence: VCFRow {
-                    position: 22,
-                    reference: "g".to_string(),
-                    alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/2".to_string()]),
-                        ("DP".to_string(), vec!["202".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "1".to_string(),
-                                "99".to_string(),
-                                "100".to_string(),
-                                "2".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 6,
                 vcf_idx: Some(2),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2759,27 +2132,7 @@ mod tests {
             Variant {
                 variant: "24g>c:0.495".to_string(),
                 nucleotide_index: 24,
-                evidence: VCFRow {
-                    position: 24,
-                    reference: "g".to_string(),
-                    alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["0/2".to_string()]),
-                        ("DP".to_string(), vec!["202".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "99".to_string(),
-                                "1".to_string(),
-                                "100".to_string(),
-                                "2".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 7,
                 vcf_idx: Some(2),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2790,27 +2143,7 @@ mod tests {
             Variant {
                 variant: "26g>a:0.48".to_string(),
                 nucleotide_index: 26,
-                evidence: VCFRow {
-                    position: 26,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/2".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "50".to_string(),
-                                "2".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 8,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2821,27 +2154,7 @@ mod tests {
             Variant {
                 variant: "26g>c:0.5".to_string(),
                 nucleotide_index: 26,
-                evidence: VCFRow {
-                    position: 26,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/2".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "50".to_string(),
-                                "2".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 8,
                 vcf_idx: Some(2),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2852,27 +2165,7 @@ mod tests {
             Variant {
                 variant: "27g>a:0.48".to_string(),
                 nucleotide_index: 27,
-                evidence: VCFRow {
-                    position: 26,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/2".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "50".to_string(),
-                                "2".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 8,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2883,27 +2176,7 @@ mod tests {
             Variant {
                 variant: "27g>t:0.5".to_string(),
                 nucleotide_index: 27,
-                evidence: VCFRow {
-                    position: 26,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/2".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "50".to_string(),
-                                "2".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 8,
                 vcf_idx: Some(2),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2914,27 +2187,7 @@ mod tests {
             Variant {
                 variant: "28g>a:0.48".to_string(),
                 nucleotide_index: 28,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2945,27 +2198,7 @@ mod tests {
             Variant {
                 variant: "28g>a:0.48".to_string(),
                 nucleotide_index: 28,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -2976,27 +2209,7 @@ mod tests {
             Variant {
                 variant: "28g>a:0.5".to_string(),
                 nucleotide_index: 28,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: Some(3),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -3007,27 +2220,7 @@ mod tests {
             Variant {
                 variant: "28g>a:0.5".to_string(),
                 nucleotide_index: 28,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: Some(3),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -3038,27 +2231,7 @@ mod tests {
             Variant {
                 variant: "29g>a:0.48".to_string(),
                 nucleotide_index: 29,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -3069,27 +2242,7 @@ mod tests {
             Variant {
                 variant: "29g>a:0.48".to_string(),
                 nucleotide_index: 29,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -3100,27 +2253,7 @@ mod tests {
             Variant {
                 variant: "29_del_g:0.5".to_string(),
                 nucleotide_index: 29,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: Some(3),
                 indel_length: -1,
                 indel_nucleotides: Some("g".to_string()),
@@ -3131,27 +2264,7 @@ mod tests {
             Variant {
                 variant: "29_del_g:0.5".to_string(),
                 nucleotide_index: 29,
-                evidence: VCFRow {
-                    position: 28,
-                    reference: "gg".to_string(),
-                    alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/3".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec![
-                                "0".to_string(),
-                                "48".to_string(),
-                                "2".to_string(),
-                                "50".to_string(),
-                            ],
-                        ),
-                        ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 9,
                 vcf_idx: Some(3),
                 indel_length: -1,
                 indel_nucleotides: Some("g".to_string()),
@@ -3173,19 +2286,7 @@ mod tests {
                     frs: None,
                     genotype: "./.".to_string(),
                     call_type: AltType::NULL,
-                    vcf_row: VCFRow {
-                        position: 2,
-                        reference: "a".to_string(),
-                        alternative: vec!["g".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["./.".to_string()]),
-                            ("DP".to_string(), vec!["2".to_string()]),
-                            ("COV".to_string(), vec!["1".to_string(), "1".to_string()]),
-                            ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 0,
                     reference: "a".to_string(),
                     alt: "x".to_string(),
                     genome_index: 2,
@@ -3212,26 +2313,7 @@ mod tests {
                         frs: None,
                         genotype: "./.".to_string(),
                         call_type: AltType::NULL,
-                        vcf_row: VCFRow {
-                            position: 4,
-                            reference: "a".to_string(),
-                            alternative: vec!["g".to_string(), "t".to_string()],
-                            filter: vec![
-                                "MIN_GCP".to_string(),
-                                "MIN_DP".to_string(),
-                                "MIN_FRS".to_string(),
-                            ],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["./.".to_string()]),
-                                ("DP".to_string(), vec!["4".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec!["1".to_string(), "2".to_string(), "1".to_string()],
-                                ),
-                                ("GT_CONF".to_string(), vec!["3.77".to_string()]),
-                            ]),
-                            is_filter_pass: false,
-                        },
+                        vcf_row: 1,
                         reference: "a".to_string(),
                         alt: "x".to_string(),
                         genome_index: 4,
@@ -3243,31 +2325,7 @@ mod tests {
                         frs: None,
                         genotype: "./.".to_string(),
                         call_type: AltType::NULL,
-                        vcf_row: VCFRow {
-                            position: 6,
-                            reference: "aaa".to_string(),
-                            alternative: vec![
-                                "ggt".to_string(),
-                                "gta".to_string(),
-                                "ata".to_string(),
-                            ],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["./.".to_string()]),
-                                ("DP".to_string(), vec!["4".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "1".to_string(),
-                                        "1".to_string(),
-                                        "1".to_string(),
-                                        "1".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["2.76".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 2,
                         reference: "a".to_string(),
                         alt: "x".to_string(),
                         genome_index: 6,
@@ -3295,31 +2353,7 @@ mod tests {
                         frs: None,
                         genotype: "./.".to_string(),
                         call_type: AltType::NULL,
-                        vcf_row: VCFRow {
-                            position: 6,
-                            reference: "aaa".to_string(),
-                            alternative: vec![
-                                "ggt".to_string(),
-                                "gta".to_string(),
-                                "ata".to_string(),
-                            ],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["./.".to_string()]),
-                                ("DP".to_string(), vec!["4".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "1".to_string(),
-                                        "1".to_string(),
-                                        "1".to_string(),
-                                        "1".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["2.76".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 2,
                         reference: "a".to_string(),
                         alt: "x".to_string(),
                         genome_index: 7,
@@ -3331,31 +2365,7 @@ mod tests {
                         frs: None,
                         genotype: "./.".to_string(),
                         call_type: AltType::NULL,
-                        vcf_row: VCFRow {
-                            position: 6,
-                            reference: "aaa".to_string(),
-                            alternative: vec![
-                                "ggt".to_string(),
-                                "gta".to_string(),
-                                "ata".to_string(),
-                            ],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["./.".to_string()]),
-                                ("DP".to_string(), vec!["4".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "1".to_string(),
-                                        "1".to_string(),
-                                        "1".to_string(),
-                                        "1".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["2.76".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 2,
                         reference: "a".to_string(),
                         alt: "x".to_string(),
                         genome_index: 8,
@@ -3382,19 +2392,7 @@ mod tests {
                     frs: Some(OrderedFloat(1.0)),
                     genotype: "1/1".to_string(),
                     call_type: AltType::SNP,
-                    vcf_row: VCFRow {
-                        position: 12,
-                        reference: "c".to_string(),
-                        alternative: vec!["t".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["1/1".to_string()]),
-                            ("DP".to_string(), vec!["50".to_string()]),
-                            ("COV".to_string(), vec!["0".to_string(), "50".to_string()]),
-                            ("GT_CONF".to_string(), vec!["200.58".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 3,
                     reference: "c".to_string(),
                     alt: "t".to_string(),
                     genome_index: 12,
@@ -3420,19 +2418,7 @@ mod tests {
                     frs: Some(OrderedFloat(1.0)),
                     genotype: "1/1".to_string(),
                     call_type: AltType::SNP,
-                    vcf_row: VCFRow {
-                        position: 12,
-                        reference: "c".to_string(),
-                        alternative: vec!["t".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["1/1".to_string()]),
-                            ("DP".to_string(), vec!["50".to_string()]),
-                            ("COV".to_string(), vec!["0".to_string(), "50".to_string()]),
-                            ("GT_CONF".to_string(), vec!["200.58".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 3,
                     reference: "c".to_string(),
                     alt: "t".to_string(),
                     genome_index: 12,
@@ -3458,22 +2444,7 @@ mod tests {
                     frs: Some(OrderedFloat(43.0 / 45.0)),
                     genotype: "2/2".to_string(),
                     call_type: AltType::SNP,
-                    vcf_row: VCFRow {
-                        position: 14,
-                        reference: "c".to_string(),
-                        alternative: vec!["t".to_string(), "g".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["2/2".to_string()]),
-                            ("DP".to_string(), vec!["45".to_string()]),
-                            (
-                                "COV".to_string(),
-                                vec!["0".to_string(), "2".to_string(), "43".to_string()],
-                            ),
-                            ("GT_CONF".to_string(), vec!["155.58".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 4,
                     reference: "c".to_string(),
                     alt: "g".to_string(),
                     genome_index: 14,
@@ -3500,22 +2471,7 @@ mod tests {
                         frs: Some(OrderedFloat(68.0 / 76.0)),
                         genotype: "1/1".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 16,
-                            reference: "ccc".to_string(),
-                            alternative: vec!["tgc".to_string(), "gtg".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/1".to_string()]),
-                                ("DP".to_string(), vec!["70".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec!["0".to_string(), "68".to_string(), "8".to_string()],
-                                ),
-                                ("GT_CONF".to_string(), vec!["300.25".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 5,
                         reference: "c".to_string(),
                         alt: "t".to_string(),
                         genome_index: 16,
@@ -3527,22 +2483,7 @@ mod tests {
                         frs: Some(OrderedFloat(68.0 / 76.0)),
                         genotype: "1/1".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 16,
-                            reference: "ccc".to_string(),
-                            alternative: vec!["tgc".to_string(), "gtg".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/1".to_string()]),
-                                ("DP".to_string(), vec!["70".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec!["0".to_string(), "68".to_string(), "8".to_string()],
-                                ),
-                                ("GT_CONF".to_string(), vec!["300.25".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 5,
                         reference: "c".to_string(),
                         alt: "g".to_string(),
                         genome_index: 17,
@@ -3570,27 +2511,7 @@ mod tests {
                         frs: None,
                         genotype: "1/2".to_string(),
                         call_type: AltType::HET,
-                        vcf_row: VCFRow {
-                            position: 22,
-                            reference: "g".to_string(),
-                            alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/2".to_string()]),
-                                ("DP".to_string(), vec!["202".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "1".to_string(),
-                                        "99".to_string(),
-                                        "100".to_string(),
-                                        "2".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 6,
                         reference: "g".to_string(),
                         alt: "z".to_string(),
                         genome_index: 22,
@@ -3602,27 +2523,7 @@ mod tests {
                         frs: None,
                         genotype: "0/2".to_string(),
                         call_type: AltType::HET,
-                        vcf_row: VCFRow {
-                            position: 24,
-                            reference: "g".to_string(),
-                            alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["0/2".to_string()]),
-                                ("DP".to_string(), vec!["202".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "99".to_string(),
-                                        "1".to_string(),
-                                        "100".to_string(),
-                                        "2".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 7,
                         reference: "g".to_string(),
                         alt: "z".to_string(),
                         genome_index: 24,
@@ -3650,27 +2551,7 @@ mod tests {
                         frs: None,
                         genotype: "1/2".to_string(),
                         call_type: AltType::HET,
-                        vcf_row: VCFRow {
-                            position: 26,
-                            reference: "gg".to_string(),
-                            alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/2".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "0".to_string(),
-                                        "48".to_string(),
-                                        "50".to_string(),
-                                        "2".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 8,
                         reference: "g".to_string(),
                         alt: "z".to_string(),
                         genome_index: 26,
@@ -3682,27 +2563,7 @@ mod tests {
                         frs: None,
                         genotype: "1/2".to_string(),
                         call_type: AltType::HET,
-                        vcf_row: VCFRow {
-                            position: 26,
-                            reference: "gg".to_string(),
-                            alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/2".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "0".to_string(),
-                                        "48".to_string(),
-                                        "50".to_string(),
-                                        "2".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 8,
                         reference: "g".to_string(),
                         alt: "z".to_string(),
                         genome_index: 27,
@@ -3730,27 +2591,7 @@ mod tests {
                         frs: None,
                         genotype: "1/3".to_string(),
                         call_type: AltType::HET,
-                        vcf_row: VCFRow {
-                            position: 28,
-                            reference: "gg".to_string(),
-                            alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/3".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "0".to_string(),
-                                        "48".to_string(),
-                                        "2".to_string(),
-                                        "50".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 9,
                         reference: "g".to_string(),
                         alt: "z".to_string(),
                         genome_index: 28,
@@ -3762,27 +2603,7 @@ mod tests {
                         frs: None,
                         genotype: "1/3".to_string(),
                         call_type: AltType::HET,
-                        vcf_row: VCFRow {
-                            position: 28,
-                            reference: "gg".to_string(),
-                            alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/3".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "0".to_string(),
-                                        "48".to_string(),
-                                        "2".to_string(),
-                                        "50".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 9,
                         reference: "g".to_string(),
                         alt: "z".to_string(),
                         genome_index: 29,
@@ -3822,22 +2643,7 @@ mod tests {
                         frs: Some(OrderedFloat(8.0 / 76.0)),
                         genotype: "1/1".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 16,
-                            reference: "ccc".to_string(),
-                            alternative: vec!["tgc".to_string(), "gtg".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/1".to_string()]),
-                                ("DP".to_string(), vec!["70".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec!["0".to_string(), "68".to_string(), "8".to_string()],
-                                ),
-                                ("GT_CONF".to_string(), vec!["300.25".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 5,
                         reference: "c".to_string(),
                         alt: "g".to_string(),
                         genome_index: 16,
@@ -3849,22 +2655,7 @@ mod tests {
                         frs: Some(OrderedFloat(8.0 / 76.0)),
                         genotype: "1/1".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 16,
-                            reference: "ccc".to_string(),
-                            alternative: vec!["tgc".to_string(), "gtg".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/1".to_string()]),
-                                ("DP".to_string(), vec!["70".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec!["0".to_string(), "68".to_string(), "8".to_string()],
-                                ),
-                                ("GT_CONF".to_string(), vec!["300.25".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 5,
                         reference: "c".to_string(),
                         alt: "t".to_string(),
                         genome_index: 17,
@@ -3876,22 +2667,7 @@ mod tests {
                         frs: Some(OrderedFloat(8.0 / 76.0)),
                         genotype: "1/1".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 16,
-                            reference: "ccc".to_string(),
-                            alternative: vec!["tgc".to_string(), "gtg".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/1".to_string()]),
-                                ("DP".to_string(), vec!["70".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec!["0".to_string(), "68".to_string(), "8".to_string()],
-                                ),
-                                ("GT_CONF".to_string(), vec!["300.25".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 5,
                         reference: "c".to_string(),
                         alt: "g".to_string(),
                         genome_index: 18,
@@ -3919,27 +2695,7 @@ mod tests {
                         frs: Some(OrderedFloat(99.0 / 202.0)),
                         genotype: "1/2".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 22,
-                            reference: "g".to_string(),
-                            alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/2".to_string()]),
-                                ("DP".to_string(), vec!["202".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "1".to_string(),
-                                        "99".to_string(),
-                                        "100".to_string(),
-                                        "2".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 6,
                         reference: "g".to_string(),
                         alt: "t".to_string(),
                         genome_index: 22,
@@ -3951,27 +2707,7 @@ mod tests {
                         frs: Some(OrderedFloat(100.0 / 202.0)),
                         genotype: "1/2".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 22,
-                            reference: "g".to_string(),
-                            alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/2".to_string()]),
-                                ("DP".to_string(), vec!["202".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "1".to_string(),
-                                        "99".to_string(),
-                                        "100".to_string(),
-                                        "2".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 6,
                         reference: "g".to_string(),
                         alt: "c".to_string(),
                         genome_index: 22,
@@ -3983,27 +2719,7 @@ mod tests {
                         frs: Some(OrderedFloat(100.0 / 202.0)),
                         genotype: "0/2".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 24,
-                            reference: "g".to_string(),
-                            alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["0/2".to_string()]),
-                                ("DP".to_string(), vec!["202".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "99".to_string(),
-                                        "1".to_string(),
-                                        "100".to_string(),
-                                        "2".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 7,
                         reference: "g".to_string(),
                         alt: "c".to_string(),
                         genome_index: 24,
@@ -4031,27 +2747,7 @@ mod tests {
                         frs: Some(OrderedFloat(48.0 / 100.0)),
                         genotype: "1/2".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 26,
-                            reference: "gg".to_string(),
-                            alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/2".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "0".to_string(),
-                                        "48".to_string(),
-                                        "50".to_string(),
-                                        "2".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 8,
                         reference: "g".to_string(),
                         alt: "a".to_string(),
                         genome_index: 26,
@@ -4063,27 +2759,7 @@ mod tests {
                         frs: Some(OrderedFloat(50.0 / 100.0)),
                         genotype: "1/2".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 26,
-                            reference: "gg".to_string(),
-                            alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/2".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "0".to_string(),
-                                        "48".to_string(),
-                                        "50".to_string(),
-                                        "2".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 8,
                         reference: "g".to_string(),
                         alt: "c".to_string(),
                         genome_index: 26,
@@ -4095,27 +2771,7 @@ mod tests {
                         frs: Some(OrderedFloat(48.0 / 100.0)),
                         genotype: "1/2".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 26,
-                            reference: "gg".to_string(),
-                            alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/2".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "0".to_string(),
-                                        "48".to_string(),
-                                        "50".to_string(),
-                                        "2".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 8,
                         reference: "g".to_string(),
                         alt: "a".to_string(),
                         genome_index: 27,
@@ -4127,27 +2783,7 @@ mod tests {
                         frs: Some(OrderedFloat(50.0 / 100.0)),
                         genotype: "1/2".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 26,
-                            reference: "gg".to_string(),
-                            alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/2".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "0".to_string(),
-                                        "48".to_string(),
-                                        "50".to_string(),
-                                        "2".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 8,
                         reference: "g".to_string(),
                         alt: "t".to_string(),
                         genome_index: 27,
@@ -4175,27 +2811,7 @@ mod tests {
                         frs: Some(OrderedFloat(50.0 / 100.0)),
                         genotype: "1/3".to_string(),
                         call_type: AltType::DEL,
-                        vcf_row: VCFRow {
-                            position: 28,
-                            reference: "gg".to_string(),
-                            alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/3".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "0".to_string(),
-                                        "48".to_string(),
-                                        "2".to_string(),
-                                        "50".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 9,
                         reference: "g".to_string(),
                         alt: "g".to_string(),
                         genome_index: 29,
@@ -4207,27 +2823,7 @@ mod tests {
                         frs: Some(OrderedFloat(48.0 / 100.0)),
                         genotype: "1/3".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 28,
-                            reference: "gg".to_string(),
-                            alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/3".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "0".to_string(),
-                                        "48".to_string(),
-                                        "2".to_string(),
-                                        "50".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 9,
                         reference: "g".to_string(),
                         alt: "a".to_string(),
                         genome_index: 29,
@@ -4262,22 +2858,7 @@ mod tests {
                         frs: Some(OrderedFloat(8.0 / 76.0)),
                         genotype: "1/1".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 16,
-                            reference: "ccc".to_string(),
-                            alternative: vec!["tgc".to_string(), "gtg".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/1".to_string()]),
-                                ("DP".to_string(), vec!["70".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec!["0".to_string(), "68".to_string(), "8".to_string()],
-                                ),
-                                ("GT_CONF".to_string(), vec!["300.25".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 5,
                         reference: "c".to_string(),
                         alt: "g".to_string(),
                         genome_index: 16,
@@ -4289,22 +2870,7 @@ mod tests {
                         frs: Some(OrderedFloat(8.0 / 76.0)),
                         genotype: "1/1".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 16,
-                            reference: "ccc".to_string(),
-                            alternative: vec!["tgc".to_string(), "gtg".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/1".to_string()]),
-                                ("DP".to_string(), vec!["70".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec!["0".to_string(), "68".to_string(), "8".to_string()],
-                                ),
-                                ("GT_CONF".to_string(), vec!["300.25".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 5,
                         reference: "c".to_string(),
                         alt: "t".to_string(),
                         genome_index: 17,
@@ -4316,22 +2882,7 @@ mod tests {
                         frs: Some(OrderedFloat(8.0 / 76.0)),
                         genotype: "1/1".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 16,
-                            reference: "ccc".to_string(),
-                            alternative: vec!["tgc".to_string(), "gtg".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/1".to_string()]),
-                                ("DP".to_string(), vec!["70".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec!["0".to_string(), "68".to_string(), "8".to_string()],
-                                ),
-                                ("GT_CONF".to_string(), vec!["300.25".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 5,
                         reference: "c".to_string(),
                         alt: "g".to_string(),
                         genome_index: 18,
@@ -4359,27 +2910,7 @@ mod tests {
                         frs: Some(OrderedFloat(99.0 / 202.0)),
                         genotype: "1/2".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 22,
-                            reference: "g".to_string(),
-                            alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/2".to_string()]),
-                                ("DP".to_string(), vec!["202".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "1".to_string(),
-                                        "99".to_string(),
-                                        "100".to_string(),
-                                        "2".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 6,
                         reference: "g".to_string(),
                         alt: "t".to_string(),
                         genome_index: 22,
@@ -4391,27 +2922,7 @@ mod tests {
                         frs: Some(OrderedFloat(100.0 / 202.0)),
                         genotype: "1/2".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 22,
-                            reference: "g".to_string(),
-                            alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/2".to_string()]),
-                                ("DP".to_string(), vec!["202".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "1".to_string(),
-                                        "99".to_string(),
-                                        "100".to_string(),
-                                        "2".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 6,
                         reference: "g".to_string(),
                         alt: "c".to_string(),
                         genome_index: 22,
@@ -4423,27 +2934,7 @@ mod tests {
                         frs: Some(OrderedFloat(100.0 / 202.0)),
                         genotype: "0/2".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 24,
-                            reference: "g".to_string(),
-                            alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["0/2".to_string()]),
-                                ("DP".to_string(), vec!["202".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "99".to_string(),
-                                        "1".to_string(),
-                                        "100".to_string(),
-                                        "2".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["613.77".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 7,
                         reference: "g".to_string(),
                         alt: "c".to_string(),
                         genome_index: 24,
@@ -4471,27 +2962,7 @@ mod tests {
                         frs: Some(OrderedFloat(48.0 / 100.0)),
                         genotype: "1/2".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 26,
-                            reference: "gg".to_string(),
-                            alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/2".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "0".to_string(),
-                                        "48".to_string(),
-                                        "50".to_string(),
-                                        "2".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 8,
                         reference: "g".to_string(),
                         alt: "a".to_string(),
                         genome_index: 26,
@@ -4503,27 +2974,7 @@ mod tests {
                         frs: Some(OrderedFloat(50.0 / 100.0)),
                         genotype: "1/2".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 26,
-                            reference: "gg".to_string(),
-                            alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/2".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "0".to_string(),
-                                        "48".to_string(),
-                                        "50".to_string(),
-                                        "2".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 8,
                         reference: "g".to_string(),
                         alt: "c".to_string(),
                         genome_index: 26,
@@ -4535,27 +2986,7 @@ mod tests {
                         frs: Some(OrderedFloat(48.0 / 100.0)),
                         genotype: "1/2".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 26,
-                            reference: "gg".to_string(),
-                            alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/2".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "0".to_string(),
-                                        "48".to_string(),
-                                        "50".to_string(),
-                                        "2".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 8,
                         reference: "g".to_string(),
                         alt: "a".to_string(),
                         genome_index: 27,
@@ -4567,27 +2998,7 @@ mod tests {
                         frs: Some(OrderedFloat(50.0 / 100.0)),
                         genotype: "1/2".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 26,
-                            reference: "gg".to_string(),
-                            alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/2".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "0".to_string(),
-                                        "48".to_string(),
-                                        "50".to_string(),
-                                        "2".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["475.54".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 8,
                         reference: "g".to_string(),
                         alt: "t".to_string(),
                         genome_index: 27,
@@ -4615,27 +3026,7 @@ mod tests {
                         frs: Some(OrderedFloat(50.0 / 100.0)),
                         genotype: "1/3".to_string(),
                         call_type: AltType::DEL,
-                        vcf_row: VCFRow {
-                            position: 28,
-                            reference: "gg".to_string(),
-                            alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/3".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "0".to_string(),
-                                        "48".to_string(),
-                                        "2".to_string(),
-                                        "50".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 9,
                         reference: "g".to_string(),
                         alt: "g".to_string(),
                         genome_index: 29,
@@ -4647,27 +3038,7 @@ mod tests {
                         frs: Some(OrderedFloat(48.0 / 100.0)),
                         genotype: "1/3".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 28,
-                            reference: "gg".to_string(),
-                            alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/3".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "0".to_string(),
-                                        "48".to_string(),
-                                        "2".to_string(),
-                                        "50".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 9,
                         reference: "g".to_string(),
                         alt: "a".to_string(),
                         genome_index: 29,
@@ -4713,27 +3084,7 @@ mod tests {
                         frs: None,
                         genotype: "1/3".to_string(),
                         call_type: AltType::HET,
-                        vcf_row: VCFRow {
-                            position: 28,
-                            reference: "gg".to_string(),
-                            alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/3".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "0".to_string(),
-                                        "48".to_string(),
-                                        "2".to_string(),
-                                        "50".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 9,
                         reference: "g".to_string(),
                         alt: "z".to_string(),
                         genome_index: 28,
@@ -4745,27 +3096,7 @@ mod tests {
                         frs: None,
                         genotype: "1/3".to_string(),
                         call_type: AltType::HET,
-                        vcf_row: VCFRow {
-                            position: 28,
-                            reference: "gg".to_string(),
-                            alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["1/3".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec![
-                                        "0".to_string(),
-                                        "48".to_string(),
-                                        "2".to_string(),
-                                        "50".to_string(),
-                                    ],
-                                ),
-                                ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 9,
                         reference: "g".to_string(),
                         alt: "z".to_string(),
                         genome_index: 29,
@@ -4792,19 +3123,7 @@ mod tests {
                     frs: Some(OrderedFloat(199.0 / 200.0)),
                     genotype: "1/1".to_string(),
                     call_type: AltType::INS,
-                    vcf_row: VCFRow {
-                        position: 33,
-                        reference: "t".to_string(),
-                        alternative: vec!["ttt".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["1/1".to_string()]),
-                            ("DP".to_string(), vec!["200".to_string()]),
-                            ("COV".to_string(), vec!["1".to_string(), "199".to_string()]),
-                            ("GT_CONF".to_string(), vec!["145.21".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 10,
                     reference: "t".to_string(),
                     alt: "tt".to_string(),
                     genome_index: 33,
@@ -4830,19 +3149,7 @@ mod tests {
                     frs: Some(OrderedFloat(199.0 / 200.0)),
                     genotype: "1/1".to_string(),
                     call_type: AltType::SNP,
-                    vcf_row: VCFRow {
-                        position: 39,
-                        reference: "tt".to_string(),
-                        alternative: vec!["agt".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["1/1".to_string()]),
-                            ("DP".to_string(), vec!["200".to_string()]),
-                            ("COV".to_string(), vec!["1".to_string(), "199".to_string()]),
-                            ("GT_CONF".to_string(), vec!["145.21".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 12,
                     reference: "t".to_string(),
                     alt: "a".to_string(),
                     genome_index: 39,
@@ -4868,19 +3175,7 @@ mod tests {
                     frs: Some(OrderedFloat(199.0 / 200.0)),
                     genotype: "1/1".to_string(),
                     call_type: AltType::DEL,
-                    vcf_row: VCFRow {
-                        position: 36,
-                        reference: "tt".to_string(),
-                        alternative: vec!["t".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["1/1".to_string()]),
-                            ("DP".to_string(), vec!["200".to_string()]),
-                            ("COV".to_string(), vec!["1".to_string(), "199".to_string()]),
-                            ("GT_CONF".to_string(), vec!["145.21".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 11,
                     reference: "t".to_string(),
                     alt: "t".to_string(),
                     genome_index: 37,
@@ -4906,19 +3201,7 @@ mod tests {
                     frs: Some(OrderedFloat(199.0 / 200.0)),
                     genotype: "1/1".to_string(),
                     call_type: AltType::INS,
-                    vcf_row: VCFRow {
-                        position: 39,
-                        reference: "tt".to_string(),
-                        alternative: vec!["agt".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["1/1".to_string()]),
-                            ("DP".to_string(), vec!["200".to_string()]),
-                            ("COV".to_string(), vec!["1".to_string(), "199".to_string()]),
-                            ("GT_CONF".to_string(), vec!["145.21".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 12,
                     reference: "t".to_string(),
                     alt: "g".to_string(),
                     genome_index: 39,
@@ -4951,27 +3234,7 @@ mod tests {
                     frs: Some(OrderedFloat(50.0 / 100.0)),
                     genotype: "1/3".to_string(),
                     call_type: AltType::DEL,
-                    vcf_row: VCFRow {
-                        position: 28,
-                        reference: "gg".to_string(),
-                        alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["1/3".to_string()]),
-                            ("DP".to_string(), vec!["100".to_string()]),
-                            (
-                                "COV".to_string(),
-                                vec![
-                                    "0".to_string(),
-                                    "48".to_string(),
-                                    "2".to_string(),
-                                    "50".to_string(),
-                                ],
-                            ),
-                            ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 9,
                     reference: "g".to_string(),
                     alt: "g".to_string(),
                     genome_index: 29,
@@ -4983,27 +3246,7 @@ mod tests {
                     frs: Some(OrderedFloat(48.0 / 100.0)),
                     genotype: "1/3".to_string(),
                     call_type: AltType::SNP,
-                    vcf_row: VCFRow {
-                        position: 28,
-                        reference: "gg".to_string(),
-                        alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["1/3".to_string()]),
-                            ("DP".to_string(), vec!["100".to_string()]),
-                            (
-                                "COV".to_string(),
-                                vec![
-                                    "0".to_string(),
-                                    "48".to_string(),
-                                    "2".to_string(),
-                                    "50".to_string(),
-                                ],
-                            ),
-                            ("GT_CONF".to_string(), vec!["315.11".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 9,
                     reference: "g".to_string(),
                     alt: "a".to_string(),
                     genome_index: 29,
@@ -5046,23 +3289,31 @@ mod tests {
 
         let diff = GenomeDifference::new(reference.clone(), sample.clone(), MinorType::COV);
 
+        let expected_vcf_rows = [
+            VCFRow {
+                position: 2,
+                reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
+                alternative: vec!["a".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["4".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
+                    ("GT_CONF".to_string(), vec!["2.05".to_string()]),
+                ]),
+                is_filter_pass: true,
+            }
+        ];
+
+        for (idx, row) in expected_vcf_rows.iter().enumerate() {
+            assert_eq!(*row, sample.get_vcf_row(idx));
+        }
+
         let expected_genome_variants = vec![
             Variant {
                 variant: "3_del_aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
                 nucleotide_index: 3,
-                evidence: VCFRow {
-                    position: 2,
-                    reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
-                    alternative: vec!["a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["4".to_string()]),
-                        ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
-                        ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 0,
                 vcf_idx: Some(1),
                 indel_length: -91,
                 indel_nucleotides: Some("aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string()),
@@ -5073,19 +3324,7 @@ mod tests {
             Variant {
                 variant: "3_del_aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
                 nucleotide_index: 3,
-                evidence: VCFRow {
-                    position: 2,
-                    reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
-                    alternative: vec!["a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["4".to_string()]),
-                        ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
-                        ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 0,
                 vcf_idx: Some(1),
                 indel_length: -91,
                 indel_nucleotides: Some("aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string()),
@@ -5096,19 +3335,7 @@ mod tests {
             Variant {
                 variant: "3_del_aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
                 nucleotide_index: 3,
-                evidence: VCFRow {
-                    position: 2,
-                    reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
-                    alternative: vec!["a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["1/1".to_string()]),
-                        ("DP".to_string(), vec!["4".to_string()]),
-                        ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
-                        ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 0,
                 vcf_idx: Some(1),
                 indel_length: -91,
                 indel_nucleotides: Some("aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string()),
@@ -5134,19 +3361,7 @@ mod tests {
                     frs: Some(OrderedFloat(0.75)),
                     genotype: "1/1".to_string(),
                     call_type: AltType::DEL,
-                    vcf_row: VCFRow {
-                        position: 2,
-                        reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
-                        alternative: vec!["a".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["1/1".to_string()]),
-                            ("DP".to_string(), vec!["4".to_string()]),
-                            ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
-                            ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 0,
                     reference: "a".to_string(),
                     alt: "aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
                     genome_index: 3,
@@ -5208,21 +3423,10 @@ mod tests {
                     frs: Some(OrderedFloat(0.75)),
                     genotype: "1/1".to_string(),
                     call_type: AltType::DEL,
-                    vcf_row: VCFRow {
-                        position: 2,
-                        reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
-                        alternative: vec!["a".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["1/1".to_string()]),
-                            ("DP".to_string(), vec!["4".to_string()]),
-                            ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
-                            ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 0,
                     reference: "a".to_string(),
-                    alt: "gggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
+                    alt: "gggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc"
+                        .to_string(),
                     genome_index: 28,
                     is_minor: false,
                     vcf_idx: Some(1),
@@ -5267,46 +3471,32 @@ mod tests {
             MinorType::COV,
         );
 
-        let expected_c_mutations = vec![
-            Mutation {
-                mutation: "4_del_ggg".to_string(),
-                gene: "C".to_string(),
-                evidence: vec![Evidence {
-                    cov: Some(3),
-                    frs: Some(OrderedFloat(0.75)),
-                    genotype: "1/1".to_string(),
-                    call_type: AltType::DEL,
-                    vcf_row: VCFRow {
-                        position: 2,
-                        reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
-                        alternative: vec!["a".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["1/1".to_string()]),
-                            ("DP".to_string(), vec!["4".to_string()]),
-                            ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
-                            ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
-                    reference: "g".to_string(),
-                    alt: "ggg".to_string(),
-                    genome_index: 94,
-                    is_minor: false,
-                    vcf_idx: Some(1),
-                }],
-                gene_position: Some(4),
-                codes_protein: Some(true),
-                ref_nucleotides: None,
-                alt_nucleotides: None,
-                nucleotide_number: None,
-                nucleotide_index: None,
-                indel_length: Some(-3),
-                indel_nucleotides: Some("ggg".to_string()),
-                amino_acid_number: None,
-                amino_acid_sequence: None,
-            },
-        ];
+        let expected_c_mutations = vec![Mutation {
+            mutation: "4_del_ggg".to_string(),
+            gene: "C".to_string(),
+            evidence: vec![Evidence {
+                cov: Some(3),
+                frs: Some(OrderedFloat(0.75)),
+                genotype: "1/1".to_string(),
+                call_type: AltType::DEL,
+                vcf_row: 0,
+                reference: "g".to_string(),
+                alt: "ggg".to_string(),
+                genome_index: 94,
+                is_minor: false,
+                vcf_idx: Some(1),
+            }],
+            gene_position: Some(4),
+            codes_protein: Some(true),
+            ref_nucleotides: None,
+            alt_nucleotides: None,
+            nucleotide_number: None,
+            nucleotide_index: None,
+            indel_length: Some(-3),
+            indel_nucleotides: Some("ggg".to_string()),
+            amino_acid_number: None,
+            amino_acid_sequence: None,
+        }];
 
         for (idx, mutation) in c_diff.mutations.iter().enumerate() {
             assert_eq!(mutation, &expected_c_mutations[idx]);
@@ -5325,23 +3515,32 @@ mod tests {
 
         let diff = GenomeDifference::new(reference.clone(), sample.clone(), MinorType::COV);
 
+        let expected_vcf_rows = [
+            VCFRow {
+                position: 2,
+                reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
+                alternative: vec!["a".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["0/0".to_string()]),
+                    ("DP".to_string(), vec!["4".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
+                    ("GT_CONF".to_string(), vec!["2.05".to_string()]),
+                ]),
+                is_filter_pass: true,
+            }
+
+        ];
+
+        for (idx, row) in expected_vcf_rows.iter().enumerate() {
+            assert_eq!(*row, sample.get_vcf_row(idx));
+        }
+
         let expected_genome_minor_variants = vec![
             Variant {
                 variant: "3_del_aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc:3".to_string(),
                 nucleotide_index: 3,
-                evidence: VCFRow {
-                    position: 2,
-                    reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
-                    alternative: vec!["a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["0/0".to_string()]),
-                        ("DP".to_string(), vec!["4".to_string()]),
-                        ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
-                        ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 0,
                 vcf_idx: Some(1),
                 indel_length: -91,
                 indel_nucleotides: Some("aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string()),
@@ -5352,19 +3551,7 @@ mod tests {
             Variant {
                 variant: "3_del_aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc:3".to_string(),
                 nucleotide_index: 3,
-                evidence: VCFRow {
-                    position: 2,
-                    reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
-                    alternative: vec!["a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["0/0".to_string()]),
-                        ("DP".to_string(), vec!["4".to_string()]),
-                        ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
-                        ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 0,
                 vcf_idx: Some(1),
                 indel_length: -91,
                 indel_nucleotides: Some("aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string()),
@@ -5375,19 +3562,7 @@ mod tests {
             Variant {
                 variant: "3_del_aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc:3".to_string(),
                 nucleotide_index: 3,
-                evidence: VCFRow {
-                    position: 2,
-                    reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
-                    alternative: vec!["a".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["0/0".to_string()]),
-                        ("DP".to_string(), vec!["4".to_string()]),
-                        ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
-                        ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                evidence: 0,
                 vcf_idx: Some(1),
                 indel_length: -91,
                 indel_nucleotides: Some("aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string()),
@@ -5413,19 +3588,7 @@ mod tests {
                     frs: Some(OrderedFloat(0.75)),
                     genotype: "0/0".to_string(),
                     call_type: AltType::DEL,
-                    vcf_row: VCFRow {
-                        position: 2,
-                        reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
-                        alternative: vec!["a".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["0/0".to_string()]),
-                            ("DP".to_string(), vec!["4".to_string()]),
-                            ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
-                            ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 0,
                     reference: "a".to_string(),
                     alt: "aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
                     genome_index: 3,
@@ -5487,21 +3650,10 @@ mod tests {
                     frs: Some(OrderedFloat(0.75)),
                     genotype: "0/0".to_string(),
                     call_type: AltType::DEL,
-                    vcf_row: VCFRow {
-                        position: 2,
-                        reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
-                        alternative: vec!["a".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["0/0".to_string()]),
-                            ("DP".to_string(), vec!["4".to_string()]),
-                            ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
-                            ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 0,
                     reference: "a".to_string(),
-                    alt: "gggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
+                    alt: "gggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc"
+                        .to_string(),
                     genome_index: 28,
                     is_minor: true,
                     vcf_idx: Some(1),
@@ -5555,21 +3707,10 @@ mod tests {
                     frs: Some(OrderedFloat(0.75)),
                     genotype: "0/0".to_string(),
                     call_type: AltType::DEL,
-                    vcf_row: VCFRow {
-                        position: 2,
-                        reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
-                        alternative: vec!["a".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["0/0".to_string()]),
-                            ("DP".to_string(), vec!["4".to_string()]),
-                            ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
-                            ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 0,
                     reference: "a".to_string(),
-                    alt: "gggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
+                    alt: "gggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc"
+                        .to_string(),
                     genome_index: 28,
                     is_minor: true,
                     vcf_idx: Some(1),
@@ -5614,46 +3755,32 @@ mod tests {
             MinorType::COV,
         );
 
-        let expected_c_minor_mutations = vec![
-            Mutation {
-                mutation: "4_del_ggg:3".to_string(),
-                gene: "C".to_string(),
-                evidence: vec![Evidence {
-                    cov: Some(3),
-                    frs: Some(OrderedFloat(0.75)),
-                    genotype: "0/0".to_string(),
-                    call_type: AltType::DEL,
-                    vcf_row: VCFRow {
-                        position: 2,
-                        reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
-                        alternative: vec!["a".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["0/0".to_string()]),
-                            ("DP".to_string(), vec!["4".to_string()]),
-                            ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
-                            ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
-                    reference: "g".to_string(),
-                    alt: "ggg".to_string(),
-                    genome_index: 94,
-                    is_minor: true,
-                    vcf_idx: Some(1),
-                }],
-                gene_position: Some(4),
-                codes_protein: Some(true),
-                ref_nucleotides: None,
-                alt_nucleotides: None,
-                nucleotide_number: None,
-                nucleotide_index: None,
-                indel_length: Some(-3),
-                indel_nucleotides: Some("ggg".to_string()),
-                amino_acid_number: None,
-                amino_acid_sequence: None,
-            },
-        ];
+        let expected_c_minor_mutations = vec![Mutation {
+            mutation: "4_del_ggg:3".to_string(),
+            gene: "C".to_string(),
+            evidence: vec![Evidence {
+                cov: Some(3),
+                frs: Some(OrderedFloat(0.75)),
+                genotype: "0/0".to_string(),
+                call_type: AltType::DEL,
+                vcf_row: 0,
+                reference: "g".to_string(),
+                alt: "ggg".to_string(),
+                genome_index: 94,
+                is_minor: true,
+                vcf_idx: Some(1),
+            }],
+            gene_position: Some(4),
+            codes_protein: Some(true),
+            ref_nucleotides: None,
+            alt_nucleotides: None,
+            nucleotide_number: None,
+            nucleotide_index: None,
+            indel_length: Some(-3),
+            indel_nucleotides: Some("ggg".to_string()),
+            amino_acid_number: None,
+            amino_acid_sequence: None,
+        }];
 
         for (idx, mutation) in c_diff.minor_mutations.iter().enumerate() {
             assert_eq!(mutation, &expected_c_minor_mutations[idx]);
@@ -5675,6 +3802,58 @@ mod tests {
         );
         assert_eq!(kat_g_diff.mutations.len(), 0);
 
+        let expected_vcf_rows = vec![
+            VCFRow {
+                // 0
+                position: 2154397,
+                reference: "g".to_string(),
+                alternative: vec!["t".to_string(), "c".to_string()],
+                filter: vec!["MIN_FRS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["0/0".to_string()]),
+                    ("DP".to_string(), vec!["100".to_string()]),
+                    (
+                        "ALLELE_DP".to_string(),
+                        vec!["75".to_string(), "15".to_string(), "10".to_string()],
+                    ),
+                    ("FRS".to_string(), vec!["0.75".to_string()]),
+                    ("COV_TOTAL".to_string(), vec!["100".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec!["75".to_string(), "15".to_string(), "10".to_string()],
+                    ),
+                    ("GT_CONF".to_string(), vec!["731.8".to_string()]),
+                    ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+            VCFRow {
+                // 1
+                position: 2154400,
+                reference: "cgg".to_string(),
+                alternative: vec!["c".to_string()],
+                filter: vec!["MIN_FRS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["0/0".to_string()]),
+                    ("DP".to_string(), vec!["100".to_string()]),
+                    (
+                        "ALLELE_DP".to_string(),
+                        vec!["75".to_string(), "25".to_string()],
+                    ),
+                    ("FRS".to_string(), vec!["0.75".to_string()]),
+                    ("COV_TOTAL".to_string(), vec!["100".to_string()]),
+                    ("COV".to_string(), vec!["75".to_string(), "25".to_string()]),
+                    ("GT_CONF".to_string(), vec!["731.8".to_string()]),
+                    ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+        ];
+
+        for (idx, row) in expected_vcf_rows.iter().enumerate() {
+            assert_eq!(*row, samples.get_vcf_row(idx));
+        }
+
         let expected_katg_minor_mutations = vec![
             Mutation {
                 mutation: "1710_del_cc:25".to_string(),
@@ -5684,26 +3863,7 @@ mod tests {
                     frs: Some(OrderedFloat(25.0 / 100.0)),
                     genotype: "0/0".to_string(),
                     call_type: AltType::DEL,
-                    vcf_row: VCFRow {
-                        position: 2154400,
-                        reference: "cgg".to_string(),
-                        alternative: vec!["c".to_string()],
-                        filter: vec!["MIN_FRS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["0/0".to_string()]),
-                            ("DP".to_string(), vec!["100".to_string()]),
-                            (
-                                "ALLELE_DP".to_string(),
-                                vec!["75".to_string(), "25".to_string()],
-                            ),
-                            ("FRS".to_string(), vec!["0.75".to_string()]),
-                            ("COV_TOTAL".to_string(), vec!["100".to_string()]),
-                            ("COV".to_string(), vec!["75".to_string(), "25".to_string()]),
-                            ("GT_CONF".to_string(), vec!["731.8".to_string()]),
-                            ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
-                        ]),
-                        is_filter_pass: false,
-                    },
+                    vcf_row: 1,
                     reference: "g".to_string(),
                     alt: "gg".to_string(),
                     genome_index: 2154401,
@@ -5730,29 +3890,7 @@ mod tests {
                         frs: Some(OrderedFloat(15.0 / 100.0)),
                         genotype: "0/0".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 2154397,
-                            reference: "g".to_string(),
-                            alternative: vec!["t".to_string(), "c".to_string()],
-                            filter: vec!["MIN_FRS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["0/0".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "ALLELE_DP".to_string(),
-                                    vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                                ),
-                                ("FRS".to_string(), vec!["0.75".to_string()]),
-                                ("COV_TOTAL".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                                ),
-                                ("GT_CONF".to_string(), vec!["731.8".to_string()]),
-                                ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
-                            ]),
-                            is_filter_pass: false,
-                        },
+                        vcf_row: 0,
                         reference: "g".to_string(),
                         alt: "t".to_string(),
                         genome_index: 2154397,
@@ -5764,29 +3902,7 @@ mod tests {
                         frs: Some(OrderedFloat(10.0 / 100.0)),
                         genotype: "0/0".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 2154397,
-                            reference: "g".to_string(),
-                            alternative: vec!["t".to_string(), "c".to_string()],
-                            filter: vec!["MIN_FRS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["0/0".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "ALLELE_DP".to_string(),
-                                    vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                                ),
-                                ("FRS".to_string(), vec!["0.75".to_string()]),
-                                ("COV_TOTAL".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                                ),
-                                ("GT_CONF".to_string(), vec!["731.8".to_string()]),
-                                ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
-                            ]),
-                            is_filter_pass: false,
-                        },
+                        vcf_row: 0,
                         reference: "g".to_string(),
                         alt: "c".to_string(),
                         genome_index: 2154397,
@@ -5830,6 +3946,63 @@ mod tests {
         );
         assert_eq!(kat_g_diff.mutations.len(), 0);
 
+        let expected_vcf_rows = vec![
+            VCFRow {
+                // 0
+                position: 2154397,
+                reference: "g".to_string(),
+                alternative: vec!["t".to_string(), "c".to_string()],
+                filter: vec!["MIN_FRS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["0/0".to_string()]),
+                    ("DP".to_string(), vec!["100".to_string()]),
+                    (
+                        "ALLELE_DP".to_string(),
+                        vec!["75".to_string(), "15".to_string(), "10".to_string()],
+                    ),
+                    ("FRS".to_string(), vec!["0.75".to_string()]),
+                    ("COV_TOTAL".to_string(), vec!["100".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec!["75".to_string(), "15".to_string(), "10".to_string()],
+                    ),
+                    (
+                        "AD".to_string(),
+                        vec!["75".to_string(), "15".to_string(), "10".to_string()],
+                    ),
+                    ("GT_CONF".to_string(), vec!["731.8".to_string()]),
+                    ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+            VCFRow {
+                // 1
+                position: 2154400,
+                reference: "cgg".to_string(),
+                alternative: vec!["c".to_string()],
+                filter: vec!["MIN_FRS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["0/0".to_string()]),
+                    ("DP".to_string(), vec!["100".to_string()]),
+                    (
+                        "ALLELE_DP".to_string(),
+                        vec!["75".to_string(), "25".to_string()],
+                    ),
+                    ("FRS".to_string(), vec!["0.75".to_string()]),
+                    ("COV_TOTAL".to_string(), vec!["100".to_string()]),
+                    ("COV".to_string(), vec!["75".to_string(), "25".to_string()]),
+                    ("AD".to_string(), vec!["75".to_string(), "25".to_string()]),
+                    ("GT_CONF".to_string(), vec!["731.8".to_string()]),
+                    ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+        ];
+
+        for (idx, row) in expected_vcf_rows.iter().enumerate() {
+            assert_eq!(*row, samples.get_vcf_row(idx));
+        }
+
         let expected_katg_minor_mutations = vec![
             Mutation {
                 mutation: "1710_del_cc:25".to_string(),
@@ -5839,27 +4012,7 @@ mod tests {
                     frs: Some(OrderedFloat(25.0 / 100.0)),
                     genotype: "0/0".to_string(),
                     call_type: AltType::DEL,
-                    vcf_row: VCFRow {
-                        position: 2154400,
-                        reference: "cgg".to_string(),
-                        alternative: vec!["c".to_string()],
-                        filter: vec!["MIN_FRS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["0/0".to_string()]),
-                            ("DP".to_string(), vec!["100".to_string()]),
-                            (
-                                "ALLELE_DP".to_string(),
-                                vec!["75".to_string(), "25".to_string()],
-                            ),
-                            ("FRS".to_string(), vec!["0.75".to_string()]),
-                            ("COV_TOTAL".to_string(), vec!["100".to_string()]),
-                            ("COV".to_string(), vec!["75".to_string(), "25".to_string()]),
-                            ("AD".to_string(), vec!["75".to_string(), "25".to_string()]),
-                            ("GT_CONF".to_string(), vec!["731.8".to_string()]),
-                            ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
-                        ]),
-                        is_filter_pass: false,
-                    },
+                    vcf_row: 1,
                     reference: "g".to_string(),
                     alt: "gg".to_string(),
                     genome_index: 2154401,
@@ -5886,33 +4039,7 @@ mod tests {
                         frs: Some(OrderedFloat(15.0 / 100.0)),
                         genotype: "0/0".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 2154397,
-                            reference: "g".to_string(),
-                            alternative: vec!["t".to_string(), "c".to_string()],
-                            filter: vec!["MIN_FRS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["0/0".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "ALLELE_DP".to_string(),
-                                    vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                                ),
-                                ("FRS".to_string(), vec!["0.75".to_string()]),
-                                ("COV_TOTAL".to_string(), vec!["100".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                                ),
-                                (
-                                    "AD".to_string(),
-                                    vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                                ),
-                                ("GT_CONF".to_string(), vec!["731.8".to_string()]),
-                                ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
-                            ]),
-                            is_filter_pass: false,
-                        },
+                        vcf_row: 0,
                         reference: "g".to_string(),
                         alt: "t".to_string(),
                         genome_index: 2154397,
@@ -5924,33 +4051,7 @@ mod tests {
                         frs: Some(OrderedFloat(10.0 / 100.0)),
                         genotype: "0/0".to_string(),
                         call_type: AltType::SNP,
-                        vcf_row: VCFRow {
-                            position: 2154397,
-                            reference: "g".to_string(),
-                            alternative: vec!["t".to_string(), "c".to_string()],
-                            filter: vec!["MIN_FRS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["0/0".to_string()]),
-                                ("DP".to_string(), vec!["100".to_string()]),
-                                (
-                                    "ALLELE_DP".to_string(),
-                                    vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                                ),
-                                ("FRS".to_string(), vec!["0.75".to_string()]),
-                                ("COV_TOTAL".to_string(), vec!["100".to_string()]),
-                                (
-                                    "AD".to_string(),
-                                    vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                                ),
-                                (
-                                    "COV".to_string(),
-                                    vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                                ),
-                                ("GT_CONF".to_string(), vec!["731.8".to_string()]),
-                                ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
-                            ]),
-                            is_filter_pass: false,
-                        },
+                        vcf_row: 0,
                         reference: "g".to_string(),
                         alt: "c".to_string(),
                         genome_index: 2154397,
@@ -5989,33 +4090,63 @@ mod tests {
 
         let diff = GenomeDifference::new(reference.clone(), sample.clone(), MinorType::COV);
 
+        let expected_vcf_rows = vec![
+            VCFRow {
+                // 0
+                position: 2154397,
+                reference: "g".to_string(),
+                alternative: vec!["t".to_string(), "c".to_string()],
+                filter: vec!["MIN_FRS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["0/0".to_string()]),
+                    ("DP".to_string(), vec!["100".to_string()]),
+                    (
+                        "ALLELE_DP".to_string(),
+                        vec!["75".to_string(), "15".to_string(), "10".to_string()],
+                    ),
+                    ("FRS".to_string(), vec!["0.75".to_string()]),
+                    ("COV_TOTAL".to_string(), vec!["100".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec!["75".to_string(), "15".to_string(), "10".to_string()],
+                    ),
+                    ("GT_CONF".to_string(), vec!["731.8".to_string()]),
+                    ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+            VCFRow {
+                // 1
+                position: 2154400,
+                reference: "cgg".to_string(),
+                alternative: vec!["c".to_string()],
+                filter: vec!["MIN_FRS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["0/0".to_string()]),
+                    ("DP".to_string(), vec!["100".to_string()]),
+                    (
+                        "ALLELE_DP".to_string(),
+                        vec!["75".to_string(), "25".to_string()],
+                    ),
+                    ("FRS".to_string(), vec!["0.75".to_string()]),
+                    ("COV_TOTAL".to_string(), vec!["100".to_string()]),
+                    ("COV".to_string(), vec!["75".to_string(), "25".to_string()]),
+                    ("GT_CONF".to_string(), vec!["731.8".to_string()]),
+                    ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+        ];
+
+        for (idx, row) in expected_vcf_rows.iter().enumerate() {
+            assert_eq!(*row, sample.get_vcf_row(idx));
+        }
+
         let expected_genome_minor_variants = vec![
             Variant {
                 variant: "2154397g>t:15".to_string(),
                 nucleotide_index: 2154397,
-                evidence: VCFRow {
-                    position: 2154397,
-                    reference: "g".to_string(),
-                    alternative: vec!["t".to_string(), "c".to_string()],
-                    filter: vec!["MIN_FRS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["0/0".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "ALLELE_DP".to_string(),
-                            vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                        ),
-                        ("FRS".to_string(), vec!["0.75".to_string()]),
-                        ("COV_TOTAL".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                        ),
-                        ("GT_CONF".to_string(), vec!["731.8".to_string()]),
-                        ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
-                    ]),
-                    is_filter_pass: false,
-                },
+                evidence: 0,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -6026,29 +4157,7 @@ mod tests {
             Variant {
                 variant: "2154397g>c:10".to_string(),
                 nucleotide_index: 2154397,
-                evidence: VCFRow {
-                    position: 2154397,
-                    reference: "g".to_string(),
-                    alternative: vec!["t".to_string(), "c".to_string()],
-                    filter: vec!["MIN_FRS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["0/0".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "ALLELE_DP".to_string(),
-                            vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                        ),
-                        ("FRS".to_string(), vec!["0.75".to_string()]),
-                        ("COV_TOTAL".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                        ),
-                        ("GT_CONF".to_string(), vec!["731.8".to_string()]),
-                        ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
-                    ]),
-                    is_filter_pass: false,
-                },
+                evidence: 0,
                 vcf_idx: Some(2),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -6059,26 +4168,7 @@ mod tests {
             Variant {
                 variant: "2154401_del_gg:25".to_string(),
                 nucleotide_index: 2154401,
-                evidence: VCFRow {
-                    position: 2154400,
-                    reference: "cgg".to_string(),
-                    alternative: vec!["c".to_string()],
-                    filter: vec!["MIN_FRS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["0/0".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "ALLELE_DP".to_string(),
-                            vec!["75".to_string(), "25".to_string()],
-                        ),
-                        ("FRS".to_string(), vec!["0.75".to_string()]),
-                        ("COV_TOTAL".to_string(), vec!["100".to_string()]),
-                        ("COV".to_string(), vec!["75".to_string(), "25".to_string()]),
-                        ("GT_CONF".to_string(), vec!["731.8".to_string()]),
-                        ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
-                    ]),
-                    is_filter_pass: false,
-                },
+                evidence: 1,
                 vcf_idx: Some(1),
                 indel_length: -2,
                 indel_nucleotides: Some("gg".to_string()),
@@ -6098,29 +4188,7 @@ mod tests {
             Variant {
                 variant: "2154397g>t:0.15".to_string(),
                 nucleotide_index: 2154397,
-                evidence: VCFRow {
-                    position: 2154397,
-                    reference: "g".to_string(),
-                    alternative: vec!["t".to_string(), "c".to_string()],
-                    filter: vec!["MIN_FRS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["0/0".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "ALLELE_DP".to_string(),
-                            vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                        ),
-                        ("FRS".to_string(), vec!["0.75".to_string()]),
-                        ("COV_TOTAL".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                        ),
-                        ("GT_CONF".to_string(), vec!["731.8".to_string()]),
-                        ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
-                    ]),
-                    is_filter_pass: false,
-                },
+                evidence: 0,
                 vcf_idx: Some(1),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -6131,29 +4199,7 @@ mod tests {
             Variant {
                 variant: "2154397g>c:0.1".to_string(),
                 nucleotide_index: 2154397,
-                evidence: VCFRow {
-                    position: 2154397,
-                    reference: "g".to_string(),
-                    alternative: vec!["t".to_string(), "c".to_string()],
-                    filter: vec!["MIN_FRS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["0/0".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "ALLELE_DP".to_string(),
-                            vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                        ),
-                        ("FRS".to_string(), vec!["0.75".to_string()]),
-                        ("COV_TOTAL".to_string(), vec!["100".to_string()]),
-                        (
-                            "COV".to_string(),
-                            vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                        ),
-                        ("GT_CONF".to_string(), vec!["731.8".to_string()]),
-                        ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
-                    ]),
-                    is_filter_pass: false,
-                },
+                evidence: 0,
                 vcf_idx: Some(2),
                 indel_length: 0,
                 indel_nucleotides: None,
@@ -6164,26 +4210,7 @@ mod tests {
             Variant {
                 variant: "2154401_del_gg:0.25".to_string(),
                 nucleotide_index: 2154401,
-                evidence: VCFRow {
-                    position: 2154400,
-                    reference: "cgg".to_string(),
-                    alternative: vec!["c".to_string()],
-                    filter: vec!["MIN_FRS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["0/0".to_string()]),
-                        ("DP".to_string(), vec!["100".to_string()]),
-                        (
-                            "ALLELE_DP".to_string(),
-                            vec!["75".to_string(), "25".to_string()],
-                        ),
-                        ("FRS".to_string(), vec!["0.75".to_string()]),
-                        ("COV_TOTAL".to_string(), vec!["100".to_string()]),
-                        ("COV".to_string(), vec!["75".to_string(), "25".to_string()]),
-                        ("GT_CONF".to_string(), vec!["731.8".to_string()]),
-                        ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
-                    ]),
-                    is_filter_pass: false,
-                },
+                evidence: 1,
                 vcf_idx: Some(1),
                 indel_length: -2,
                 indel_nucleotides: Some("gg".to_string()),
@@ -6213,26 +4240,7 @@ mod tests {
                     frs: Some(OrderedFloat(25.0 / 100.0)),
                     genotype: "0/0".to_string(),
                     call_type: AltType::DEL,
-                    vcf_row: VCFRow {
-                        position: 2154400,
-                        reference: "cgg".to_string(),
-                        alternative: vec!["c".to_string()],
-                        filter: vec!["MIN_FRS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["0/0".to_string()]),
-                            ("DP".to_string(), vec!["100".to_string()]),
-                            (
-                                "ALLELE_DP".to_string(),
-                                vec!["75".to_string(), "25".to_string()],
-                            ),
-                            ("FRS".to_string(), vec!["0.75".to_string()]),
-                            ("COV_TOTAL".to_string(), vec!["100".to_string()]),
-                            ("COV".to_string(), vec!["75".to_string(), "25".to_string()]),
-                            ("GT_CONF".to_string(), vec!["731.8".to_string()]),
-                            ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
-                        ]),
-                        is_filter_pass: false,
-                    },
+                    vcf_row: 1,
                     reference: "g".to_string(),
                     alt: "gg".to_string(),
                     genome_index: 2154401,
@@ -6258,29 +4266,7 @@ mod tests {
                     frs: Some(OrderedFloat(15.0 / 100.0)),
                     genotype: "0/0".to_string(),
                     call_type: AltType::SNP,
-                    vcf_row: VCFRow {
-                        position: 2154397,
-                        reference: "g".to_string(),
-                        alternative: vec!["t".to_string(), "c".to_string()],
-                        filter: vec!["MIN_FRS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["0/0".to_string()]),
-                            ("DP".to_string(), vec!["100".to_string()]),
-                            (
-                                "ALLELE_DP".to_string(),
-                                vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                            ),
-                            ("FRS".to_string(), vec!["0.75".to_string()]),
-                            ("COV_TOTAL".to_string(), vec!["100".to_string()]),
-                            (
-                                "COV".to_string(),
-                                vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                            ),
-                            ("GT_CONF".to_string(), vec!["731.8".to_string()]),
-                            ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
-                        ]),
-                        is_filter_pass: false,
-                    },
+                    vcf_row: 0,
                     reference: "g".to_string(),
                     alt: "t".to_string(),
                     genome_index: 2154397,
@@ -6306,29 +4292,7 @@ mod tests {
                     frs: Some(OrderedFloat(10.0 / 100.0)),
                     genotype: "0/0".to_string(),
                     call_type: AltType::SNP,
-                    vcf_row: VCFRow {
-                        position: 2154397,
-                        reference: "g".to_string(),
-                        alternative: vec!["t".to_string(), "c".to_string()],
-                        filter: vec!["MIN_FRS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["0/0".to_string()]),
-                            ("DP".to_string(), vec!["100".to_string()]),
-                            (
-                                "ALLELE_DP".to_string(),
-                                vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                            ),
-                            ("FRS".to_string(), vec!["0.75".to_string()]),
-                            ("COV_TOTAL".to_string(), vec!["100".to_string()]),
-                            (
-                                "COV".to_string(),
-                                vec!["75".to_string(), "15".to_string(), "10".to_string()],
-                            ),
-                            ("GT_CONF".to_string(), vec!["731.8".to_string()]),
-                            ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
-                        ]),
-                        is_filter_pass: false,
-                    },
+                    vcf_row: 0,
                     reference: "g".to_string(),
                     alt: "c".to_string(),
                     genome_index: 2154397,
@@ -6359,6 +4323,62 @@ mod tests {
         let vcf = VCFFile::new("test/TEST-DNA-misc-indel.vcf".to_string(), false, 3);
         let mut sample = mutate(&genome, vcf);
 
+        let expected_vcf_rows = vec![
+            VCFRow {
+                // 0
+                position: 6,
+                reference: "a".to_string(),
+                alternative: vec!["aa".to_string(), "aaa".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["0/0".to_string()]),
+                    ("DP".to_string(), vec!["10".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec!["4".to_string(), "3".to_string(), "3".to_string()],
+                    ),
+                    ("GT_CONF".to_string(), vec!["2.05".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 1
+                position: 8,
+                reference: "a".to_string(),
+                alternative: vec!["aa".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["0/0".to_string()]),
+                    ("DP".to_string(), vec!["10".to_string()]),
+                    ("COV".to_string(), vec!["6".to_string(), "4".to_string()]),
+                    ("GT_CONF".to_string(), vec!["2.05".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+            VCFRow {
+                // 2
+                position: 94,
+                reference: "c".to_string(),
+                alternative: vec!["cc".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["0/0".to_string()]),
+                    ("DP".to_string(), vec!["10".to_string()]),
+                    ("COV".to_string(), vec!["6".to_string(), "4".to_string()]),
+                    ("GT_CONF".to_string(), vec!["2.05".to_string()]),
+                ]),
+                is_filter_pass: true,
+            },
+        ];
+
+        for (idx, row) in expected_vcf_rows.iter().enumerate() {
+            assert_eq!(*row, sample.get_vcf_row(idx));
+            // Double check that if we ask for a row from a genome with no VCF, it panics
+            assert_panics!(genome.get_vcf_row(idx));
+        }
+        // Also check that asking for a row which doesn't exist it panics
+        assert_panics!(sample.get_vcf_row(3333));
+
         let expected_minor_mutations = vec![
             Mutation {
                 mutation: "3_indel:3".to_string(),
@@ -6369,22 +4389,7 @@ mod tests {
                         frs: Some(OrderedFloat(3.0 / 10.0)),
                         genotype: "0/0".to_string(),
                         call_type: AltType::INS,
-                        vcf_row: VCFRow {
-                            position: 6,
-                            reference: "a".to_string(),
-                            alternative: vec!["aa".to_string(), "aaa".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["0/0".to_string()]),
-                                ("DP".to_string(), vec!["10".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec!["4".to_string(), "3".to_string(), "3".to_string()],
-                                ),
-                                ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 0,
                         reference: "a".to_string(),
                         alt: "a".to_string(),
                         genome_index: 6,
@@ -6396,22 +4401,7 @@ mod tests {
                         frs: Some(OrderedFloat(3.0 / 10.0)),
                         genotype: "0/0".to_string(),
                         call_type: AltType::INS,
-                        vcf_row: VCFRow {
-                            position: 6,
-                            reference: "a".to_string(),
-                            alternative: vec!["aa".to_string(), "aaa".to_string()],
-                            filter: vec!["PASS".to_string()],
-                            fields: HashMap::from([
-                                ("GT".to_string(), vec!["0/0".to_string()]),
-                                ("DP".to_string(), vec!["10".to_string()]),
-                                (
-                                    "COV".to_string(),
-                                    vec!["4".to_string(), "3".to_string(), "3".to_string()],
-                                ),
-                                ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                            ]),
-                            is_filter_pass: true,
-                        },
+                        vcf_row: 0,
                         reference: "a".to_string(),
                         alt: "aa".to_string(),
                         genome_index: 6,
@@ -6438,19 +4428,7 @@ mod tests {
                     frs: Some(OrderedFloat(4.0 / 10.0)),
                     genotype: "0/0".to_string(),
                     call_type: AltType::INS,
-                    vcf_row: VCFRow {
-                        position: 8,
-                        reference: "a".to_string(),
-                        alternative: vec!["aa".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["0/0".to_string()]),
-                            ("DP".to_string(), vec!["10".to_string()]),
-                            ("COV".to_string(), vec!["6".to_string(), "4".to_string()]),
-                            ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 1,
                     reference: "a".to_string(),
                     alt: "a".to_string(),
                     genome_index: 8,
@@ -6489,19 +4467,7 @@ mod tests {
                 frs: Some(OrderedFloat(4.0 / 10.0)),
                 genotype: "0/0".to_string(),
                 call_type: AltType::INS,
-                vcf_row: VCFRow {
-                    position: 94,
-                    reference: "c".to_string(),
-                    alternative: vec!["cc".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["0/0".to_string()]),
-                        ("DP".to_string(), vec!["10".to_string()]),
-                        ("COV".to_string(), vec!["6".to_string(), "4".to_string()]),
-                        ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                vcf_row: 2,
                 reference: "c".to_string(),
                 alt: "c".to_string(),
                 genome_index: 94,
@@ -6549,22 +4515,7 @@ mod tests {
                     frs: Some(OrderedFloat(3.0 / 10.0)),
                     genotype: "0/0".to_string(),
                     call_type: AltType::INS,
-                    vcf_row: VCFRow {
-                        position: 6,
-                        reference: "a".to_string(),
-                        alternative: vec!["aa".to_string(), "aaa".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["0/0".to_string()]),
-                            ("DP".to_string(), vec!["10".to_string()]),
-                            (
-                                "COV".to_string(),
-                                vec!["4".to_string(), "3".to_string(), "3".to_string()],
-                            ),
-                            ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 0,
                     reference: "a".to_string(),
                     alt: "a".to_string(),
                     genome_index: 6,
@@ -6590,22 +4541,7 @@ mod tests {
                     frs: Some(OrderedFloat(3.0 / 10.0)),
                     genotype: "0/0".to_string(),
                     call_type: AltType::INS,
-                    vcf_row: VCFRow {
-                        position: 6,
-                        reference: "a".to_string(),
-                        alternative: vec!["aa".to_string(), "aaa".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["0/0".to_string()]),
-                            ("DP".to_string(), vec!["10".to_string()]),
-                            (
-                                "COV".to_string(),
-                                vec!["4".to_string(), "3".to_string(), "3".to_string()],
-                            ),
-                            ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 0,
                     reference: "a".to_string(),
                     alt: "aa".to_string(),
                     genome_index: 6,
@@ -6631,19 +4567,7 @@ mod tests {
                     frs: Some(OrderedFloat(4.0 / 10.0)),
                     genotype: "0/0".to_string(),
                     call_type: AltType::INS,
-                    vcf_row: VCFRow {
-                        position: 8,
-                        reference: "a".to_string(),
-                        alternative: vec!["aa".to_string()],
-                        filter: vec!["PASS".to_string()],
-                        fields: HashMap::from([
-                            ("GT".to_string(), vec!["0/0".to_string()]),
-                            ("DP".to_string(), vec!["10".to_string()]),
-                            ("COV".to_string(), vec!["6".to_string(), "4".to_string()]),
-                            ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                        ]),
-                        is_filter_pass: true,
-                    },
+                    vcf_row: 1,
                     reference: "a".to_string(),
                     alt: "a".to_string(),
                     genome_index: 8,
@@ -6722,19 +4646,7 @@ mod tests {
                 frs: Some(OrderedFloat(4.0 / 10.0)),
                 genotype: "0/0".to_string(),
                 call_type: AltType::INS,
-                vcf_row: VCFRow {
-                    position: 94,
-                    reference: "c".to_string(),
-                    alternative: vec!["cc".to_string()],
-                    filter: vec!["PASS".to_string()],
-                    fields: HashMap::from([
-                        ("GT".to_string(), vec!["0/0".to_string()]),
-                        ("DP".to_string(), vec!["10".to_string()]),
-                        ("COV".to_string(), vec!["6".to_string(), "4".to_string()]),
-                        ("GT_CONF".to_string(), vec!["2.05".to_string()]),
-                    ]),
-                    is_filter_pass: true,
-                },
+                vcf_row: 2,
                 reference: "c".to_string(),
                 alt: "c".to_string(),
                 genome_index: 94,

@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 
 use ordered_float::{Float, OrderedFloat};
 
-use crate::common::{Alt, AltType, Evidence, MinorType, VCFRow};
+use crate::common::{Alt, AltType, Evidence, MinorType};
 use crate::gene::{codon_to_aa, Gene, GenePos};
 use crate::genome::Genome;
 
@@ -22,8 +22,8 @@ pub struct Variant {
     pub nucleotide_index: i64,
 
     #[pyo3(get, set)]
-    /// Evidence for this variant
-    pub evidence: VCFRow,
+    /// VCF row index for this variant's evidence
+    pub evidence: usize,
 
     #[pyo3(get, set)]
     /// Index of the VCF row. i.e COV at vcf_idx == coverage for this variant
@@ -274,7 +274,7 @@ impl GenomeDifference {
                         let variant = Variant {
                             variant: garc.clone(),
                             nucleotide_index: ref_pos.genome_idx,
-                            evidence: alt.evidence.vcf_row.clone(),
+                            evidence: alt.evidence.vcf_row,
                             vcf_idx: alt.evidence.vcf_idx,
                             indel_length,
                             indel_nucleotides: indel_bases.clone(),

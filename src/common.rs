@@ -91,8 +91,8 @@ pub struct Evidence {
     pub is_minor: bool,
 
     #[pyo3(get, set)]
-    /// VCF row which this call originated from
-    pub vcf_row: VCFRow,
+    /// VCF row index which this call originated from
+    pub vcf_row: usize,
 
     #[pyo3(get, set)]
     /// Index of the COV field in the VCF row which this call originated from
