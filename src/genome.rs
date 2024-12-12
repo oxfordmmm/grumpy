@@ -4728,4 +4728,34 @@ mod tests {
         assert_eq!(mymt_diff.mutations.len(), 0);
         assert_eq!(mymt_diff.minor_mutations.len(), 0);
     }
+
+    #[test]
+    fn test_snp_after_del() {
+        let mut genome = Genome::new("reference/NC_000962.3.gbk");
+        let vcf = VCFFile::new("test/tb-snp-after-del.vcf".to_string(), false, 3);
+        let mut sample = mutate(&genome, vcf);
+
+        let diff = GenomeDifference::new(genome.clone(), sample.clone(), MinorType::COV);
+
+        let expected_variants = [
+            "1224300_del_tgcgcctcccgcgagcagacacagaatcgcactgcgccggcccggcgcgtgcgattctgtgtctg",
+            "1224367t>c",
+        ];
+        for (idx, variant) in diff.variants.iter().enumerate() {
+            assert_eq!(variant.variant, expected_variants[idx]);
+        }
+        assert_eq!(diff.minor_variants.len(), 0);
+
+        let rv1096_diff = GeneDifference::new(
+            genome.get_gene("Rv1096".to_string()),
+            sample.get_gene("Rv1096".to_string()),
+            MinorType::COV,
+        );
+        assert_eq!(rv1096_diff.minor_mutations.len(), 0);
+        assert_eq!(
+            rv1096_diff.mutations[0].mutation,
+            "-85_del_tgcgcctcccgcgagcagacacagaatcgcactgcgccggcccggcgcgtgcgattctgtgtctg".to_string()
+        );
+        assert_eq!(rv1096_diff.mutations[1].mutation, "t-18c".to_string());
+    }
 }

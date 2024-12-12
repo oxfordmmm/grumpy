@@ -292,7 +292,7 @@ impl VCFFile {
         let (record_calls, record_minor_calls) =
             VCFFile::parse_record_for_calls(row.clone(), min_dp, vcf_row_index);
 
-        // if record.position == 1474466{
+        // if record.position == 1224298 {
         //     println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
         //     for call in record_calls.iter(){
         //         println!("{:?}\n", call);
@@ -636,7 +636,17 @@ impl VCFFile {
             let a = _x.chars().nth(i - offset).unwrap();
             if r != 'N' && a != 'N' && r != a {
                 if _indel_type == AltType::DEL {
-                    calls.push(((i - offset) as i64, AltType::SNP, a.to_string()));
+                    if indel_left > 0 {
+                        // We have some deletion ahead of this positon, so it doesn't need to be adjusted
+                        calls.push(((i - offset) as i64, AltType::SNP, a.to_string()));
+                    } else {
+                        // We've passed the deletion, so adjust the offset to account for the deletion
+                        calls.push((
+                            (i - offset + length as usize) as i64,
+                            AltType::SNP,
+                            a.to_string(),
+                        ));
+                    }
                 } else {
                     calls.push(((i - offset) as i64, AltType::SNP, r.to_string()));
                 }
@@ -774,6 +784,22 @@ mod tests {
         assert_eq!(
             VCFFile::simplify_call("ACGT".to_string(), "ACGAGT".to_string()),
             vec![(2, AltType::INS, "AG".to_string()),]
+        );
+
+        assert_eq!(
+            VCFFile::simplify_call(
+                "AGTGCGCCTCCCGCGAGCAGACACAGAATCGCACTGCGCCGGCCCGGCGCGTGCGATTCTGTGTCTGCTT"
+                    .to_string(),
+                "AGCTC".to_string()
+            ),
+            vec![
+                (
+                    2,
+                    AltType::DEL,
+                    "TGCGCCTCCCGCGAGCAGACACAGAATCGCACTGCGCCGGCCCGGCGCGTGCGATTCTGTGTCTG".to_string()
+                ),
+                (69, AltType::SNP, "C".to_string()),
+            ]
         );
     }
 
