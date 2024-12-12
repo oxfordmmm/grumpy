@@ -377,7 +377,9 @@ impl Genome {
             let gene = self.build_gene(gene_name.clone());
             self.genes.insert(gene_name.clone(), gene);
         }
-        return self.genes.get(&gene_name).unwrap().clone();
+
+        // I hate implicit returns, but appease clippy
+        self.genes.get(&gene_name).unwrap().clone()
     }
 
     /// Get the data at a given genome index
