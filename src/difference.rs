@@ -745,19 +745,16 @@ impl GeneDifference {
                             for (nc, cov, frs, ev) in minor_snps.iter() {
                                 codon += &nc.to_string();
                                 // Evidence is the only field which is None in the case of no minor SNP at this nc
-                                match ev {
-                                    Some(e) => {
-                                        for e in e.iter() {
-                                            minor_evidence.push(e.clone());
-                                        }
-                                        if cov.is_some() && cov.unwrap() > minor_cov {
-                                            minor_cov = cov.unwrap();
-                                        }
-                                        if frs.is_some() && frs.unwrap() > minor_frs {
-                                            minor_frs = frs.unwrap();
-                                        }
+                                if let Some(e) = ev {
+                                    for e in e.iter() {
+                                        minor_evidence.push(e.clone());
                                     }
-                                    None => {}
+                                    if cov.is_some() && cov.unwrap() > minor_cov {
+                                        minor_cov = cov.unwrap();
+                                    }
+                                    if frs.is_some() && frs.unwrap() > minor_frs {
+                                        minor_frs = frs.unwrap();
+                                    }
                                 }
                             }
                             let aa = codon_to_aa(codon.clone());

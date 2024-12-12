@@ -36,7 +36,7 @@ fn main() {
     let mut sample = mutate(&reference, vcf);
     let sample_end = SystemTime::now();
 
-    let target_gene = "mmpL5";
+    let target_gene = "Rv1096";
 
     let genome_start = SystemTime::now();
     let mut difference = GenomeDifference::new(reference.clone(), sample.clone(), MinorType::COV);
