@@ -4763,7 +4763,6 @@ mod tests {
         );
         assert_eq!(rv1096_diff.mutations[1].mutation, "t-18c".to_string());
 
-
         // Single VCF row should give a large deletion crossing a gene boundary of a revcomp gene
         // while giving a minor call for a SNP at the first position of the deletion
         // It doesn't look like the first position, but revcomp puts the end of the deletion at the start
