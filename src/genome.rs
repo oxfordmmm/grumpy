@@ -4739,14 +4739,17 @@ mod tests {
 
         let diff = GenomeDifference::new(genome.clone(), sample.clone(), MinorType::COV);
 
+        // Looks odd with the first deletions, but it lies in 2 genes so is duplicated in the variants
         let expected_variants = [
+            "178453_del_ccgccattgggattcatctcgttgccgatcaagatgaaattgagctggctggggctgggagcgttgggacccagcgagatgaggtgctgcatttccagggacgcgatgacggcgctctgcgaatagccgaacacggtgacgtggtttccggcgttgatttgctcccaaatcgcgccgtcgagaatctgtaggcccaactgcaccgaggtttggaagggcagggatttgacgccggtgatcggatatagctcttcgggcgtcaccagcgctttgacgaccggattcgagacgacggggtcgatgaacaaggtcgtgatggcgttgacataactcggcgtgggtatcggtgacccggtgccgcccatgatgatcgccgtattttggttgaacattggcggtagcaccgggggtgaggttggcttaaagagtccggccgtcgcctcctgcaccagcgcgctcgtgttggtggcctcggcattgacaaatgcgtttgcggccgccgccaacctctgggtgaattcgttgtgaaacgccgcaacctgtgcgctgatcgcctggaactgctggccgtacgcgccgaacagcgtggcaagggccgtggacacttcgtccgcggcagccgccgccaggccggttgtcggggccgcgacggccgccgtagcctggttgatcgccgagccgatcccggccaaatcggtagccgccgctgccaataccgacggctgcgcgaatacgtacgacaaaccccatccctccttgtcgacggggcccataacccacccgtcgagccgatacgttgagcgtaaagcgactccgcggttgtgtctggcctttggagtgaacccaaatggggccatgctgcctcgtcattggcgaggtcggtaaacggtagtcggtggacgtcgatgccgtcgggaatccgttaggtgacgaggccctcgatgtttcgaacggtgtccgaggccgccgcgaggagggtgagcaattccacgccgcccgctatcgatcgtgcctaaacctacggtggccgccaggggatagccgatcgcgttgatcagattgcccgcagcgagttgcctgacgaacagttgggtggtgtacagcggcagggtggtgaccagggcgagggcgatgtccacggtgggcagcaggacggcgtagttggttgagatgatcctggcgagcgtgttcaccacctcggccggcgtcggtgcggcggccaccgcggccaccagatcggcgggttgcggcagctggatctgcgggagcgtgagcggttgcgcggacagcgcctgcaggtcggccgtgaagtcaaggatgccttcttgtgttccggcggccagggcatcggcgatgacctgaggcggcacgttcggccacagcccgaacggcgttcgcacatcggcgtagctcgtcgagtagccgtagttcgggtcgccgtagcccaggttgacgatcaccttcaggttcggctggatcaggtcggccagcggatctccgatgaccggcaccgcccgcagcggttgcagcagcggccgattctcggtgcggatgatgtagtagtcggtgacccccgtatagcccggcgacgtcggtaatttagtagcgccctcgacctgcgcgggcgtgaggtccaaatacttggtgtgtacgaatgtgatgcctgcaaccgcgttgaggtcggaaatgaagttgagcgggtatcgcgagaagtcggcgaacccgtcgtactcgagcgtgtagatggccgtcggatagatcgtgtccgagggcgtt",
+            "178453_del_ccgccattgggattcatctcgttgccgatcaagatgaaattgagctggctggggctgggagcgttgggacccagcgagatgaggtgctgcatttccagggacgcgatgacggcgctctgcgaatagccgaacacggtgacgtggtttccggcgttgatttgctcccaaatcgcgccgtcgagaatctgtaggcccaactgcaccgaggtttggaagggcagggatttgacgccggtgatcggatatagctcttcgggcgtcaccagcgctttgacgaccggattcgagacgacggggtcgatgaacaaggtcgtgatggcgttgacataactcggcgtgggtatcggtgacccggtgccgcccatgatgatcgccgtattttggttgaacattggcggtagcaccgggggtgaggttggcttaaagagtccggccgtcgcctcctgcaccagcgcgctcgtgttggtggcctcggcattgacaaatgcgtttgcggccgccgccaacctctgggtgaattcgttgtgaaacgccgcaacctgtgcgctgatcgcctggaactgctggccgtacgcgccgaacagcgtggcaagggccgtggacacttcgtccgcggcagccgccgccaggccggttgtcggggccgcgacggccgccgtagcctggttgatcgccgagccgatcccggccaaatcggtagccgccgctgccaataccgacggctgcgcgaatacgtacgacaaaccccatccctccttgtcgacggggcccataacccacccgtcgagccgatacgttgagcgtaaagcgactccgcggttgtgtctggcctttggagtgaacccaaatggggccatgctgcctcgtcattggcgaggtcggtaaacggtagtcggtggacgtcgatgccgtcgggaatccgttaggtgacgaggccctcgatgtttcgaacggtgtccgaggccgccgcgaggagggtgagcaattccacgccgcccgctatcgatcgtgcctaaacctacggtggccgccaggggatagccgatcgcgttgatcagattgcccgcagcgagttgcctgacgaacagttgggtggtgtacagcggcagggtggtgaccagggcgagggcgatgtccacggtgggcagcaggacggcgtagttggttgagatgatcctggcgagcgtgttcaccacctcggccggcgtcggtgcggcggccaccgcggccaccagatcggcgggttgcggcagctggatctgcgggagcgtgagcggttgcgcggacagcgcctgcaggtcggccgtgaagtcaaggatgccttcttgtgttccggcggccagggcatcggcgatgacctgaggcggcacgttcggccacagcccgaacggcgttcgcacatcggcgtagctcgtcgagtagccgtagttcgggtcgccgtagcccaggttgacgatcaccttcaggttcggctggatcaggtcggccagcggatctccgatgaccggcaccgcccgcagcggttgcagcagcggccgattctcggtgcggatgatgtagtagtcggtgacccccgtatagcccggcgacgtcggtaatttagtagcgccctcgacctgcgcgggcgtgaggtccaaatacttggtgtgtacgaatgtgatgcctgcaaccgcgttgaggtcggaaatgaagttgagcgggtatcgcgagaagtcggcgaacccgtcgtactcgagcgtgtagatggccgtcggatagatcgtgtccgagggcgtt",
             "1224300_del_tgcgcctcccgcgagcagacacagaatcgcactgcgccggcccggcgcgtgcgattctgtgtctg",
-            "1224367t>c",
+            "1224367t>c"
         ];
         for (idx, variant) in diff.variants.iter().enumerate() {
             assert_eq!(variant.variant, expected_variants[idx]);
         }
-        assert_eq!(diff.minor_variants.len(), 0);
+        assert_eq!(diff.minor_variants[0].variant, "178453c>g:3".to_string());
 
         let rv1096_diff = GeneDifference::new(
             genome.get_gene("Rv1096".to_string()),
@@ -4759,5 +4762,20 @@ mod tests {
             "-85_del_tgcgcctcccgcgagcagacacagaatcgcactgcgccggcccggcgcgtgcgattctgtgtctg".to_string()
         );
         assert_eq!(rv1096_diff.mutations[1].mutation, "t-18c".to_string());
+
+
+        // Single VCF row should give a large deletion crossing a gene boundary of a revcomp gene
+        // while giving a minor call for a SNP at the first position of the deletion
+        // It doesn't look like the first position, but revcomp puts the end of the deletion at the start
+        let pe1_diff = GeneDifference::new(
+            genome.get_gene("PE1".to_string()),
+            sample.get_gene("PE1".to_string()),
+            MinorType::COV,
+        );
+        assert_eq!(pe1_diff.mutations.len(), 1);
+        assert_eq!(pe1_diff.minor_mutations.len(), 1);
+
+        assert_eq!(pe1_diff.mutations[0].mutation, "-9_del_cgaggcagcatggccccatttgggttcactccaaaggccagacacaaccgcggagtcgctttacgctcaacgtatcggctcgacgggtgggttatgggccccgtcgacaaggagggatggggtttgtcgtacgtattcgcgcagccgtcggtattggcagcggcggctaccgatttggccgggatcggctcggcgatcaaccaggctacggcggccgtcgcggccccgacaaccggcctggcggcggctgccgcggacgaagtgtccacggcccttgccacgctgttcggcgcgtacggccagcagttccaggcgatcagcgcacaggttgcggcgtttcacaacgaattcacccagaggttggcggcggccgcaaacgcatttgtcaatgccgaggccaccaacacgagcgcgctggtgcaggaggcgacggccggactctttaagccaacctcacccccggtgctaccgccaatgttcaaccaaaatacggcgatcatcatgggcggcaccgggtcaccgatacccacgccgagttatgtcaacgccatcacgaccttgttcatcgaccccgtcgtctcgaatccggtcgtcaaagcgctggtgacgcccgaagagctatatccgatcaccggcgtcaaatccctgcccttccaaacctcggtgcagttgggcctacagattctcgacggcgcgatttgggagcaaatcaacgccggaaaccacgtcaccgtgttcggctattcgcagagcgccgtcatcgcgtccctggaaatgcagcacctcatctcgctgggtcccaacgctcccagccccagccagctcaatttcatcttgatcggcaacgagatgaatcccaatggcg".to_string());
+        assert_eq!(pe1_diff.minor_mutations[0].mutation, "G286A:3".to_string());
     }
 }
