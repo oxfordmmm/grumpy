@@ -292,7 +292,7 @@ impl VCFFile {
         let (record_calls, record_minor_calls) =
             VCFFile::parse_record_for_calls(row.clone(), min_dp, vcf_row_index);
 
-        // if record.position == 1224298 {
+        // if record.position == 178452 {
         //     println!("{:?}\t{:?}\t{:?}\t{:?}\t{:?}", record.position, String::from_utf8_lossy(&record.reference), alts, filters, fields);
         //     for call in record_calls.iter(){
         //         println!("{:?}\n", call);
