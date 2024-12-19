@@ -249,6 +249,7 @@ impl Gene {
                     let fixed_alts = genome_positions[*pos]
                         .alts
                         .iter()
+                        .filter(|x| x.alt_type == AltType::INS && x.evidence.is_minor == *is_minor)
                         .map(|x| Gene::rev_comp_indel_alt(x, i64::MAX))
                         .collect::<Vec<Alt>>();
 
@@ -256,7 +257,7 @@ impl Gene {
                     fixed_genome_positions[*pos].alts = genome_positions[*pos]
                         .alts
                         .iter()
-                        .filter(|x| x.alt_type != AltType::INS && x.evidence.is_minor == *is_minor)
+                        .filter(|x| x.alt_type != AltType::INS && x.evidence.is_minor != *is_minor)
                         .cloned()
                         .collect::<Vec<Alt>>();
 
@@ -280,6 +281,7 @@ impl Gene {
                     let fixed_alts = genome_positions[*pos]
                         .alts
                         .iter()
+                        .filter(|x| x.alt_type == AltType::DEL && x.evidence.is_minor == *is_minor)
                         .map(|x| Gene::rev_comp_indel_alt(x, _max_del_length))
                         .collect::<Vec<Alt>>();
 
@@ -287,7 +289,7 @@ impl Gene {
                     fixed_genome_positions[*pos].alts = genome_positions[*pos]
                         .alts
                         .iter()
-                        .filter(|x| x.alt_type != AltType::DEL && x.evidence.is_minor == *is_minor)
+                        .filter(|x| x.alt_type != AltType::DEL && x.evidence.is_minor != *is_minor)
                         .cloned()
                         .collect::<Vec<Alt>>();
 
