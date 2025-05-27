@@ -965,6 +965,7 @@ mod tests {
             },
             VCFRow {
                 // 8
+                // Ambiguous filter fail (filter was null), so row is ignored for calls
                 position: 13333,
                 reference: "c".to_string(),
                 alternative: vec!["a".to_string(), "g".to_string()],
@@ -983,6 +984,7 @@ mod tests {
             VCFRow {
                 // 9
                 // Edge case of using `RO` and `AO` for coverage
+                // Fails on a nulling filter, so gets a null call
                 position: 13335,
                 reference: "t".to_string(),
                 alternative: vec!["a".to_string()],
@@ -1000,6 +1002,7 @@ mod tests {
             VCFRow {
                 // 10
                 // Odd edge case which is a valid VCF row where it's a het GT but single COV value
+                // Ambiguous filter fail (filter was null), so row is ignored for calls
                 position: 13336,
                 reference: "c".to_string(),
                 alternative: vec!["a".to_string()],
@@ -1014,7 +1017,7 @@ mod tests {
             },
             VCFRow {
                 // 11
-                // Null call by virtue of failing specific filter
+                // Null call by virtue of failing specific filter. Gets null call
                 position: 14000,
                 reference: "c".to_string(),
                 alternative: vec!["a".to_string()],
