@@ -1,6 +1,6 @@
 [package]
 name = "grumpy"
-version = "0.2.6"
+version = "0.2.7"
 edition = "2021"
 description = "Genetic analysis in Rust."
 license-file = "LICENSE"
@@ -13,7 +13,7 @@ gb-io = "0.7.1"
 ordered-float = "4.2.1"
 string_cache = "0.8.7"
 vcf = "0.6.1"
-pyo3 = { version = "0.22.1", features = ["extension-module"] }
+pyo3 = { version = "0.25.0", features = ["extension-module"] }
 pretty_assertions = "1.4.0"
 rayon = "1.10.0"
 
