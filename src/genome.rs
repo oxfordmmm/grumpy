@@ -962,7 +962,74 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
-            }, // Latter rows omitted as are all filter fails
+            },
+            VCFRow {
+                // 8
+                // Ambiguous filter fail (filter was null), so row is ignored for calls
+                position: 13333,
+                reference: "c".to_string(),
+                alternative: vec!["a".to_string(), "g".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/2".to_string()]),
+                    ("DP".to_string(), vec!["100".to_string()]),
+                    (
+                        "COV".to_string(),
+                        vec!["2".to_string(), "50".to_string(), "48".to_string()],
+                    ),
+                    ("GT_CONF".to_string(), vec!["613".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+            VCFRow {
+                // 9
+                // Edge case of using `RO` and `AO` for coverage
+                // Fails on a nulling filter, so gets a null call
+                position: 13335,
+                reference: "t".to_string(),
+                alternative: vec!["a".to_string()],
+                filter: vec!["MAX_DP".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["68".to_string()]),
+                    ("RO".to_string(), vec!["66".to_string()]),
+                    ("AO".to_string(), vec!["2".to_string()]),
+                    ("COV".to_string(), vec!["66".to_string(), "2".to_string()]),
+                    ("GT_CONF".to_string(), vec!["3.77".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+            VCFRow {
+                // 10
+                // Odd edge case which is a valid VCF row where it's a het GT but single COV value
+                // Ambiguous filter fail (filter was null), so row is ignored for calls
+                position: 13336,
+                reference: "c".to_string(),
+                alternative: vec!["a".to_string()],
+                filter: vec![],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["0/1".to_string()]),
+                    ("DP".to_string(), vec!["50".to_string()]),
+                    ("COV".to_string(), vec!["50".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
+            VCFRow {
+                // 11
+                // Null call by virtue of failing specific filter. Gets null call
+                position: 14000,
+                reference: "c".to_string(),
+                alternative: vec!["a".to_string()],
+                filter: vec!["MIN_QUAL".to_string(), "MIN_FRS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["50".to_string()]),
+                    ("COV".to_string(), vec!["50".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
         ];
 
         for (idx, row) in expected_vcf_rows.iter().enumerate() {
@@ -1034,6 +1101,28 @@ mod tests {
                 indel_nucleotides: None,
                 gene_position: Some(4295),
                 codon_idx: Some(2),
+                gene_name: Some("orf1ab".to_string()),
+            },
+            Variant {
+                variant: "13335c>x".to_string(),
+                nucleotide_index: 13335,
+                evidence: 9,
+                vcf_idx: Some(1),
+                indel_length: 0,
+                indel_nucleotides: None,
+                gene_position: Some(4357),
+                codon_idx: Some(1),
+                gene_name: Some("orf1ab".to_string()),
+            },
+            Variant {
+                variant: "14000t>x".to_string(),
+                nucleotide_index: 14000,
+                evidence: 11,
+                vcf_idx: None,
+                indel_length: 0,
+                indel_nucleotides: None,
+                gene_position: Some(4579),
+                codon_idx: Some(1),
                 gene_name: Some("orf1ab".to_string()),
             },
         ];
@@ -1232,6 +1321,58 @@ mod tests {
                 indel_length: None,
                 indel_nucleotides: None,
                 amino_acid_number: Some(4295),
+                amino_acid_sequence: Some('X'),
+            },
+            Mutation {
+                mutation: "A4357X".to_string(),
+                gene: "orf1ab".to_string(),
+                evidence: vec![Evidence {
+                    cov: Some(2),
+                    frs: Some(ordered_float::OrderedFloat(0.029411765)),
+                    genotype: "1/1".to_string(),
+                    call_type: AltType::NULL,
+                    vcf_row: 9,
+                    reference: "t".to_string(),
+                    alt: "x".to_string(),
+                    genome_index: 13335,
+                    is_minor: false,
+                    vcf_idx: Some(1),
+                }],
+                gene_position: Some(4357),
+                codes_protein: Some(true),
+                ref_nucleotides: Some("gct".to_string()),
+                alt_nucleotides: Some("gxt".to_string()),
+                nucleotide_number: None,
+                nucleotide_index: None,
+                indel_length: None,
+                indel_nucleotides: None,
+                amino_acid_number: Some(4357),
+                amino_acid_sequence: Some('X'),
+            },
+            Mutation {
+                mutation: "L4579X".to_string(),
+                gene: "orf1ab".to_string(),
+                evidence: vec![Evidence {
+                    cov: Some(0),
+                    frs: Some(ordered_float::OrderedFloat(0.0)),
+                    genotype: "1/1".to_string(),
+                    call_type: AltType::NULL,
+                    vcf_row: 11,
+                    reference: "c".to_string(),
+                    alt: "x".to_string(),
+                    genome_index: 14000,
+                    is_minor: false,
+                    vcf_idx: None,
+                }],
+                gene_position: Some(4579),
+                codes_protein: Some(true),
+                ref_nucleotides: Some("tta".to_string()),
+                alt_nucleotides: Some("txa".to_string()),
+                nucleotide_number: None,
+                nucleotide_index: None,
+                indel_length: None,
+                indel_nucleotides: None,
+                amino_acid_number: Some(4579),
                 amino_acid_sequence: Some('X'),
             },
         ];

@@ -10,6 +10,16 @@ use vcf::{VCFReader, VCFRecord};
 
 use crate::common::{AltType, Evidence, VCFRow};
 
+const NULL_FILTERS: [&str; 7] = [
+    "MIN_QUAL",
+    "MIN_MQ",
+    "MIN_VDB",
+    "MIN_HQ_DP",
+    "STRAND_BIAS",
+    "STRAND_MISMATCH",
+    "SNP_SUPPORT_IN_VCF",
+];
+
 #[pyclass]
 /// Dummy struct for wrapping VCFRecord
 ///
@@ -93,33 +103,7 @@ impl VCFFile {
             records.push(record.clone());
             for call in record_calls.iter() {
                 let mut added = false;
-                if call.call_type == AltType::NULL {
-                    // Null calls need some nudging...
-                    if passed || ignore_filter {
-                        added = true;
-                    } else if !passed {
-                        // Not passed filter, so check if all filters are in allowed filters
-                        let allowed_filters = [
-                            "MIN_FRS".to_string(),
-                            "MIN_DP".to_string(),
-                            "MIN_GCP".to_string(),
-                            "NO_DATA".to_string(),
-                        ];
-                        let mut all_allowed = true;
-                        for f in record.filter.iter() {
-                            if !allowed_filters.contains(f) {
-                                all_allowed = false;
-                                break;
-                            }
-                        }
-                        if all_allowed {
-                            added = true;
-                        }
-                    } else {
-                        // Skip this call as it's a null call with extra filter fails
-                        continue;
-                    }
-                } else if ignore_filter || passed {
+                if call.call_type == AltType::NULL || ignore_filter || passed {
                     added = true;
                 }
 
@@ -160,6 +144,10 @@ impl VCFFile {
                     "MIN_FRS".to_string(),
                     "MIN_DP".to_string(),
                     "MIN_GCP".to_string(),
+                    // ONT specific
+                    "MIN_IDV".to_string(),
+                    "MIN_IMF".to_string(),
+                    "OVERLAP_BETTER_VARIANT".to_string(),
                 ];
                 // Auto-ignore if no filters are present (i.e filter = "." which is fail)
                 let mut all_allowed = !record.filter.is_empty();
@@ -345,6 +333,27 @@ impl VCFFile {
         let mut alt_allele = "".to_string();
 
         let mut call_type = AltType::NULL;
+
+        // Check the filters to see if we need to override the parsing to a null call
+        for filter in record.filter.iter() {
+            // Doesn't matter what else is happening in this record if the filter
+            // is a filter we want to null
+            if NULL_FILTERS.contains(&filter.as_str()) {
+                calls.push(Evidence {
+                    cov: Some(0),
+                    frs: Some(ordered_float::OrderedFloat(0.0)),
+                    genotype: genotype.join("/"),
+                    call_type: AltType::NULL,
+                    vcf_row: vcf_row_index,
+                    reference: ref_allele.chars().nth(0).unwrap().to_string(),
+                    alt: "x".to_string(),
+                    genome_index: record.position,
+                    is_minor: false,
+                    vcf_idx: None,
+                });
+                return (calls, minor_calls);
+            }
+        }
 
         // println!(
         //     "{:?}\t{:?}\t{:?}\t{:?}\t{:?}",
@@ -1312,6 +1321,20 @@ mod tests {
                 ]),
                 is_filter_pass: false,
             },
+            VCFRow {
+                // Null call by virtue of failing specific filter
+                position: 14000,
+                reference: "c".to_string(),
+                alternative: vec!["a".to_string()],
+                filter: vec!["MIN_QUAL".to_string(), "MIN_FRS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["50".to_string()]),
+                    ("COV".to_string(), vec!["50".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613".to_string()]),
+                ]),
+                is_filter_pass: false,
+            },
         ];
         for (idx, record) in expected_records.iter().enumerate() {
             assert_eq!(record.position, vcf.records[idx].position);
@@ -1392,6 +1415,32 @@ mod tests {
                 reference: "a".to_string(),
                 alt: "x".to_string(),
                 genome_index: 13150,
+                is_minor: false,
+                vcf_idx: None,
+            }],
+            // Null call ignoring filter fails
+            vec![Evidence {
+                cov: Some(2),
+                frs: Some(ordered_float::OrderedFloat(0.029411765)),
+                genotype: "1/1".to_string(),
+                call_type: AltType::NULL,
+                vcf_row: 9,
+                reference: "t".to_string(),
+                alt: "x".to_string(),
+                genome_index: 13335,
+                is_minor: false,
+                vcf_idx: Some(1),
+            }],
+            // Null call caused by specific filter fail
+            vec![Evidence {
+                cov: Some(0),
+                frs: Some(ordered_float::OrderedFloat(0.0)),
+                genotype: "1/1".to_string(),
+                call_type: AltType::NULL,
+                vcf_row: 11,
+                reference: "c".to_string(),
+                alt: "x".to_string(),
+                genome_index: 14000,
                 is_minor: false,
                 vcf_idx: None,
             }],
