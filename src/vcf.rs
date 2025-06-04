@@ -266,6 +266,8 @@ impl VCFFile {
             passed = true;
         }
 
+        let is_complex = record.reference.len() > 1000 && alts.len() > 1;
+
         let row = VCFRow {
             position: record.position as i64,
             reference: String::from_utf8_lossy(&record.reference)
@@ -275,6 +277,7 @@ impl VCFFile {
             filter: filters.clone(),
             fields: fields.clone(),
             is_filter_pass: passed,
+            is_complex,
         };
 
         let (record_calls, record_minor_calls) =
@@ -334,9 +337,6 @@ impl VCFFile {
 
         let mut call_type = AltType::NULL;
 
-        // Check if the VCF row is complex
-        let vcf_is_complex = record.alternative.len() > 1 && record.reference.len() > 1000;
-
         // Check the filters to see if we need to override the parsing to a null call
         for filter in record.filter.iter() {
             // Doesn't matter what else is happening in this record if the filter
@@ -353,7 +353,6 @@ impl VCFFile {
                     genome_index: record.position,
                     is_minor: false,
                     vcf_idx: None,
-                    vcf_is_complex,
                 });
                 return (calls, minor_calls);
             }
@@ -397,7 +396,6 @@ impl VCFFile {
                 genome_index: record.position,
                 is_minor: false,
                 vcf_idx,
-                vcf_is_complex,
             });
             return (calls, minor_calls);
         }
@@ -454,7 +452,6 @@ impl VCFFile {
                     genome_index: record.position + offset,
                     is_minor: false,
                     vcf_idx: Some((alt_idx + 1) as i64),
-                    vcf_is_complex,
                 });
             }
         } else {
@@ -491,7 +488,6 @@ impl VCFFile {
                     genome_index: record.position + offset as i64,
                     is_minor: false,
                     vcf_idx,
-                    vcf_is_complex,
                 });
             }
         }
@@ -535,7 +531,6 @@ impl VCFFile {
                         genome_index: record.position + offset,
                         is_minor: true,
                         vcf_idx: Some(idx as i64),
-                        vcf_is_complex,
                     });
                 }
             }
@@ -839,6 +834,7 @@ mod tests {
                     ("COV".to_string(), vec!["1".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             };
             let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 1, 0);
             assert_eq!(calls.len(), 1);
@@ -866,6 +862,7 @@ mod tests {
                     ("COV".to_string(), vec!["1".to_string(), "2".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             };
             let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 1, 0);
             assert_eq!(calls.len(), 1);
@@ -893,6 +890,7 @@ mod tests {
                     ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             };
             let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 2, 0);
             assert_eq!(calls.len(), 1);
@@ -932,6 +930,7 @@ mod tests {
                     ("COV".to_string(), vec!["1".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             };
             let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 2, 0);
             assert_eq!(calls.len(), 1);
@@ -959,6 +958,7 @@ mod tests {
                     ("COV".to_string(), vec!["1".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             };
             let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 1, 0);
             assert_eq!(calls.len(), 1);
@@ -986,6 +986,7 @@ mod tests {
                     ("COV".to_string(), vec!["1".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             };
             let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 2, 0);
             assert_eq!(calls.len(), 1);
@@ -1013,6 +1014,7 @@ mod tests {
                     ("COV".to_string(), vec!["1".to_string(), "5".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             };
             let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 3, 123);
             assert_eq!(calls.len(), 1);
@@ -1040,6 +1042,7 @@ mod tests {
                     ("COV".to_string(), vec!["1".to_string(), "5".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             };
             let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 3, 0);
             assert_eq!(calls.len(), 1);
@@ -1067,6 +1070,7 @@ mod tests {
                     ("COV".to_string(), vec!["1".to_string(), "5".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             };
             let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 3, 0);
             assert_eq!(calls.len(), 2);
@@ -1106,6 +1110,7 @@ mod tests {
                     ),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             };
             let (calls, minor_calls) = VCFFile::parse_record_for_calls(record, 3, 0);
             assert_eq!(calls.len(), 2);
@@ -1188,6 +1193,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 position: 4725,
@@ -1201,6 +1207,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 position: 4730,
@@ -1217,6 +1224,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 position: 4735,
@@ -1230,6 +1238,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["63.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 position: 4740,
@@ -1243,6 +1252,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["63.77".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 position: 13148,
@@ -1256,6 +1266,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 position: 13149,
@@ -1269,6 +1280,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 position: 13150,
@@ -1282,6 +1294,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 position: 13333,
@@ -1298,6 +1311,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // Edge case of using `RO` and `AO` for coverage
@@ -1314,6 +1328,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["3.77".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // Odd edge case which is a valid VCF row where it's a het GT but single COV value
@@ -1328,6 +1343,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // Null call by virtue of failing specific filter
@@ -1342,6 +1358,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
         ];
         for (idx, record) in expected_records.iter().enumerate() {
@@ -1365,7 +1382,6 @@ mod tests {
                 genome_index: 4687,
                 is_minor: false,
                 vcf_idx: Some(1),
-                vcf_is_complex: false,
             }],
             vec![Evidence {
                 cov: None,
@@ -1378,7 +1394,6 @@ mod tests {
                 genome_index: 4730,
                 is_minor: false,
                 vcf_idx: None,
-                vcf_is_complex: false,
             }],
             vec![Evidence {
                 cov: Some(68),
@@ -1391,7 +1406,6 @@ mod tests {
                 genome_index: 4735,
                 is_minor: false,
                 vcf_idx: Some(1),
-                vcf_is_complex: false,
             }],
             vec![Evidence {
                 cov: None,
@@ -1404,7 +1418,6 @@ mod tests {
                 genome_index: 13148,
                 is_minor: false,
                 vcf_idx: None,
-                vcf_is_complex: false,
             }],
             vec![Evidence {
                 cov: None,
@@ -1417,7 +1430,6 @@ mod tests {
                 genome_index: 13149,
                 is_minor: false,
                 vcf_idx: None,
-                vcf_is_complex: false,
             }],
             vec![Evidence {
                 cov: None,
@@ -1430,7 +1442,6 @@ mod tests {
                 genome_index: 13150,
                 is_minor: false,
                 vcf_idx: None,
-                vcf_is_complex: false,
             }],
             // Null call ignoring filter fails
             vec![Evidence {
@@ -1444,7 +1455,6 @@ mod tests {
                 genome_index: 13335,
                 is_minor: false,
                 vcf_idx: Some(1),
-                vcf_is_complex: false,
             }],
             // Null call caused by specific filter fail
             vec![Evidence {
@@ -1458,7 +1468,6 @@ mod tests {
                 genome_index: 14000,
                 is_minor: false,
                 vcf_idx: None,
-                vcf_is_complex: false,
             }],
         ];
 
@@ -1491,7 +1500,6 @@ mod tests {
                 genome_index: 4730,
                 is_minor: true,
                 vcf_idx: Some(1),
-                vcf_is_complex: false,
             },
             Evidence {
                 cov: Some(100),
@@ -1504,7 +1512,6 @@ mod tests {
                 genome_index: 4730,
                 is_minor: true,
                 vcf_idx: Some(2),
-                vcf_is_complex: false,
             },
         ]];
 
@@ -1521,7 +1528,6 @@ mod tests {
                 assert_eq!(call.genome_index, actual[idx].genome_index);
                 assert_eq!(call.is_minor, actual[idx].is_minor);
                 assert_eq!(call.vcf_idx, actual[idx].vcf_idx);
-                assert_eq!(call.vcf_is_complex, actual[idx].vcf_is_complex);
             }
         }
     }
@@ -1535,118 +1541,70 @@ mod tests {
         // Ref of length 1001 with 1 alt at 5730
         // Ref of length 1001 with 2 alts at 7030 <-- this is the complex row
 
-        // We don't really care about the VCFRows here, it's just the calls which have the flag
         let vcf = VCFFile::new("test/complex.vcf".to_string(), false, 3);
 
-        let expected_calls = [
-            vec![Evidence {
-                cov: Some(68),
-                frs: Some(ordered_float::OrderedFloat(1.0)),
-                genotype: "1/1".to_string(),
-                call_type: AltType::SNP,
-                vcf_row: 0,
+        let expected_records = vec![
+            VCFRow {
+                position: 4687,
                 reference: "t".to_string(),
-                alt: "c".to_string(),
-                genome_index: 4687,
-                is_minor: false,
-                vcf_idx: Some(1),
-                vcf_is_complex: false,
-            }],
-            vec![Evidence {
-                cov: Some(99),
-                frs: Some(ordered_float::OrderedFloat(0.495)),
-                genotype: "1/1".to_string(),
-                call_type: AltType::SNP,
-                vcf_row: 1,
-                reference: "a".to_string(),
-                alt: "t".to_string(),
-                genome_index: 4730,
-                is_minor: false,
-                vcf_idx: Some(1),
-                vcf_is_complex: false,
-            }],
-            vec![Evidence {
-                cov: Some(99),
-                frs: Some(ordered_float::OrderedFloat(0.495)),
-                genotype: "1/1".to_string(),
-                call_type: AltType::DEL,
-                vcf_row: 2,
+                alternative: vec!["c".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["68".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "68".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
+                ]),
+                is_filter_pass: true,is_complex: false,
+            },
+            VCFRow {
+                position: 4730,
                 reference: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
-                alt: "t".to_string(),
-                genome_index: 4731,
-                is_minor: false,
-                vcf_idx: Some(1),
-                vcf_is_complex: false,
-            }],
-            vec![Evidence {
-                cov: Some(99),
-                frs: Some(ordered_float::OrderedFloat(0.99)),
-                genotype: "1/1".to_string(),
-                call_type: AltType::SNP,
-                vcf_row: 2,
-                reference: "a".to_string(),
-                alt: "t".to_string(),
-                genome_index: 5730,
-                is_minor: false,
-                vcf_idx: Some(1),
-                vcf_is_complex: false,
-            }],
-            vec![Evidence {
-                cov: Some(99),
-                frs: Some(ordered_float::OrderedFloat(0.99)),
-                genotype: "1/1".to_string(),
-                call_type: AltType::DEL,
-                vcf_row: 2,
+                alternative: vec!["t".to_string(), "g".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["200".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "99".to_string(), "100".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
+                ]),
+                is_filter_pass: true,is_complex: false,
+            },
+            VCFRow {
+                position: 5730,
                 reference: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
-                alt: "t".to_string(),
-                genome_index: 5731,
-                is_minor: false,
-                vcf_idx: Some(1),
-                vcf_is_complex: false,
-            }],
-            vec![Evidence {
-                cov: Some(100),
-                frs: Some(ordered_float::OrderedFloat(0.5)),
-                genotype: "2/2".to_string(),
-                call_type: AltType::SNP,
-                vcf_row: 3,
-                reference: "a".to_string(),
-                alt: "t".to_string(),
-                genome_index: 7030,
-                is_minor: false,
-                vcf_idx: Some(1),
-                vcf_is_complex: true,
-            }],
-            vec![Evidence {
-                cov: Some(100),
-                frs: Some(ordered_float::OrderedFloat(0.5)),
-                genotype: "2/2".to_string(),
-                call_type: AltType::DEL,
-                vcf_row: 3,
+                alternative: vec!["t".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["200".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "99".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
+                ]),
+                is_filter_pass: true,is_complex: false,
+            },
+            VCFRow {
+                position: 7030,
                 reference: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
-                alt: "t".to_string(),
-                genome_index: 7031,
-                is_minor: false,
-                vcf_idx: Some(1),
-                vcf_is_complex: true,
-            }]
+                alternative: vec!["t".to_string(), "g".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["2/2".to_string()]),
+                    ("DP".to_string(), vec!["200".to_string()]),
+                    ("COV".to_string(), vec!["1".to_string(), "99".to_string(), "100".to_string()]),
+                    ("GT_CONF".to_string(), vec!["613.77".to_string()]),
+                ]),
+                is_filter_pass: true,is_complex: true,
+            },
         ];
 
-        for calls in expected_calls.iter() {
-            let actual = vcf.calls.get(&calls[0].genome_index).unwrap();
-            for (idx, call) in actual.iter().enumerate() {
-                assert_eq!(call.cov, actual[idx].cov);
-                assert_eq!(call.frs, actual[idx].frs);
-                assert_eq!(call.genotype, actual[idx].genotype);
-                assert_eq!(call.call_type, actual[idx].call_type);
-                assert_eq!(call.vcf_row, actual[idx].vcf_row);
-                assert_eq!(call.reference, actual[idx].reference);
-                assert_eq!(call.alt, actual[idx].alt);
-                assert_eq!(call.genome_index, actual[idx].genome_index);
-                assert_eq!(call.is_minor, actual[idx].is_minor);
-                assert_eq!(call.vcf_idx, actual[idx].vcf_idx);
-                assert_eq!(call.vcf_is_complex, actual[idx].vcf_is_complex);
-            }
+        for (idx, record) in expected_records.iter().enumerate() {
+            assert_eq!(record.position, vcf.records[idx].position);
+            assert_eq!(record.reference, vcf.records[idx].reference);
+            assert_eq!(record.alternative, vcf.records[idx].alternative);
+            assert_eq!(record.filter, vcf.records[idx].filter);
+            assert_eq!(record.fields, vcf.records[idx].fields);
+            assert_eq!(record.is_filter_pass, vcf.records[idx].is_filter_pass);
         }
     }
 }

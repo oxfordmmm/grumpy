@@ -51,6 +51,12 @@ pub struct VCFRow {
     #[pyo3(get, set)]
     /// True if the filter column passes
     pub is_filter_pass: bool,
+
+    #[pyo3(get, set)]
+    /// Whether this VCF row is complex
+    /// Complex VCF rows are edge cases where a row has a large (>1,000) bases for the ref as well as >1 alt
+    /// This is used to flag when mutations' evidence isn't worth fetching due to size.
+    pub is_complex: bool,
 }
 
 #[pyclass(eq)]
@@ -93,12 +99,6 @@ pub struct Evidence {
     #[pyo3(get, set)]
     /// VCF row index which this call originated from
     pub vcf_row: usize,
-
-    #[pyo3(get, set)]
-    /// Whether this VCF row is complex
-    /// Complex VCF rows are edge cases where a row has a large (>1,000) bases for the ref as well as >1 alt
-    /// This is used to flag when mutations' evidence isn't worth fetching due to size.
-    pub vcf_is_complex: bool,
 
     #[pyo3(get, set)]
     /// Index of the COV field in the VCF row which this call originated from

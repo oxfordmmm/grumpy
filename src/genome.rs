@@ -861,6 +861,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 1
@@ -875,6 +876,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 2
@@ -892,6 +894,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 3
@@ -906,6 +909,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["63.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 4
@@ -920,6 +924,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["63.77".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 5
@@ -934,6 +939,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 6
@@ -948,6 +954,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 7
@@ -962,6 +969,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 8
@@ -980,6 +988,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 9
@@ -998,6 +1007,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["3.77".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 10
@@ -1014,6 +1024,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 11
@@ -1029,6 +1040,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
         ];
 
@@ -1181,7 +1193,6 @@ mod tests {
                     genome_index: 4687,
                     is_minor: false,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(4422),
                 codes_protein: Some(true),
@@ -1208,7 +1219,6 @@ mod tests {
                     genome_index: 4687,
                     is_minor: false,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(1474),
                 codes_protein: Some(true),
@@ -1235,7 +1245,6 @@ mod tests {
                     genome_index: 4730,
                     is_minor: false,
                     vcf_idx: None,
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(1489),
                 codes_protein: Some(true),
@@ -1262,7 +1271,6 @@ mod tests {
                     genome_index: 4735,
                     is_minor: false,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(4470),
                 codes_protein: Some(true),
@@ -1290,7 +1298,6 @@ mod tests {
                         is_minor: false,
                         vcf_row: 5,
                         vcf_idx: None,
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: None,
@@ -1303,7 +1310,6 @@ mod tests {
                         is_minor: false,
                         vcf_row: 6,
                         vcf_idx: None,
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: None,
@@ -1316,7 +1322,6 @@ mod tests {
                         is_minor: false,
                         vcf_row: 7,
                         vcf_idx: None,
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(4295),
@@ -1344,7 +1349,6 @@ mod tests {
                     genome_index: 13335,
                     is_minor: false,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(4357),
                 codes_protein: Some(true),
@@ -1371,7 +1375,6 @@ mod tests {
                     genome_index: 14000,
                     is_minor: false,
                     vcf_idx: None,
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(4579),
                 codes_protein: Some(true),
@@ -1410,7 +1413,6 @@ mod tests {
                     genome_index: 4730,
                     is_minor: true,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 },
                 Evidence {
                     cov: Some(100),
@@ -1423,7 +1425,6 @@ mod tests {
                     genome_index: 4730,
                     is_minor: true,
                     vcf_idx: Some(2),
-                    vcf_is_complex: false,
                 },
             ],
             gene_position: Some(1489),
@@ -1467,6 +1468,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["2.05".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 1
@@ -1488,6 +1490,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["3.77".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 2
@@ -1510,6 +1513,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["2.76".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 3
@@ -1524,6 +1528,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["200.58".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 4
@@ -1541,6 +1546,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["155.58".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 5
@@ -1558,6 +1564,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["300.25".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 6
@@ -1580,6 +1587,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 7
@@ -1602,6 +1610,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 8
@@ -1624,6 +1633,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["475.54".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 9
@@ -1646,6 +1656,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["315.11".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 10
@@ -1660,6 +1671,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["145.21".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 11
@@ -1674,6 +1686,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["145.21".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 12
@@ -1688,6 +1701,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["145.21".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 13
@@ -1702,6 +1716,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["145.21".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 14
@@ -1716,6 +1731,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["145.21".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 15
@@ -1733,6 +1749,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["145.21".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
         ];
 
@@ -2446,7 +2463,6 @@ mod tests {
                     genome_index: 2,
                     is_minor: false,
                     vcf_idx: None,
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(-2),
                 codes_protein: Some(false),
@@ -2474,7 +2490,6 @@ mod tests {
                         genome_index: 4,
                         is_minor: false,
                         vcf_idx: None,
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: None,
@@ -2487,7 +2502,6 @@ mod tests {
                         genome_index: 6,
                         is_minor: false,
                         vcf_idx: None,
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(1),
@@ -2516,7 +2530,6 @@ mod tests {
                         genome_index: 7,
                         is_minor: false,
                         vcf_idx: None,
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: None,
@@ -2529,7 +2542,6 @@ mod tests {
                         genome_index: 8,
                         is_minor: false,
                         vcf_idx: None,
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(2),
@@ -2557,7 +2569,6 @@ mod tests {
                     genome_index: 12,
                     is_minor: false,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(9),
                 codes_protein: Some(true),
@@ -2584,7 +2595,6 @@ mod tests {
                     genome_index: 12,
                     is_minor: false,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(3),
                 codes_protein: Some(true),
@@ -2611,7 +2621,6 @@ mod tests {
                     genome_index: 14,
                     is_minor: false,
                     vcf_idx: Some(2),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(4),
                 codes_protein: Some(true),
@@ -2639,7 +2648,6 @@ mod tests {
                         genome_index: 16,
                         is_minor: false,
                         vcf_idx: Some(1),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(68),
@@ -2652,7 +2660,6 @@ mod tests {
                         genome_index: 17,
                         is_minor: false,
                         vcf_idx: Some(1),
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(5),
@@ -2681,7 +2688,6 @@ mod tests {
                         genome_index: 22,
                         is_minor: false,
                         vcf_idx: None,
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: None,
@@ -2694,7 +2700,6 @@ mod tests {
                         genome_index: 24,
                         is_minor: false,
                         vcf_idx: None,
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(7),
@@ -2723,7 +2728,6 @@ mod tests {
                         genome_index: 26,
                         is_minor: false,
                         vcf_idx: None,
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: None,
@@ -2736,7 +2740,6 @@ mod tests {
                         genome_index: 27,
                         is_minor: false,
                         vcf_idx: None,
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(8),
@@ -2765,7 +2768,6 @@ mod tests {
                         genome_index: 28,
                         is_minor: false,
                         vcf_idx: None,
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: None,
@@ -2778,7 +2780,6 @@ mod tests {
                         genome_index: 29,
                         is_minor: false,
                         vcf_idx: None,
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(9),
@@ -2819,7 +2820,6 @@ mod tests {
                         genome_index: 16,
                         is_minor: true,
                         vcf_idx: Some(2),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(8),
@@ -2832,7 +2832,6 @@ mod tests {
                         genome_index: 17,
                         is_minor: true,
                         vcf_idx: Some(2),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(8),
@@ -2845,7 +2844,6 @@ mod tests {
                         genome_index: 18,
                         is_minor: true,
                         vcf_idx: Some(2),
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(5),
@@ -2874,7 +2872,6 @@ mod tests {
                         genome_index: 22,
                         is_minor: true,
                         vcf_idx: Some(1),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(100),
@@ -2887,7 +2884,6 @@ mod tests {
                         genome_index: 22,
                         is_minor: true,
                         vcf_idx: Some(2),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(100),
@@ -2900,7 +2896,6 @@ mod tests {
                         genome_index: 24,
                         is_minor: true,
                         vcf_idx: Some(2),
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(7),
@@ -2929,7 +2924,6 @@ mod tests {
                         genome_index: 26,
                         is_minor: true,
                         vcf_idx: Some(1),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(50),
@@ -2942,7 +2936,6 @@ mod tests {
                         genome_index: 26,
                         is_minor: true,
                         vcf_idx: Some(2),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(48),
@@ -2955,7 +2948,6 @@ mod tests {
                         genome_index: 27,
                         is_minor: true,
                         vcf_idx: Some(1),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(50),
@@ -2968,7 +2960,6 @@ mod tests {
                         genome_index: 27,
                         is_minor: true,
                         vcf_idx: Some(2),
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(8),
@@ -2997,7 +2988,6 @@ mod tests {
                         genome_index: 29,
                         is_minor: true,
                         vcf_idx: Some(3),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(48),
@@ -3010,7 +3000,6 @@ mod tests {
                         genome_index: 29,
                         is_minor: true,
                         vcf_idx: Some(1),
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(26),
@@ -3046,7 +3035,6 @@ mod tests {
                         genome_index: 16,
                         is_minor: true,
                         vcf_idx: Some(2),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(8),
@@ -3059,7 +3047,6 @@ mod tests {
                         genome_index: 17,
                         is_minor: true,
                         vcf_idx: Some(2),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(8),
@@ -3072,7 +3059,6 @@ mod tests {
                         genome_index: 18,
                         is_minor: true,
                         vcf_idx: Some(2),
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(5),
@@ -3101,7 +3087,6 @@ mod tests {
                         genome_index: 22,
                         is_minor: true,
                         vcf_idx: Some(1),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(100),
@@ -3114,7 +3099,6 @@ mod tests {
                         genome_index: 22,
                         is_minor: true,
                         vcf_idx: Some(2),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(100),
@@ -3127,7 +3111,6 @@ mod tests {
                         genome_index: 24,
                         is_minor: true,
                         vcf_idx: Some(2),
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(7),
@@ -3156,7 +3139,6 @@ mod tests {
                         genome_index: 26,
                         is_minor: true,
                         vcf_idx: Some(1),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(50),
@@ -3169,7 +3151,6 @@ mod tests {
                         genome_index: 26,
                         is_minor: true,
                         vcf_idx: Some(2),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(48),
@@ -3182,7 +3163,6 @@ mod tests {
                         genome_index: 27,
                         is_minor: true,
                         vcf_idx: Some(1),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(50),
@@ -3195,7 +3175,6 @@ mod tests {
                         genome_index: 27,
                         is_minor: true,
                         vcf_idx: Some(2),
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(8),
@@ -3224,7 +3203,6 @@ mod tests {
                         genome_index: 29,
                         is_minor: true,
                         vcf_idx: Some(3),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(48),
@@ -3237,7 +3215,6 @@ mod tests {
                         genome_index: 29,
                         is_minor: true,
                         vcf_idx: Some(1),
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(26),
@@ -3284,7 +3261,6 @@ mod tests {
                         genome_index: 28,
                         is_minor: false,
                         vcf_idx: None,
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: None,
@@ -3297,7 +3273,6 @@ mod tests {
                         genome_index: 29,
                         is_minor: false,
                         vcf_idx: None,
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(1),
@@ -3325,7 +3300,6 @@ mod tests {
                     genome_index: 33,
                     is_minor: false,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(6),
                 codes_protein: Some(true),
@@ -3352,7 +3326,6 @@ mod tests {
                     genome_index: 39,
                     is_minor: false,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(4),
                 codes_protein: Some(true),
@@ -3379,7 +3352,6 @@ mod tests {
                     genome_index: 37,
                     is_minor: false,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(10),
                 codes_protein: Some(true),
@@ -3406,7 +3378,6 @@ mod tests {
                     genome_index: 39,
                     is_minor: false,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(12),
                 codes_protein: Some(true),
@@ -3440,7 +3411,6 @@ mod tests {
                     genome_index: 29,
                     is_minor: true,
                     vcf_idx: Some(3),
-                    vcf_is_complex: false,
                 },
                 Evidence {
                     cov: Some(48),
@@ -3453,7 +3423,6 @@ mod tests {
                     genome_index: 29,
                     is_minor: true,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 },
             ],
             gene_position: Some(2),
@@ -3503,7 +3472,7 @@ mod tests {
                     ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
                     ("GT_CONF".to_string(), vec!["2.05".to_string()]),
                 ]),
-                is_filter_pass: true,
+                is_filter_pass: true, is_complex: false,
             }
         ];
 
@@ -3568,7 +3537,7 @@ mod tests {
                     alt: "aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
                     genome_index: 3,
                     is_minor: false,
-                    vcf_idx: Some(1),vcf_is_complex: false,
+                    vcf_idx: Some(1),
                 }],
                 gene_position: Some(-1),
                 codes_protein: Some(false),
@@ -3632,7 +3601,6 @@ mod tests {
                     genome_index: 28,
                     is_minor: false,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(1),
                 codes_protein: Some(true),
@@ -3688,7 +3656,6 @@ mod tests {
                 genome_index: 94,
                 is_minor: false,
                 vcf_idx: Some(1),
-                vcf_is_complex: false,
             }],
             gene_position: Some(4),
             codes_protein: Some(true),
@@ -3731,7 +3698,7 @@ mod tests {
                     ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
                     ("GT_CONF".to_string(), vec!["2.05".to_string()]),
                 ]),
-                is_filter_pass: true,
+                is_filter_pass: true, is_complex: false,
             }
 
         ];
@@ -3797,7 +3764,7 @@ mod tests {
                     alt: "aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
                     genome_index: 3,
                     is_minor: true,
-                    vcf_idx: Some(1),vcf_is_complex: false,
+                    vcf_idx: Some(1),
                 }],
                 gene_position: Some(-1),
                 codes_protein: Some(false),
@@ -3861,7 +3828,6 @@ mod tests {
                     genome_index: 28,
                     is_minor: true,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(1),
                 codes_protein: Some(true),
@@ -3919,7 +3885,6 @@ mod tests {
                     genome_index: 28,
                     is_minor: true,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(1),
                 codes_protein: Some(true),
@@ -3975,7 +3940,6 @@ mod tests {
                 genome_index: 94,
                 is_minor: true,
                 vcf_idx: Some(1),
-                vcf_is_complex: false,
             }],
             gene_position: Some(4),
             codes_protein: Some(true),
@@ -4033,6 +3997,7 @@ mod tests {
                     ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 1
@@ -4054,6 +4019,7 @@ mod tests {
                     ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
         ];
 
@@ -4076,7 +4042,6 @@ mod tests {
                     genome_index: 2154401,
                     is_minor: true,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(1710),
                 codes_protein: Some(true),
@@ -4104,7 +4069,6 @@ mod tests {
                         genome_index: 2154397,
                         is_minor: true,
                         vcf_idx: Some(1),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(10),
@@ -4117,7 +4081,6 @@ mod tests {
                         genome_index: 2154397,
                         is_minor: true,
                         vcf_idx: Some(2),
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(572),
@@ -4184,6 +4147,7 @@ mod tests {
                     ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 1
@@ -4206,6 +4170,7 @@ mod tests {
                     ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
         ];
 
@@ -4228,7 +4193,6 @@ mod tests {
                     genome_index: 2154401,
                     is_minor: true,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(1710),
                 codes_protein: Some(true),
@@ -4256,7 +4220,6 @@ mod tests {
                         genome_index: 2154397,
                         is_minor: true,
                         vcf_idx: Some(1),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(10),
@@ -4269,7 +4232,6 @@ mod tests {
                         genome_index: 2154397,
                         is_minor: true,
                         vcf_idx: Some(2),
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(572),
@@ -4327,6 +4289,7 @@ mod tests {
                     ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 1
@@ -4348,6 +4311,7 @@ mod tests {
                     ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
         ];
 
@@ -4459,7 +4423,6 @@ mod tests {
                     genome_index: 2154401,
                     is_minor: true,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(1710),
                 codes_protein: Some(false),
@@ -4486,7 +4449,6 @@ mod tests {
                     genome_index: 2154397,
                     is_minor: true,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(1715),
                 codes_protein: Some(false),
@@ -4513,7 +4475,6 @@ mod tests {
                     genome_index: 2154397,
                     is_minor: true,
                     vcf_idx: Some(2),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(1715),
                 codes_protein: Some(false),
@@ -4556,6 +4517,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["2.05".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 1
@@ -4570,6 +4532,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["2.05".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 2
@@ -4584,6 +4547,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["2.05".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
         ];
 
@@ -4611,7 +4575,6 @@ mod tests {
                         genome_index: 6,
                         is_minor: true,
                         vcf_idx: Some(1),
-                        vcf_is_complex: false,
                     },
                     Evidence {
                         cov: Some(3),
@@ -4624,7 +4587,6 @@ mod tests {
                         genome_index: 6,
                         is_minor: true,
                         vcf_idx: Some(2),
-                        vcf_is_complex: false,
                     },
                 ],
                 gene_position: Some(3),
@@ -4652,7 +4614,6 @@ mod tests {
                     genome_index: 8,
                     is_minor: true,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(5),
                 codes_protein: Some(true),
@@ -4692,7 +4653,6 @@ mod tests {
                 genome_index: 94,
                 is_minor: true,
                 vcf_idx: Some(1),
-                vcf_is_complex: false,
             }],
             gene_position: Some(2),
             codes_protein: Some(true),
@@ -4741,7 +4701,6 @@ mod tests {
                     genome_index: 6,
                     is_minor: true,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(3),
                 codes_protein: Some(false),
@@ -4768,7 +4727,6 @@ mod tests {
                     genome_index: 6,
                     is_minor: true,
                     vcf_idx: Some(2),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(3),
                 codes_protein: Some(false),
@@ -4795,7 +4753,6 @@ mod tests {
                     genome_index: 8,
                     is_minor: true,
                     vcf_idx: Some(1),
-                    vcf_is_complex: false,
                 }],
                 gene_position: Some(5),
                 codes_protein: Some(false),
@@ -4875,7 +4832,6 @@ mod tests {
                 genome_index: 94,
                 is_minor: true,
                 vcf_idx: Some(1),
-                vcf_is_complex: false,
             },
         };
         assert_eq!(
