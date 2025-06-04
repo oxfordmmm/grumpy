@@ -334,6 +334,9 @@ impl VCFFile {
 
         let mut call_type = AltType::NULL;
 
+        // Check if the VCF row is complex
+        let vcf_is_complex = record.alternative.len() > 1 && record.reference.len() > 1000;
+
         // Check the filters to see if we need to override the parsing to a null call
         for filter in record.filter.iter() {
             // Doesn't matter what else is happening in this record if the filter
@@ -350,6 +353,7 @@ impl VCFFile {
                     genome_index: record.position,
                     is_minor: false,
                     vcf_idx: None,
+                    vcf_is_complex,
                 });
                 return (calls, minor_calls);
             }
@@ -393,6 +397,7 @@ impl VCFFile {
                 genome_index: record.position,
                 is_minor: false,
                 vcf_idx,
+                vcf_is_complex,
             });
             return (calls, minor_calls);
         }
@@ -449,6 +454,7 @@ impl VCFFile {
                     genome_index: record.position + offset,
                     is_minor: false,
                     vcf_idx: Some((alt_idx + 1) as i64),
+                    vcf_is_complex,
                 });
             }
         } else {
@@ -485,6 +491,7 @@ impl VCFFile {
                     genome_index: record.position + offset as i64,
                     is_minor: false,
                     vcf_idx,
+                    vcf_is_complex,
                 });
             }
         }
@@ -528,6 +535,7 @@ impl VCFFile {
                         genome_index: record.position + offset,
                         is_minor: true,
                         vcf_idx: Some(idx as i64),
+                        vcf_is_complex,
                     });
                 }
             }
@@ -1357,6 +1365,7 @@ mod tests {
                 genome_index: 4687,
                 is_minor: false,
                 vcf_idx: Some(1),
+                vcf_is_complex: false,
             }],
             vec![Evidence {
                 cov: None,
@@ -1369,6 +1378,7 @@ mod tests {
                 genome_index: 4730,
                 is_minor: false,
                 vcf_idx: None,
+                vcf_is_complex: false,
             }],
             vec![Evidence {
                 cov: Some(68),
@@ -1381,6 +1391,7 @@ mod tests {
                 genome_index: 4735,
                 is_minor: false,
                 vcf_idx: Some(1),
+                vcf_is_complex: false,
             }],
             vec![Evidence {
                 cov: None,
@@ -1393,6 +1404,7 @@ mod tests {
                 genome_index: 13148,
                 is_minor: false,
                 vcf_idx: None,
+                vcf_is_complex: false,
             }],
             vec![Evidence {
                 cov: None,
@@ -1405,6 +1417,7 @@ mod tests {
                 genome_index: 13149,
                 is_minor: false,
                 vcf_idx: None,
+                vcf_is_complex: false,
             }],
             vec![Evidence {
                 cov: None,
@@ -1417,6 +1430,7 @@ mod tests {
                 genome_index: 13150,
                 is_minor: false,
                 vcf_idx: None,
+                vcf_is_complex: false,
             }],
             // Null call ignoring filter fails
             vec![Evidence {
@@ -1430,6 +1444,7 @@ mod tests {
                 genome_index: 13335,
                 is_minor: false,
                 vcf_idx: Some(1),
+                vcf_is_complex: false,
             }],
             // Null call caused by specific filter fail
             vec![Evidence {
@@ -1443,6 +1458,7 @@ mod tests {
                 genome_index: 14000,
                 is_minor: false,
                 vcf_idx: None,
+                vcf_is_complex: false,
             }],
         ];
 
@@ -1475,6 +1491,7 @@ mod tests {
                 genome_index: 4730,
                 is_minor: true,
                 vcf_idx: Some(1),
+                vcf_is_complex: false,
             },
             Evidence {
                 cov: Some(100),
@@ -1487,6 +1504,7 @@ mod tests {
                 genome_index: 4730,
                 is_minor: true,
                 vcf_idx: Some(2),
+                vcf_is_complex: false,
             },
         ]];
 
@@ -1503,6 +1521,131 @@ mod tests {
                 assert_eq!(call.genome_index, actual[idx].genome_index);
                 assert_eq!(call.is_minor, actual[idx].is_minor);
                 assert_eq!(call.vcf_idx, actual[idx].vcf_idx);
+                assert_eq!(call.vcf_is_complex, actual[idx].vcf_is_complex);
+            }
+        }
+    }
+
+    #[test]
+    fn test_complex_is_detected() {
+        // Check that the is_complex flag gets set if a VCF has a complex row in it
+        // This VCF has 1 standard row, then 2 almost complex rows, then a complex row
+        // Standard SNP at 4687
+        // Ref of length 1000 with 2 alts at 4730
+        // Ref of length 1001 with 1 alt at 5730
+        // Ref of length 1001 with 2 alts at 7030 <-- this is the complex row
+
+        // We don't really care about the VCFRows here, it's just the calls which have the flag
+        let vcf = VCFFile::new("test/complex.vcf".to_string(), false, 3);
+
+        let expected_calls = [
+            vec![Evidence {
+                cov: Some(68),
+                frs: Some(ordered_float::OrderedFloat(1.0)),
+                genotype: "1/1".to_string(),
+                call_type: AltType::SNP,
+                vcf_row: 0,
+                reference: "t".to_string(),
+                alt: "c".to_string(),
+                genome_index: 4687,
+                is_minor: false,
+                vcf_idx: Some(1),
+                vcf_is_complex: false,
+            }],
+            vec![Evidence {
+                cov: Some(99),
+                frs: Some(ordered_float::OrderedFloat(0.495)),
+                genotype: "1/1".to_string(),
+                call_type: AltType::SNP,
+                vcf_row: 1,
+                reference: "a".to_string(),
+                alt: "t".to_string(),
+                genome_index: 4730,
+                is_minor: false,
+                vcf_idx: Some(1),
+                vcf_is_complex: false,
+            }],
+            vec![Evidence {
+                cov: Some(99),
+                frs: Some(ordered_float::OrderedFloat(0.495)),
+                genotype: "1/1".to_string(),
+                call_type: AltType::DEL,
+                vcf_row: 2,
+                reference: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+                alt: "t".to_string(),
+                genome_index: 4731,
+                is_minor: false,
+                vcf_idx: Some(1),
+                vcf_is_complex: false,
+            }],
+            vec![Evidence {
+                cov: Some(99),
+                frs: Some(ordered_float::OrderedFloat(0.99)),
+                genotype: "1/1".to_string(),
+                call_type: AltType::SNP,
+                vcf_row: 2,
+                reference: "a".to_string(),
+                alt: "t".to_string(),
+                genome_index: 5730,
+                is_minor: false,
+                vcf_idx: Some(1),
+                vcf_is_complex: false,
+            }],
+            vec![Evidence {
+                cov: Some(99),
+                frs: Some(ordered_float::OrderedFloat(0.99)),
+                genotype: "1/1".to_string(),
+                call_type: AltType::DEL,
+                vcf_row: 2,
+                reference: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+                alt: "t".to_string(),
+                genome_index: 5731,
+                is_minor: false,
+                vcf_idx: Some(1),
+                vcf_is_complex: false,
+            }],
+            vec![Evidence {
+                cov: Some(100),
+                frs: Some(ordered_float::OrderedFloat(0.5)),
+                genotype: "2/2".to_string(),
+                call_type: AltType::SNP,
+                vcf_row: 3,
+                reference: "a".to_string(),
+                alt: "t".to_string(),
+                genome_index: 7030,
+                is_minor: false,
+                vcf_idx: Some(1),
+                vcf_is_complex: true,
+            }],
+            vec![Evidence {
+                cov: Some(100),
+                frs: Some(ordered_float::OrderedFloat(0.5)),
+                genotype: "2/2".to_string(),
+                call_type: AltType::DEL,
+                vcf_row: 3,
+                reference: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+                alt: "t".to_string(),
+                genome_index: 7031,
+                is_minor: false,
+                vcf_idx: Some(1),
+                vcf_is_complex: true,
+            }]
+        ];
+
+        for calls in expected_calls.iter() {
+            let actual = vcf.calls.get(&calls[0].genome_index).unwrap();
+            for (idx, call) in actual.iter().enumerate() {
+                assert_eq!(call.cov, actual[idx].cov);
+                assert_eq!(call.frs, actual[idx].frs);
+                assert_eq!(call.genotype, actual[idx].genotype);
+                assert_eq!(call.call_type, actual[idx].call_type);
+                assert_eq!(call.vcf_row, actual[idx].vcf_row);
+                assert_eq!(call.reference, actual[idx].reference);
+                assert_eq!(call.alt, actual[idx].alt);
+                assert_eq!(call.genome_index, actual[idx].genome_index);
+                assert_eq!(call.is_minor, actual[idx].is_minor);
+                assert_eq!(call.vcf_idx, actual[idx].vcf_idx);
+                assert_eq!(call.vcf_is_complex, actual[idx].vcf_is_complex);
             }
         }
     }
