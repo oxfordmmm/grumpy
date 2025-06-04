@@ -1,6 +1,6 @@
 [package]
 name = "grumpy"
-version = "0.2.7"
+version = "1.0.0"
 edition = "2021"
 description = "Genetic analysis in Rust."
 license-file = "LICENSE"

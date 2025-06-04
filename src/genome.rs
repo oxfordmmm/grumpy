@@ -861,6 +861,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 1
@@ -875,6 +876,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 2
@@ -892,6 +894,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 3
@@ -906,6 +909,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["63.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 4
@@ -920,6 +924,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["63.77".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 5
@@ -934,6 +939,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 6
@@ -948,6 +954,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 7
@@ -962,6 +969,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 8
@@ -980,6 +988,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 9
@@ -998,6 +1007,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["3.77".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 10
@@ -1014,6 +1024,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 11
@@ -1029,6 +1040,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
         ];
 
@@ -1456,6 +1468,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["2.05".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 1
@@ -1477,6 +1490,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["3.77".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 2
@@ -1499,6 +1513,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["2.76".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 3
@@ -1513,6 +1528,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["200.58".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 4
@@ -1530,6 +1546,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["155.58".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 5
@@ -1547,6 +1564,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["300.25".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 6
@@ -1569,6 +1587,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 7
@@ -1591,6 +1610,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 8
@@ -1613,6 +1633,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["475.54".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 9
@@ -1635,6 +1656,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["315.11".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 10
@@ -1649,6 +1671,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["145.21".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 11
@@ -1663,6 +1686,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["145.21".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 12
@@ -1677,6 +1701,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["145.21".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 13
@@ -1691,6 +1716,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["145.21".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 14
@@ -1705,6 +1731,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["145.21".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 15
@@ -1722,6 +1749,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["145.21".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
         ];
 
@@ -3444,7 +3472,7 @@ mod tests {
                     ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
                     ("GT_CONF".to_string(), vec!["2.05".to_string()]),
                 ]),
-                is_filter_pass: true,
+                is_filter_pass: true, is_complex: false,
             }
         ];
 
@@ -3670,7 +3698,7 @@ mod tests {
                     ("COV".to_string(), vec!["1".to_string(), "3".to_string()]),
                     ("GT_CONF".to_string(), vec!["2.05".to_string()]),
                 ]),
-                is_filter_pass: true,
+                is_filter_pass: true, is_complex: false,
             }
 
         ];
@@ -3969,6 +3997,7 @@ mod tests {
                     ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 1
@@ -3990,6 +4019,7 @@ mod tests {
                     ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
         ];
 
@@ -4117,6 +4147,7 @@ mod tests {
                     ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 1
@@ -4139,6 +4170,7 @@ mod tests {
                     ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
         ];
 
@@ -4257,6 +4289,7 @@ mod tests {
                     ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
             VCFRow {
                 // 1
@@ -4278,6 +4311,7 @@ mod tests {
                     ("GT_CONF_PERCENTILE".to_string(), vec!["77.89".to_string()]),
                 ]),
                 is_filter_pass: false,
+                is_complex: false,
             },
         ];
 
@@ -4483,6 +4517,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["2.05".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 1
@@ -4497,6 +4532,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["2.05".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
             VCFRow {
                 // 2
@@ -4511,6 +4547,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["2.05".to_string()]),
                 ]),
                 is_filter_pass: true,
+                is_complex: false,
             },
         ];
 
