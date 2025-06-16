@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
+use std::io::Write;
 
 use gb_io::reader::SeqReader;
 use gb_io::seq::Location::Complement;
@@ -409,6 +410,80 @@ impl Genome {
             panic!("No VCF records associated with this genome");
         }
         self.vcf_records.as_ref().unwrap()[index].clone()
+    }
+
+    /// Write the genome (including indels) to a FASTA file
+    ///
+    /// # Arguments
+    /// - `filename` - Name of the file to write to
+    pub fn write_fasta(&self, filename: &str) {
+        let mut nc_sequence = String::new();
+        for position in self.genome_positions.iter() {
+            if position.is_deleted {
+                // Position deleted, so skip it
+                continue;
+            }
+            // Only alts we care about now are SNPs, nulls and ins
+            // It's possible that we have both a SNP/null and an ins at a given position
+            // So check for both
+
+            let alts = position
+                .alts
+                .iter()
+                .filter(|alt| {
+                    alt.alt_type == AltType::SNP
+                        || alt.alt_type == AltType::NULL
+                        || alt.alt_type == AltType::INS
+                })
+                .cloned()
+                .collect::<Vec<Alt>>();
+
+            if alts.is_empty() {
+                // No mutations at this position, so just add the reference base
+                nc_sequence.push(position.reference);
+            } else {
+                let snps = alts
+                    .iter()
+                    .filter(|alt| alt.alt_type == AltType::SNP || alt.alt_type == AltType::NULL)
+                    .collect::<Vec<&Alt>>();
+
+                if snps.len() != 1 {
+                    // No SNPs or het here so reference base
+                    nc_sequence.push(position.reference);
+                } else {
+                    // Only one SNP, so use that
+                    let mut snp = snps[0].base.chars().next().unwrap();
+                    if snp == 'x' {
+                        // We use X internally for null calls, but N is the valid character in fastas
+                        snp = 'n';
+                    }
+                    nc_sequence.push(snp);
+                }
+
+                let ins = alts
+                    .iter()
+                    .filter(|alt| alt.alt_type == AltType::INS)
+                    .collect::<Vec<&Alt>>();
+                if ins.len() == 1 {
+                    // Insertions are a bit more complex, we need to insert the bases
+                    // at this position
+                    // We only want to do this in cases of a clear, single alt's insertion
+                    nc_sequence.push_str(&ins[0].base);
+                }
+            }
+        }
+
+        // Write the sequence to a FASTA file
+        let mut fasta_file = File::create(filename).expect("Unable to create FASTA file");
+        writeln!(fasta_file, ">{}", self.name).expect("Unable to write to FASTA file");
+        for (idx, c) in nc_sequence.chars().enumerate() {
+            let idx = idx + 1;
+            write!(fasta_file, "{}", c.to_uppercase()).expect("Unable to write to FASTA file");
+            if idx % 80 == 0 {
+                // Add a newline every 80 characters
+                writeln!(fasta_file).expect("Unable to write to FASTA file");
+            }
+        }
     }
 }
 
