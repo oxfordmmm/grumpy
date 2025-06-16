@@ -468,9 +468,7 @@ impl Genome {
                     // Insertions are a bit more complex, we need to insert the bases
                     // at this position
                     // We only want to do this in cases of a clear, single alt's insertion
-                    for ins_alt in ins.iter() {
-                        nc_sequence.push_str(&ins_alt.base);
-                    }
+                    nc_sequence.push_str(&ins[0].base);
                 }
             }
         }
