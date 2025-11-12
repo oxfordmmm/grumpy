@@ -398,10 +398,12 @@ impl Gene {
                     codon = "".to_string();
                 }
             }
-            if !codon.is_empty() {
-                println!(
-                    "Incomplete codon at end of gene {}: with ranges {:?}",
-                    gene_def.name, gene_def.ranges
+            if !codon.is_empty() && !gene_def.name.starts_with("INCOMPLETE_"){
+                // This theoretically should not happen as incomplete genes should be marked, 
+                // but catch these and complain loudly if it does
+                panic!(
+                    "Incomplete codon at end of gene {}: {:?}",
+                    gene_def.name, gene_def
                 );
             }
         }
