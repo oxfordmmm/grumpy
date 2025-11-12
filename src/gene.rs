@@ -398,8 +398,8 @@ impl Gene {
                     codon = "".to_string();
                 }
             }
-            if !codon.is_empty() && !gene_def.name.starts_with("INCOMPLETE_"){
-                // This theoretically should not happen as incomplete genes should be marked, 
+            if !codon.is_empty() && !gene_def.name.starts_with("INCOMPLETE_") {
+                // This theoretically should not happen as incomplete genes should be marked,
                 // but catch these and complain loudly if it does
                 panic!(
                     "Incomplete codon at end of gene {}: {:?}",

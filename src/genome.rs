@@ -186,23 +186,29 @@ impl Genome {
                             // not ideal but exact mirror of gumpy
                             name += "_2";
                         }
-                        
+
                         // Catching where the gene is incomplete is a little difficult
                         // Base case for non-revcomp single range genes is a simple range check for %3
                         // For revcomp multiple range it needs an extra nudge
                         if coding {
                             if reverse_complement && ranges.len() > 1 {
-                                if (ranges.iter().map(|(s, e)| (s - e).abs() + 1).sum::<i64>() - ranges.len() as i64 - 1) % 3
-                                != 0 {
+                                if (ranges.iter().map(|(s, e)| (s - e).abs() + 1).sum::<i64>()
+                                    - ranges.len() as i64
+                                    - 1)
+                                    % 3
+                                    != 0
+                                {
                                     eprintln!("Warning: Gene {} has length not divisible by 3 (ranges {:?}), marking gene name", name, ranges);
                                     name = "INCOMPLETE_".to_string() + &name;
                                 }
-                            } else if (reverse_complement && ranges.len() == 1) || !reverse_complement {
-                                if (ranges.iter().map(|(s, e)| (s - e).abs() + 1).sum::<i64>() - ranges.len() as i64) % 3
-                                != 0 {
-                                    eprintln!("Warning: Gene {} has length not divisible by 3 (ranges {:?}), marking gene name", name, ranges);
-                                    name = "INCOMPLETE_".to_string() + &name;
-                                }
+                            } else if !(reverse_complement && ranges.len() != 1)
+                                && (ranges.iter().map(|(s, e)| (s - e).abs() + 1).sum::<i64>()
+                                    - ranges.len() as i64)
+                                    % 3
+                                    != 0
+                            {
+                                eprintln!("Warning: Gene {} has length not divisible by 3 (ranges {:?}), marking gene name", name, ranges);
+                                name = "INCOMPLETE_".to_string() + &name;
                             }
                         }
                         gene_names.push(name.clone());
