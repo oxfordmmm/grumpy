@@ -371,11 +371,14 @@ impl Genome {
         let mut genome_positions: Vec<GenomePosition> = Vec::new();
         if gene_def.reverse_complement {
             for (idx, (start, end)) in gene_def.ranges.iter().rev().enumerate() {
-                let last_idx: usize = if idx == 0 && gene_def.promoter_start != -1 {
+                let mut last_idx: usize = if idx == 0 && gene_def.promoter_start != -1 {
                     gene_def.promoter_start as usize
                 } else {
                     *start as usize
                 };
+                if last_idx == self.genome_positions.len() {
+                    last_idx -= 1;
+                } 
                 for i in *end as usize..last_idx + 1 {
                     nucleotide_sequence.push(self.genome_positions[i].reference);
                     nucleotide_index.push(self.genome_positions[i].genome_idx);
@@ -5069,5 +5072,26 @@ mod tests {
 
         assert_eq!(pe1_diff.mutations[0].mutation, "-9_del_cgaggcagcatggccccatttgggttcactccaaaggccagacacaaccgcggagtcgctttacgctcaacgtatcggctcgacgggtgggttatgggccccgtcgacaaggagggatggggtttgtcgtacgtattcgcgcagccgtcggtattggcagcggcggctaccgatttggccgggatcggctcggcgatcaaccaggctacggcggccgtcgcggccccgacaaccggcctggcggcggctgccgcggacgaagtgtccacggcccttgccacgctgttcggcgcgtacggccagcagttccaggcgatcagcgcacaggttgcggcgtttcacaacgaattcacccagaggttggcggcggccgcaaacgcatttgtcaatgccgaggccaccaacacgagcgcgctggtgcaggaggcgacggccggactctttaagccaacctcacccccggtgctaccgccaatgttcaaccaaaatacggcgatcatcatgggcggcaccgggtcaccgatacccacgccgagttatgtcaacgccatcacgaccttgttcatcgaccccgtcgtctcgaatccggtcgtcaaagcgctggtgacgcccgaagagctatatccgatcaccggcgtcaaatccctgcccttccaaacctcggtgcagttgggcctacagattctcgacggcgcgatttgggagcaaatcaacgccggaaaccacgtcaccgtgttcggctattcgcagagcgccgtcatcgcgtccctggaaatgcagcacctcatctcgctgggtcccaacgctcccagccccagccagctcaatttcatcttgatcggcaacgagatgaatcccaatggcg".to_string());
         assert_eq!(pe1_diff.minor_mutations[0].mutation, "G286A:3".to_string());
+    }
+
+    #[test]
+    fn test_odd_genbank() {
+        // Intracellulare has all of the issues weird genbanks can have
+        // - Gene crossing genome boundary
+        // - Incomplete genes
+        // - Nested complement and join
+
+        // Instanciating without error is the main test here
+        let mut reference = Genome::new("reference/NZ_CP085945.1.gbk");
+
+        // Just check that genes are built correctly
+        reference.build_all_genes();
+
+        // Check that the gene crossing the boundary is correctly marked as incomplete
+        // This gene has all of the issues so can be a single point of test
+        assert!(!reference.gene_names.contains(&"LK403_RS00005".to_string()));
+        assert!(reference.gene_names.contains(&"INCOMPLETE_LK403_RS00005".to_string()));
+
+
     }
 }
