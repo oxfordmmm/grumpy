@@ -135,12 +135,8 @@ pub struct GeneDef {
     pub reverse_complement: bool,
 
     #[pyo3(get, set)]
-    /// Genome index of the gene start
-    pub start: i64,
-
-    #[pyo3(get, set)]
-    /// Genome index of the gene end
-    pub end: i64,
+    /// Genome indicies for the start/end of each range of the gene
+    pub ranges: Vec<(i64, i64)>,
 
     #[pyo3(get, set)]
     /// Genome index of the gene promoter start
@@ -149,10 +145,6 @@ pub struct GeneDef {
     #[pyo3(get, set)]
     /// Number of bases in the promoter
     pub promoter_size: i64,
-
-    #[pyo3(get, set)]
-    /// Vec of duplicated positions due to ribosomal shifts
-    pub ribosomal_shifts: Vec<i64>,
 }
 
 #[pyclass(eq)]

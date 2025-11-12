@@ -118,10 +118,6 @@ pub struct Gene {
     pub amino_acid_number: Vec<i64>,
 
     #[pyo3(get, set)]
-    /// Positions of genome indicies duplicated by ribosomal shifts
-    pub ribosomal_shifts: Vec<i64>,
-
-    #[pyo3(get, set)]
     /// Codons of the gene. Empty if gene is non-coding
     pub codons: Vec<String>,
 
@@ -161,30 +157,6 @@ impl Gene {
 
         // Ensure we pick up deletions upstream or downstream of the gene
         Gene::adjust_dels(&mut genome_positions, &gene_def);
-
-        for pos in gene_def.ribosomal_shifts.iter() {
-            // Figure out the index of the vectors to insert the ribosomal shift
-            let mut idx: i64 = -1;
-            for (i, nc_idx) in nucleotide_index.iter().enumerate() {
-                if nc_idx == pos {
-                    idx = i as i64;
-                    break;
-                }
-            }
-            if idx == -1 {
-                panic!(
-                    "Ribosomal shift position {} not found in gene {}",
-                    pos, gene_def.name
-                );
-            }
-            // Duplicate those indices
-            nucleotide_sequence.insert(
-                idx as usize,
-                nucleotide_sequence.chars().nth(idx as usize).unwrap(),
-            );
-            nucleotide_index.insert(idx as usize, nucleotide_index[idx as usize]);
-            genome_positions.insert(idx as usize, genome_positions[idx as usize].clone());
-        }
 
         if gene_def.reverse_complement {
             // Reverse complement the sequence
@@ -228,7 +200,7 @@ impl Gene {
                     // Insertion
                     if *pos == 0 {
                         // Warn the user about a missing insertion, and skip it
-                        println!(
+                        eprintln!(
                             "Insertion at start of gene {} is revcomp and cannot be adjusted. Skipping!",
                             gene_def.name
                         );
@@ -334,10 +306,20 @@ impl Gene {
         }
         let prom_end = nucleotide_number.len();
         // Now non-promoter
+        let mut total_length = gene_def
+            .ranges
+            .iter()
+            .map(|(start, end)| (start - end).abs())
+            .sum::<i64>()
+            + (gene_def.ranges.len() as i64 - 1);
+        if gene_def.ranges.len() > 1 {
+            total_length += gene_def.ranges.len() as i64 - 1;
+        } else {
+            total_length += 1;
+        }
+
         let mut nc_idx = prom_end;
-        for i in
-            1..(gene_def.start - gene_def.end).abs() + gene_def.ribosomal_shifts.len() as i64 + 1
-        {
+        for i in 1..total_length {
             nucleotide_number.push(i);
             if !gene_def.coding {
                 // No adjustment needed for non-coding as gene pos == nucleotide num
@@ -364,9 +346,18 @@ impl Gene {
             let mut codon_idx = 1;
             for (nc_num, i) in (prom_end..nucleotide_sequence.len()).enumerate() {
                 codon.push(nucleotide_sequence.chars().nth(i).unwrap());
-                genome_idx_map.insert(nucleotide_index[i], (codon_idx, Some((nc_num % 3) as i64)));
                 if codon.len() == 3 {
                     // Codon is complete
+                    genome_idx_map.insert(
+                        nucleotide_index[i - 2],
+                        (codon_idx, Some(((nc_num - 2) % 3) as i64)),
+                    );
+                    genome_idx_map.insert(
+                        nucleotide_index[i - 1],
+                        (codon_idx, Some(((nc_num - 1) % 3) as i64)),
+                    );
+                    genome_idx_map
+                        .insert(nucleotide_index[i], (codon_idx, Some((nc_num % 3) as i64)));
                     amino_acid_sequence.push(codon_to_aa(codon.clone()));
                     codons.push(codon.clone());
                     gene_number.push(codon_idx);
@@ -408,7 +399,10 @@ impl Gene {
                 }
             }
             if !codon.is_empty() {
-                panic!("Incomplete codon at end of gene {}", gene_def.name);
+                println!(
+                    "Incomplete codon at end of gene {}: with ranges {:?}",
+                    gene_def.name, gene_def.ranges
+                );
             }
         }
 
@@ -424,7 +418,6 @@ impl Gene {
             nucleotide_number,
             amino_acid_sequence,
             amino_acid_number,
-            ribosomal_shifts: gene_def.ribosomal_shifts,
             codons,
             genome_idx_map,
         }

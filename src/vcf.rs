@@ -1543,8 +1543,7 @@ mod tests {
 
         let vcf = VCFFile::new("test/complex.vcf".to_string(), false, 3);
 
-        let expected_records = vec![
-            VCFRow {
+        let expected_records = [VCFRow {
                 position: 4687,
                 reference: "t".to_string(),
                 alternative: vec!["c".to_string()],
@@ -1595,8 +1594,7 @@ mod tests {
                     ("GT_CONF".to_string(), vec!["613.77".to_string()]),
                 ]),
                 is_filter_pass: true,is_complex: true,
-            },
-        ];
+            }];
 
         for (idx, record) in expected_records.iter().enumerate() {
             assert_eq!(record.position, vcf.records[idx].position);

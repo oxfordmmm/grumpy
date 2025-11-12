@@ -90,6 +90,44 @@ pub struct Genome {
     pub vcf_records: Option<Vec<VCFRow>>,
 }
 
+/// Recursively parse a GenBank location into ranges
+/// Required as complement and join can be nested
+///
+/// # Arguments
+/// - `location` - GenBank location to parse
+/// - `ranges` - Mutable vector to store the parsed ranges
+/// - `reverse_complement` - Whether the location is on the reverse complement strand. Should be false at the top level.
+///
+/// # Returns
+/// Whether the location is on the reverse complement strand
+pub fn parse_genbank_location(
+    location: &gb_io::seq::Location,
+    ranges: &mut Vec<(i64, i64)>,
+    reverse_complement: bool,
+) -> bool {
+    match location {
+        Complement(x) => {
+            parse_genbank_location(x, ranges, true);
+            return true;
+        }
+        Range(s, e) => {
+            if reverse_complement {
+                ranges.push((e.0, s.0));
+            } else {
+                ranges.push((s.0, e.0));
+            }
+        }
+        Join(loc_ranges) => {
+            // Checking for PRFS
+            for range in loc_ranges {
+                parse_genbank_location(range, ranges, reverse_complement);
+            }
+        }
+        _ => panic!("Location not range, complement or join"),
+    }
+    false
+}
+
 #[pymethods]
 impl Genome {
     #[new]
@@ -112,56 +150,17 @@ impl Genome {
             genome_name = seq.name.unwrap();
             for feature in seq.features {
                 let mut name: String = "".to_string();
-                let start: i64;
-                let end: i64;
+                let mut ranges: Vec<(i64, i64)> = Vec::new();
                 let mut coding: bool = false;
-                let mut reverse_complement: bool = false;
-                let mut ribosomal_shifts: Vec<i64> = Vec::new();
+                let reverse_complement: bool;
+                let mut skip = false;
                 if feature.kind == *"CDS" || feature.kind == *"rRNA" {
                     if feature.kind != *"rRNA" {
                         coding = true;
                     }
-                    match feature.location {
-                        Complement(x) => {
-                            reverse_complement = true;
-                            match *x {
-                                Range(s, e) => {
-                                    start = e.0;
-                                    end = s.0;
-                                }
-                                _ => panic!("Complement location not range"),
-                            }
-                        }
-                        Range(s, e) => {
-                            start = s.0;
-                            end = e.0
-                        }
-                        Join(ranges) => {
-                            // Checking for PRFS
-                            let mut start_pos: i64 = 0;
-                            let mut end_pos = 0;
-                            let mut first = true;
-                            for range in ranges {
-                                match range {
-                                    Range(s, e) => {
-                                        if first {
-                                            start_pos = s.0;
-                                            first = false;
-                                        } else {
-                                            // Adjust the position to match the 1-indexed genome
-                                            ribosomal_shifts.push(s.0 + 1);
-                                        }
-                                        end_pos = e.0;
-                                    }
-                                    _ => panic!("Join location not range"),
-                                }
-                            }
-                            start = start_pos;
-                            end = end_pos;
-                        }
-                        _ => panic!("Location not range, complement or join"),
-                    }
-                    for qual in feature.qualifiers {
+                    reverse_complement =
+                        parse_genbank_location(&feature.location, &mut ranges, false);
+                    for qual in feature.qualifiers.clone() {
                         match qual.1 {
                             Some(val) => {
                                 if qual.0 == *"gene" {
@@ -173,26 +172,37 @@ impl Genome {
                                     name = val.clone();
                                 }
                             }
-                            None => continue,
+                            None => {
+                                if qual.0 == *"pseudo" {
+                                    skip = true;
+                                }
+                            }
                         }
                     }
-                    while gene_names.contains(&name) {
-                        // Duplicate gene names can exist :(
-                        // Repeatedly add _2 to the end of the name until it is unique
-                        // not ideal but exact mirror of gumpy
-                        name += "_2";
+                    if !skip {
+                        while gene_names.contains(&name) {
+                            // Duplicate gene names can exist :(
+                            // Repeatedly add _2 to the end of the name until it is unique
+                            // not ideal but exact mirror of gumpy
+                            name += "_2";
+                        }
+                        if coding
+                            && (ranges.iter().map(|(s, e)| (s - e).abs() + 1).sum::<i64>() - 1) % 3
+                                != 0
+                        {
+                            eprintln!("Warning: Gene {} has length not divisible by 3 (ranges {:?}), marking gene name", name, ranges);
+                            name = "INCOMPLETE_".to_string() + &name;
+                        }
+                        gene_names.push(name.clone());
+                        _gene_definitions.push(GeneDef {
+                            name,
+                            reverse_complement,
+                            coding,
+                            ranges,
+                            promoter_start: -1,
+                            promoter_size: 0,
+                        });
                     }
-                    gene_names.push(name.clone());
-                    _gene_definitions.push(GeneDef {
-                        name,
-                        reverse_complement,
-                        coding,
-                        start,
-                        end,
-                        promoter_start: -1,
-                        promoter_size: 0,
-                        ribosomal_shifts,
-                    });
                 }
             }
         }
@@ -234,30 +244,42 @@ impl Genome {
         let max_promoter_length = 99;
         for gene in self.gene_definitions.iter_mut() {
             // First pass to add gene names to all positions they exist in
-            let mut start_idx = gene.start;
-            let mut end_idx = gene.end;
-            if gene.reverse_complement {
-                start_idx = gene.end;
-                end_idx = gene.start;
-            }
-            for i in start_idx..end_idx {
-                self.genome_positions[i as usize]
-                    .genes
-                    .push(gene.name.clone());
+            for (start, end) in gene.ranges.iter() {
+                let mut start_idx = *start;
+                let mut end_idx = *end;
+                if gene.reverse_complement {
+                    start_idx = *end;
+                    end_idx = *start;
+                }
+                for i in start_idx..end_idx {
+                    self.genome_positions[i as usize]
+                        .genes
+                        .push(gene.name.clone());
+                    self.genome_positions[i as usize].genes.dedup();
+                }
             }
         }
         for gene in self.gene_definitions.iter_mut() {
             // Check for overlapping genes, assigning promoters to non-overlapping genes
-            if self.genome_positions[gene.start as usize].genes.len() > 1 {
+            let start;
+            if gene.ranges.len() == 1 {
+                start = gene.ranges[0].0;
+            } else if gene.reverse_complement {
+                start = gene.ranges[gene.ranges.len() - 1].0;
+            } else {
+                start = gene.ranges[0].0;
+            }
+
+            if self.genome_positions[start as usize].genes.len() > 1 {
                 continue;
-            } else if gene.start == 0 {
+            } else if start == 0 {
                 // Catch edge case of gene starting at genome index 0
                 // this couldn't have a promoter so mark as such
                 gene.promoter_start = -1;
             } else if gene.reverse_complement {
-                gene.promoter_start = gene.start - 1;
+                gene.promoter_start = start - 1;
             } else {
-                gene.promoter_start = gene.start;
+                gene.promoter_start = start;
             }
         }
 
@@ -330,27 +352,35 @@ impl Genome {
         let mut nucleotide_index = Vec::new();
         let mut genome_positions: Vec<GenomePosition> = Vec::new();
         if gene_def.reverse_complement {
-            let mut last_idx = gene_def.promoter_start;
-            if gene_def.promoter_start == -1 {
-                last_idx = gene_def.start;
-            }
-            for i in gene_def.end..last_idx + 1 {
-                nucleotide_sequence.push(self.genome_positions[i as usize].reference);
-                nucleotide_index.push(self.genome_positions[i as usize].genome_idx);
-                genome_positions.push(self.genome_positions[i as usize].clone());
+            for (idx, (start, end)) in gene_def.ranges.iter().rev().enumerate() {
+                let last_idx: usize = if idx == 0 && gene_def.promoter_start != -1 {
+                    gene_def.promoter_start as usize
+                } else {
+                    *start as usize
+                };
+                for i in *end as usize..last_idx + 1 {
+                    nucleotide_sequence.push(self.genome_positions[i].reference);
+                    nucleotide_index.push(self.genome_positions[i].genome_idx);
+                    genome_positions.push(self.genome_positions[i].clone());
+                }
             }
         } else {
-            let mut first_idx = gene_def.promoter_start - 1;
-            if gene_def.promoter_start == -1 {
-                first_idx = gene_def.start;
-            }
-            if first_idx == -1 {
-                first_idx = 0;
-            }
-            for i in first_idx..gene_def.end {
-                nucleotide_sequence.push(self.genome_positions[i as usize].reference);
-                nucleotide_index.push(self.genome_positions[i as usize].genome_idx);
-                genome_positions.push(self.genome_positions[i as usize].clone());
+            for (idx, (start, end)) in gene_def.ranges.iter().enumerate() {
+                let first_idx: usize;
+                if idx == 0 && gene_def.promoter_start != -1 {
+                    if gene_def.promoter_start == 0 {
+                        first_idx = 0;
+                    } else {
+                        first_idx = gene_def.promoter_start as usize - 1;
+                    }
+                } else {
+                    first_idx = *start as usize;
+                }
+                for i in first_idx..*end as usize {
+                    nucleotide_sequence.push(self.genome_positions[i].reference);
+                    nucleotide_index.push(self.genome_positions[i].genome_idx);
+                    genome_positions.push(self.genome_positions[i].clone());
+                }
             }
         }
 
@@ -922,7 +952,7 @@ mod tests {
 
         let genome_diff = GenomeDifference::new(reference.clone(), sample.clone(), MinorType::COV);
 
-        let expected_vcf_rows = vec![
+        let expected_vcf_rows = [
             VCFRow {
                 // 0
                 position: 4687,
@@ -1123,7 +1153,7 @@ mod tests {
             assert_eq!(*row, sample.get_vcf_row(idx));
         }
 
-        let expected_genome_variants = vec![
+        let expected_genome_variants = [
             Variant {
                 variant: "4687a>c".to_string(),
                 nucleotide_index: 4687,
@@ -1218,7 +1248,7 @@ mod tests {
             assert_eq!(*variant, expected_genome_variants[idx]);
         }
 
-        let expected_genome_minor_variants = vec![
+        let expected_genome_minor_variants = [
             Variant {
                 // Looks weird, but the reference in the genbank = 't' and in vcf is 'c'
                 variant: "4730t>t:99".to_string(),
@@ -1253,7 +1283,7 @@ mod tests {
             HashSet::from(["orf1ab".to_string()])
         );
 
-        let expected_orf1ab_mutations = vec![
+        let expected_orf1ab_mutations = [
             Mutation {
                 mutation: "a4422c".to_string(),
                 gene: "orf1ab".to_string(),
@@ -1473,7 +1503,7 @@ mod tests {
             assert_eq!(*mutation, expected_orf1ab_mutations[idx]);
         }
 
-        let expected_orf1ab_minor_mutations = vec![Mutation {
+        let expected_orf1ab_minor_mutations = [Mutation {
             mutation: "Y1489Z:100".to_string(),
             gene: "orf1ab".to_string(),
             evidence: vec![
@@ -1529,7 +1559,7 @@ mod tests {
 
         let genome_diff = GenomeDifference::new(reference.clone(), sample.clone(), MinorType::COV);
 
-        let expected_vcf_rows = vec![
+        let expected_vcf_rows = [
             VCFRow {
                 // 0
                 position: 2,
@@ -2879,7 +2909,7 @@ mod tests {
             assert_eq!(mutation, &expected_a_mutations[idx])
         }
 
-        let expected_a_minor_mutations = vec![
+        let expected_a_minor_mutations = [
             Mutation {
                 mutation: "P5V:8".to_string(),
                 gene: "A".to_string(),
@@ -3094,7 +3124,7 @@ mod tests {
             assert_eq!(mutation, &expected_a_minor_mutations[idx])
         }
 
-        let expected_a_minor_mutations_frs = vec![
+        let expected_a_minor_mutations_frs = [
             Mutation {
                 mutation: "P5V:0.105".to_string(),
                 gene: "A".to_string(),
@@ -3320,7 +3350,7 @@ mod tests {
             MinorType::COV,
         );
 
-        let expected_b_mutations = vec![
+        let expected_b_mutations = [
             Mutation {
                 mutation: "G1Z".to_string(),
                 gene: "B".to_string(),
@@ -3471,7 +3501,7 @@ mod tests {
             assert_eq!(mutation, &expected_b_mutations[idx])
         }
 
-        let expected_b_minor_mutations = vec![Mutation {
+        let expected_b_minor_mutations = [Mutation {
             mutation: "2_mixed:50".to_string(),
             gene: "B".to_string(),
             evidence: vec![
@@ -3555,8 +3585,7 @@ mod tests {
             assert_eq!(*row, sample.get_vcf_row(idx));
         }
 
-        let expected_genome_variants = vec![
-            Variant {
+        let expected_genome_variants = [Variant {
                 variant: "3_del_aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
                 nucleotide_index: 3,
                 evidence: 0,
@@ -3588,8 +3617,7 @@ mod tests {
                 gene_position: Some(4),
                 codon_idx: Some(0),
                 gene_name: Some("C".to_string()),
-            },
-        ];
+            }];
 
         for (idx, variant) in diff.variants.iter().enumerate() {
             assert_eq!(variant, &expected_genome_variants[idx]);
@@ -3598,8 +3626,7 @@ mod tests {
         assert_eq!(diff.minor_variants.len(), 0);
 
         // This deletion should cover large deletions in A and B, as well as partial deletions in C
-        let expected_a_mutations = vec![
-            Mutation {
+        let expected_a_mutations = [Mutation {
                 mutation: "-1_del_aaaaaaaaccccccccccgggggggggg".to_string(),
                 gene: "A".to_string(),
                 evidence: vec![Evidence {
@@ -3639,8 +3666,7 @@ mod tests {
                 indel_nucleotides: None,
                 amino_acid_number: None,
                 amino_acid_sequence: None,
-            },
-        ];
+            }];
 
         let a_diff = GeneDifference::new(
             reference.get_gene("A".to_string()),
@@ -3660,7 +3686,7 @@ mod tests {
             MinorType::COV,
         );
 
-        let expected_b_mutations = vec![
+        let expected_b_mutations = [
             Mutation {
                 mutation: "1_del_gggttttttttttaaaaaaaaaacccccccccc".to_string(),
                 gene: "B".to_string(),
@@ -3717,7 +3743,7 @@ mod tests {
             MinorType::COV,
         );
 
-        let expected_c_mutations = vec![Mutation {
+        let expected_c_mutations = [Mutation {
             mutation: "4_del_ggg".to_string(),
             gene: "C".to_string(),
             evidence: vec![Evidence {
@@ -3782,8 +3808,7 @@ mod tests {
             assert_eq!(*row, sample.get_vcf_row(idx));
         }
 
-        let expected_genome_minor_variants = vec![
-            Variant {
+        let expected_genome_minor_variants = [Variant {
                 variant: "3_del_aaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc:3".to_string(),
                 nucleotide_index: 3,
                 evidence: 0,
@@ -3815,8 +3840,7 @@ mod tests {
                 gene_position: Some(4),
                 codon_idx: Some(0),
                 gene_name: Some("C".to_string()),
-            },
-        ];
+            }];
 
         for (idx, variant) in diff.minor_variants.iter().enumerate() {
             assert_eq!(variant, &expected_genome_minor_variants[idx]);
@@ -3825,8 +3849,7 @@ mod tests {
         assert_eq!(diff.variants.len(), 0);
 
         // This deletion should cover large deletions in A and B, as well as partial deletions in C
-        let expected_a_minor_mutations = vec![
-            Mutation {
+        let expected_a_minor_mutations = [Mutation {
                 mutation: "-1_del_aaaaaaaaccccccccccgggggggggg:3".to_string(),
                 gene: "A".to_string(),
                 evidence: vec![Evidence {
@@ -3866,8 +3889,7 @@ mod tests {
                 indel_nucleotides: None,
                 amino_acid_number: None,
                 amino_acid_sequence: None,
-            },
-        ];
+            }];
 
         let a_diff = GeneDifference::new(
             reference.get_gene("A".to_string()),
@@ -3887,7 +3909,7 @@ mod tests {
             MinorType::COV,
         );
 
-        let expected_b_minor_mutations = vec![
+        let expected_b_minor_mutations = [
             Mutation {
                 mutation: "1_del_gggttttttttttaaaaaaaaaacccccccccc:3".to_string(),
                 gene: "B".to_string(),
@@ -3944,7 +3966,7 @@ mod tests {
             MinorType::FRS,
         );
 
-        let expected_b_minor_mutations = vec![
+        let expected_b_minor_mutations = [
             Mutation {
                 mutation: "1_del_gggttttttttttaaaaaaaaaacccccccccc:0.75".to_string(),
                 gene: "B".to_string(),
@@ -4001,7 +4023,7 @@ mod tests {
             MinorType::COV,
         );
 
-        let expected_c_minor_mutations = vec![Mutation {
+        let expected_c_minor_mutations = [Mutation {
             mutation: "4_del_ggg:3".to_string(),
             gene: "C".to_string(),
             evidence: vec![Evidence {
@@ -4048,7 +4070,7 @@ mod tests {
         );
         assert_eq!(kat_g_diff.mutations.len(), 0);
 
-        let expected_vcf_rows = vec![
+        let expected_vcf_rows = [
             VCFRow {
                 // 0
                 position: 2154397,
@@ -4102,7 +4124,7 @@ mod tests {
             assert_eq!(*row, samples.get_vcf_row(idx));
         }
 
-        let expected_katg_minor_mutations = vec![
+        let expected_katg_minor_mutations = [
             Mutation {
                 mutation: "1710_del_cc:25".to_string(),
                 gene: "katG".to_string(),
@@ -4194,7 +4216,7 @@ mod tests {
         );
         assert_eq!(kat_g_diff.mutations.len(), 0);
 
-        let expected_vcf_rows = vec![
+        let expected_vcf_rows = [
             VCFRow {
                 // 0
                 position: 2154397,
@@ -4253,7 +4275,7 @@ mod tests {
             assert_eq!(*row, samples.get_vcf_row(idx));
         }
 
-        let expected_katg_minor_mutations = vec![
+        let expected_katg_minor_mutations = [
             Mutation {
                 mutation: "1710_del_cc:25".to_string(),
                 gene: "katG".to_string(),
@@ -4340,7 +4362,7 @@ mod tests {
 
         let diff = GenomeDifference::new(reference.clone(), sample.clone(), MinorType::COV);
 
-        let expected_vcf_rows = vec![
+        let expected_vcf_rows = [
             VCFRow {
                 // 0
                 position: 2154397,
@@ -4394,7 +4416,7 @@ mod tests {
             assert_eq!(*row, sample.get_vcf_row(idx));
         }
 
-        let expected_genome_minor_variants = vec![
+        let expected_genome_minor_variants = [
             Variant {
                 variant: "2154397g>t:15".to_string(),
                 nucleotide_index: 2154397,
@@ -4436,7 +4458,7 @@ mod tests {
 
         let diff = GenomeDifference::new(reference.clone(), sample.clone(), MinorType::FRS);
 
-        let expected_genome_minor_variants = vec![
+        let expected_genome_minor_variants = [
             Variant {
                 variant: "2154397g>t:0.15".to_string(),
                 nucleotide_index: 2154397,
@@ -4483,7 +4505,7 @@ mod tests {
         );
         assert_eq!(kat_g_diff.mutations.len(), 0);
 
-        let expected_katg_minor_mutations = vec![
+        let expected_katg_minor_mutations = [
             Mutation {
                 mutation: "1710_del_cc:0.25".to_string(),
                 gene: "katG".to_string(),
@@ -4575,7 +4597,7 @@ mod tests {
         let vcf = VCFFile::new("test/TEST-DNA-misc-indel.vcf".to_string(), false, 3);
         let mut sample = mutate(&genome, vcf);
 
-        let expected_vcf_rows = vec![
+        let expected_vcf_rows = [
             VCFRow {
                 // 0
                 position: 6,
@@ -4634,7 +4656,7 @@ mod tests {
         // Also check that asking for a row which doesn't exist it panics
         assert_panics!(sample.get_vcf_row(3333));
 
-        let expected_minor_mutations = vec![
+        let expected_minor_mutations = [
             Mutation {
                 mutation: "3_indel:3".to_string(),
                 gene: "A".to_string(),
@@ -4714,7 +4736,7 @@ mod tests {
         }
 
         // Additional ins in C to double check revcomp ins is handled as appropriate
-        let expected_minor_c_mutations = vec![Mutation {
+        let expected_minor_c_mutations = [Mutation {
             mutation: "2_ins_g:4".to_string(),
             gene: "C".to_string(),
             evidence: vec![Evidence {
@@ -4761,7 +4783,7 @@ mod tests {
         let vcf = VCFFile::new("test/TEST-DNA-misc-indel.vcf".to_string(), false, 3);
         let mut sample = mutate(&genome, vcf);
 
-        let expected_minor_mutations = vec![
+        let expected_minor_mutations = [
             Mutation {
                 mutation: "3_ins_a:3".to_string(),
                 gene: "A".to_string(),
