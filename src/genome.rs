@@ -378,7 +378,7 @@ impl Genome {
                 };
                 if last_idx == self.genome_positions.len() {
                     last_idx -= 1;
-                } 
+                }
                 for i in *end as usize..last_idx + 1 {
                     nucleotide_sequence.push(self.genome_positions[i].reference);
                     nucleotide_index.push(self.genome_positions[i].genome_idx);
@@ -5090,8 +5090,8 @@ mod tests {
         // Check that the gene crossing the boundary is correctly marked as incomplete
         // This gene has all of the issues so can be a single point of test
         assert!(!reference.gene_names.contains(&"LK403_RS00005".to_string()));
-        assert!(reference.gene_names.contains(&"INCOMPLETE_LK403_RS00005".to_string()));
-
-
+        assert!(reference
+            .gene_names
+            .contains(&"INCOMPLETE_LK403_RS00005".to_string()));
     }
 }
