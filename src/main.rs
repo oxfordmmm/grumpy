@@ -26,7 +26,8 @@ struct Args {
     #[arg(long)]
     vcf: String,
 
-    /// Target gene name. If given, pull out all variants and mutations within this gene
+    /// Target gene name. If given, pull out all variants and mutations within this gene.
+    /// If omitted, pull out variants and mutations within all genes
     #[arg(long)]
     gene: Option<String>,
 
@@ -55,15 +56,25 @@ fn main() {
     let sample_end = SystemTime::now();
 
     // If given a gene name, pull out the genome and gene level differences
+    let target_genes;
     if let Some(target_gene) = args.gene {
-        let genome_start = SystemTime::now();
-        let mut difference =
-            GenomeDifference::new(reference.clone(), sample.clone(), MinorType::COV);
-        let genome_end = SystemTime::now();
+        target_genes = vec![target_gene];
+    } else {
+        target_genes = reference.gene_names.clone();
+    }
+
+    let genome_start = SystemTime::now();
+    let mut difference = GenomeDifference::new(reference.clone(), sample.clone(), MinorType::COV);
+    let genome_end = SystemTime::now();
+
+    let mut is_first = true;
+    let mut gene_start = SystemTime::now();
+    let mut gene_end = SystemTime::now();
+    for target_gene in target_genes.iter() {
         for variant in difference.variants.iter_mut() {
             if variant.gene_name.clone().is_none()
                 || (variant.gene_name.clone().is_some()
-                    && variant.gene_name.clone().unwrap() != target_gene)
+                    && variant.gene_name.clone().unwrap() != *target_gene)
             {
                 continue;
             }
@@ -77,7 +88,7 @@ fn main() {
         for variant in difference.minor_variants.iter_mut() {
             if variant.gene_name.clone().is_none()
                 || (variant.gene_name.clone().is_some()
-                    && variant.gene_name.clone().unwrap() != target_gene)
+                    && variant.gene_name.clone().unwrap() != *target_gene)
             {
                 continue;
             }
@@ -88,10 +99,11 @@ fn main() {
                 variant.variant.clone()
             );
         }
-
-        let gene_start = SystemTime::now();
+        if is_first {
+            gene_start = SystemTime::now();
+        }
         for gene_name in sample.genes_with_mutations.clone().iter() {
-            if gene_name != &target_gene {
+            if gene_name != target_gene {
                 continue;
             }
             println!("{}", gene_name);
@@ -117,27 +129,27 @@ fn main() {
                     .collect::<Vec<String>>()
             );
         }
-        let gene_end = SystemTime::now();
-
-        println!("\n-----------------------------------\n");
-        println!("VCF took {:?}", vcf_end.duration_since(vcf_start).unwrap());
-        println!(
-            "Reference took {:?}",
-            reference_end.duration_since(reference_start).unwrap()
-        );
-        println!(
-            "Sample took {:?}",
-            sample_end.duration_since(sample_start).unwrap()
-        );
-        println!(
-            "Genome diff took {:?}",
-            genome_end.duration_since(genome_start).unwrap()
-        );
-        println!(
-            "Gene diff took {:?}",
-            gene_end.duration_since(gene_start).unwrap()
-        );
+        gene_end = SystemTime::now();
+        is_first = false;
     }
+    println!("\n-----------------------------------\n");
+    println!("VCF took {:?}", vcf_end.duration_since(vcf_start).unwrap());
+    println!(
+        "Reference took {:?}",
+        reference_end.duration_since(reference_start).unwrap()
+    );
+    println!(
+        "Sample took {:?}",
+        sample_end.duration_since(sample_start).unwrap()
+    );
+    println!(
+        "Genome diff took {:?}",
+        genome_end.duration_since(genome_start).unwrap()
+    );
+    println!(
+        "Gene diff took {:?}",
+        gene_end.duration_since(gene_start).unwrap()
+    );
 
     // If a FASTA path is provided, write the sample genome to it
     if let Some(fasta_path) = args.fasta {
