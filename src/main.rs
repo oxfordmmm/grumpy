@@ -74,7 +74,14 @@ fn main() {
     // println!("{:?}", sample.at_genome_index(3115424));
     // println!("{:?}", sample.at_genome_index(3115425));
 
-    println!("{:?}", sample.gene_definitions.iter().filter(|x| x.name == "INCOMPLETE_LK403_RS14635").collect::<Vec<&GeneDef>>());
+    println!(
+        "{:?}",
+        sample
+            .gene_definitions
+            .iter()
+            .filter(|x| x.name == "INCOMPLETE_LK403_RS14635")
+            .collect::<Vec<&GeneDef>>()
+    );
 
     // If given a gene name, pull out the genome and gene level differences
     let target_genes;

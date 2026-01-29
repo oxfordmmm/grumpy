@@ -392,7 +392,8 @@ impl Genome {
                     genome_positions.push(self.genome_positions[i].clone());
                 }
             }
-            for idx in gene_def.ranges.last().unwrap().1 as usize..=gene_def.promoter_start as usize {
+            for idx in gene_def.ranges.last().unwrap().1 as usize..=gene_def.promoter_start as usize
+            {
                 nucleotide_sequence.push(self.genome_positions[idx].reference);
                 nucleotide_index.push(self.genome_positions[idx].genome_idx);
                 genome_positions.push(self.genome_positions[idx].clone());

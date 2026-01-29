@@ -605,7 +605,7 @@ impl Gene {
                     // }
                     if gene_name == "INCOMPLETE_LK403_RS14635" {
                         println!("{:?} {} {} {}", alt, last_pos, bases_to_trim, gene_name);
-                        println!("{:?}",g[g.len() - 1]);
+                        println!("{:?}", g[g.len() - 1]);
                     }
                     alt.base = alt.base[0..alt.base.len() - bases_to_trim].to_string();
                 }
