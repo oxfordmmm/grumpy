@@ -38,6 +38,8 @@ struct Args {
 
 #[cfg(not(tarpaulin_include))]
 fn main() {
+    use crate::common::GeneDef;
+
     let args = Args::parse();
 
     let reference_path = args.reference;
@@ -55,6 +57,25 @@ fn main() {
     let mut sample = mutate(&reference, vcf);
     let sample_end = SystemTime::now();
 
+    // println!("Sample genome created");
+    // println!("~~~~~~~~~~~~~~~~~~~~~~");
+    // for i in 3114190..3115418 {
+    //     let pos = sample.at_genome_index(i);
+    //     if pos.alts.len() > 0 {
+    //         println!("-- Position {:?} --", pos);
+    //     }
+    //     if pos.deleted_evidence.len() > 0 {
+    //         println!("Deleted evidence: {:?}", pos.deleted_evidence);
+    //     }
+    // }
+    // println!("~~~~~~~~~~~~~~~~~~~~~~");
+    // println!("{:?}", sample.at_genome_index(3115422));
+    // println!("{:?}", sample.at_genome_index(3115423));
+    // println!("{:?}", sample.at_genome_index(3115424));
+    // println!("{:?}", sample.at_genome_index(3115425));
+
+    println!("{:?}", sample.gene_definitions.iter().filter(|x| x.name == "INCOMPLETE_LK403_RS14635").collect::<Vec<&GeneDef>>());
+
     // If given a gene name, pull out the genome and gene level differences
     let target_genes;
     if let Some(target_gene) = args.gene {
@@ -70,68 +91,68 @@ fn main() {
     let mut is_first = true;
     let mut gene_start = SystemTime::now();
     let mut gene_end = SystemTime::now();
-    for target_gene in target_genes.iter() {
-        for variant in difference.variants.iter_mut() {
-            if variant.gene_name.clone().is_none()
-                || (variant.gene_name.clone().is_some()
-                    && variant.gene_name.clone().unwrap() != *target_gene)
-            {
-                continue;
-            }
-            println!(
-                "{:?}@{:?} --> {:?}",
-                variant.gene_name,
-                variant.gene_position,
-                variant.variant.clone()
-            );
-        }
-        for variant in difference.minor_variants.iter_mut() {
-            if variant.gene_name.clone().is_none()
-                || (variant.gene_name.clone().is_some()
-                    && variant.gene_name.clone().unwrap() != *target_gene)
-            {
-                continue;
-            }
-            println!(
-                "{:?}@{:?} --> {:?}",
-                variant.gene_name,
-                variant.gene_position,
-                variant.variant.clone()
-            );
-        }
-        if is_first {
-            gene_start = SystemTime::now();
-        }
-        for gene_name in sample.genes_with_mutations.clone().iter() {
-            if gene_name != target_gene {
-                continue;
-            }
-            println!("{}", gene_name);
-            let gene_diff = GeneDifference::new(
-                reference.get_gene(gene_name.clone()),
-                sample.get_gene(gene_name.clone()),
-                MinorType::COV,
-            );
-            println!(
-                "{:?}",
-                gene_diff
-                    .mutations
-                    .iter()
-                    .map(|mutation| mutation.mutation.clone())
-                    .collect::<Vec<String>>()
-            );
-            println!(
-                "{:?}\n",
-                gene_diff
-                    .minor_mutations
-                    .iter()
-                    .map(|mutation| mutation.mutation.clone())
-                    .collect::<Vec<String>>()
-            );
-        }
-        gene_end = SystemTime::now();
-        is_first = false;
-    }
+    // for target_gene in target_genes.iter() {
+    //     for variant in difference.variants.iter_mut() {
+    //         if variant.gene_name.clone().is_none()
+    //             || (variant.gene_name.clone().is_some()
+    //                 && variant.gene_name.clone().unwrap() != *target_gene)
+    //         {
+    //             continue;
+    //         }
+    //         println!(
+    //             "{:?}@{:?} --> {:?}",
+    //             variant.gene_name,
+    //             variant.gene_position,
+    //             variant.variant.clone()
+    //         );
+    //     }
+    //     for variant in difference.minor_variants.iter_mut() {
+    //         if variant.gene_name.clone().is_none()
+    //             || (variant.gene_name.clone().is_some()
+    //                 && variant.gene_name.clone().unwrap() != *target_gene)
+    //         {
+    //             continue;
+    //         }
+    //         println!(
+    //             "{:?}@{:?} --> {:?}",
+    //             variant.gene_name,
+    //             variant.gene_position,
+    //             variant.variant.clone()
+    //         );
+    //     }
+    //     if is_first {
+    //         gene_start = SystemTime::now();
+    //     }
+    //     for gene_name in sample.genes_with_mutations.clone().iter() {
+    //         if gene_name != target_gene {
+    //             continue;
+    //         }
+    //         println!("{}", gene_name);
+    //         let gene_diff = GeneDifference::new(
+    //             reference.get_gene(gene_name.clone()),
+    //             sample.get_gene(gene_name.clone()),
+    //             MinorType::COV,
+    //         );
+    //         println!(
+    //             "{:?}",
+    //             gene_diff
+    //                 .mutations
+    //                 .iter()
+    //                 .map(|mutation| mutation.mutation.clone())
+    //                 .collect::<Vec<String>>()
+    //         );
+    //         println!(
+    //             "{:?}\n",
+    //             gene_diff
+    //                 .minor_mutations
+    //                 .iter()
+    //                 .map(|mutation| mutation.mutation.clone())
+    //                 .collect::<Vec<String>>()
+    //         );
+    //     }
+    //     gene_end = SystemTime::now();
+    //     is_first = false;
+    // }
     println!("\n-----------------------------------\n");
     println!("VCF took {:?}", vcf_end.duration_since(vcf_start).unwrap());
     println!(

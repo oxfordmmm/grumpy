@@ -111,11 +111,7 @@ pub fn parse_genbank_location(
             return true;
         }
         Range(s, e) => {
-            if reverse_complement {
-                ranges.push((e.0, s.0));
-            } else {
-                ranges.push((s.0, e.0));
-            }
+            ranges.push((s.0, e.0));
         }
         Join(loc_ranges) => {
             // Checking for PRFS
@@ -265,10 +261,10 @@ impl Genome {
             for (start, end) in gene.ranges.iter() {
                 let mut start_idx = *start;
                 let mut end_idx = *end;
-                if gene.reverse_complement {
-                    start_idx = *end;
-                    end_idx = *start;
-                }
+                // if gene.reverse_complement {
+                //     start_idx = *end;
+                //     end_idx = *start;
+                // }
                 for i in start_idx..end_idx {
                     self.genome_positions[i as usize]
                         .genes
@@ -281,9 +277,13 @@ impl Genome {
             // Check for overlapping genes, assigning promoters to non-overlapping genes
             let start;
             if gene.ranges.len() == 1 {
-                start = gene.ranges[0].0;
+                if gene.reverse_complement {
+                    start = gene.ranges[0].1;
+                } else {
+                    start = gene.ranges[0].0;
+                }
             } else if gene.reverse_complement {
-                start = gene.ranges[gene.ranges.len() - 1].0;
+                start = gene.ranges[gene.ranges.len() - 1].1;
             } else {
                 start = gene.ranges[0].0;
             }
@@ -370,20 +370,32 @@ impl Genome {
         let mut nucleotide_index = Vec::new();
         let mut genome_positions: Vec<GenomePosition> = Vec::new();
         if gene_def.reverse_complement {
-            for (idx, (start, end)) in gene_def.ranges.iter().rev().enumerate() {
-                let mut last_idx: usize = if idx == 0 && gene_def.promoter_start != -1 {
-                    gene_def.promoter_start as usize
-                } else {
-                    *start as usize
-                };
-                if last_idx == self.genome_positions.len() {
-                    last_idx -= 1;
-                }
-                for i in *end as usize..last_idx + 1 {
+            // for (idx, (end, start)) in gene_def.ranges.iter().rev().enumerate() {
+            //     let mut last_idx: usize = if idx == 0 && gene_def.promoter_start != -1 {
+            //         gene_def.promoter_start as usize
+            //     } else {
+            //         *start as usize
+            //     };
+            //     if last_idx == self.genome_positions.len() {
+            //         last_idx -= 1;
+            //     }
+            //     for i in *end as usize..last_idx + 1 {
+            //         nucleotide_sequence.push(self.genome_positions[i].reference);
+            //         nucleotide_index.push(self.genome_positions[i].genome_idx);
+            //         genome_positions.push(self.genome_positions[i].clone());
+            //     }
+            // }
+            for (start, end) in gene_def.ranges.iter() {
+                for i in *start as usize..*end as usize {
                     nucleotide_sequence.push(self.genome_positions[i].reference);
                     nucleotide_index.push(self.genome_positions[i].genome_idx);
                     genome_positions.push(self.genome_positions[i].clone());
                 }
+            }
+            for idx in gene_def.ranges.last().unwrap().1 as usize..=gene_def.promoter_start as usize {
+                nucleotide_sequence.push(self.genome_positions[idx].reference);
+                nucleotide_index.push(self.genome_positions[idx].genome_idx);
+                genome_positions.push(self.genome_positions[idx].clone());
             }
         } else {
             for (idx, (start, end)) in gene_def.ranges.iter().enumerate() {
@@ -404,7 +416,24 @@ impl Genome {
                 }
             }
         }
-
+        // if gene_def.name == "INCOMPLETE_LK403_RS14635" {
+        //     for pos in genome_positions.iter() {
+        //         if pos.alts.len() > 0 || pos.deleted_evidence.len() > 0 {
+        //             println!("-- Position from gene {:?} --", pos);
+        //         }
+        //     }
+        //     println!("{:?}", gene_def);
+        // }
+        // if gene_def.reverse_complement {
+        //     // Reverse the sequence
+        //     let revcomp_sequence: String = nucleotide_sequence
+        //         .chars()
+        //         .rev()
+        //         .collect();
+        //     nucleotide_sequence = revcomp_sequence;
+        //     nucleotide_index.reverse();
+        //     genome_positions.reverse();
+        // }
         // I hate implicit returns, but appease clippy
         Gene::new(
             gene_def,

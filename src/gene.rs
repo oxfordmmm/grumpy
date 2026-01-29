@@ -589,15 +589,23 @@ impl Gene {
 
         // Iter all positions, double checking that the deletions don't pass end of gene
         // truncating those which do
+        let g = genome_positions.to_vec();
         for position in genome_positions.iter_mut() {
             for alt in position.alts.iter_mut() {
                 if alt.alt_type == AltType::DEL
                     && position.genome_idx + (alt.base.len() as i64) > last_pos
                 {
-                    let bases_to_trim =
+                    let mut bases_to_trim =
                         (position.genome_idx + alt.base.len() as i64 - last_pos - 1) as usize;
                     if bases_to_trim == 0 {
                         continue;
+                    }
+                    // if bases_to_trim > alt.base.len() {
+                    //     bases_to_trim = alt.base.len();
+                    // }
+                    if gene_name == "INCOMPLETE_LK403_RS14635" {
+                        println!("{:?} {} {} {}", alt, last_pos, bases_to_trim, gene_name);
+                        println!("{:?}",g[g.len() - 1]);
                     }
                     alt.base = alt.base[0..alt.base.len() - bases_to_trim].to_string();
                 }
