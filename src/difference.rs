@@ -248,12 +248,27 @@ impl GenomeDifference {
 
                     if alt.evidence.is_minor {
                         // Append coverage to the variant
-                        if minor_type == MinorType::COV && alt.evidence.cov.is_some() {
-                            garc = garc + ":" + &alt.evidence.cov.unwrap().to_string();
+                        if minor_type == MinorType::COV {
+                            match alt.evidence.cov {
+                                Some(cov) => {
+                                    garc = garc + ":" + &cov.to_string();
+                                }
+                                None => {
+                                    panic!(
+                                        "Missing coverage for minor allele: {}, skipping!",
+                                        garc
+                                    );
+                                }
+                            }
                         } else if minor_type == MinorType::FRS && alt.evidence.frs.is_some() {
-                            garc = garc
-                                + ":"
-                                + &trim_float_string(format!("{:.3}", alt.evidence.frs.unwrap()));
+                            match alt.evidence.frs {
+                                Some(frs) => {
+                                    garc = garc + ":" + &trim_float_string(format!("{:.3}", frs));
+                                }
+                                None => {
+                                    panic!("Missing FRS for minor allele: {}, skipping!", garc);
+                                }
+                            }
                         } else {
                             println!("Missing evidence for minor allele: {}, skipping!", garc);
                             continue;
@@ -658,20 +673,32 @@ impl GeneDifference {
                                             indel_nucleotides = Some(e.base.clone());
                                             evidence = vec![e.evidence.clone()];
                                         }
-                                        if minor_type == MinorType::COV && e.evidence.cov.is_some()
-                                        {
-                                            _mutation = _mutation
-                                                + ":"
-                                                + &e.evidence.cov.unwrap().to_string();
-                                        } else if minor_type == MinorType::FRS
-                                            && e.evidence.frs.is_some()
-                                        {
-                                            _mutation = _mutation
-                                                + ":"
-                                                + &trim_float_string(format!(
-                                                    "{:.3}",
-                                                    e.evidence.frs.unwrap()
-                                                ));
+                                        if minor_type == MinorType::COV {
+                                            match e.evidence.cov {
+                                                Some(cov) => {
+                                                    _mutation = _mutation + ":" + &cov.to_string();
+                                                }
+                                                None => {
+                                                    panic!(
+                                                        "Missing coverage for minor allele: {}, skipping!",
+                                                        _mutation
+                                                    );
+                                                }
+                                            }
+                                        } else if minor_type == MinorType::FRS {
+                                            match e.evidence.frs {
+                                                Some(frs) => {
+                                                    _mutation = _mutation
+                                                        + ":"
+                                                        + &trim_float_string(format!("{:.3}", frs));
+                                                }
+                                                None => {
+                                                    panic!(
+                                                        "Missing FRS for minor allele: {}, skipping!",
+                                                        _mutation
+                                                    );
+                                                }
+                                            }
                                         } else {
                                             println!(
                                                 "Missing evidence for minor allele: {}, skipping!",
@@ -844,28 +871,43 @@ impl GeneDifference {
 
                             if alt.evidence.is_minor {
                                 // Append coverage to the variant
-                                if minor_type == MinorType::COV && alt.evidence.cov.is_some() {
-                                    mutation =
-                                        mutation + ":" + &alt.evidence.cov.unwrap().to_string();
-                                } else if minor_type == MinorType::FRS && alt.evidence.frs.is_some()
-                                {
-                                    mutation = mutation
-                                        + ":"
-                                        + &trim_float_string(format!(
-                                            "{:.3}",
-                                            alt.evidence.frs.unwrap()
-                                        ));
+                                if minor_type == MinorType::COV {
+                                    match alt.evidence.cov {
+                                        Some(cov) => {
+                                            mutation = mutation + ":" + &cov.to_string();
+                                        }
+                                        None => {
+                                            panic!(
+                                                "Missing coverage for minor allele: {}, skipping!",
+                                                mutation
+                                            );
+                                        }
+                                    }
+                                } else if minor_type == MinorType::FRS {
+                                    match alt.evidence.frs {
+                                        Some(frs) => {
+                                            mutation = mutation
+                                                + ":"
+                                                + &trim_float_string(format!("{:.3}", frs));
+                                        }
+                                        None => {
+                                            panic!(
+                                                "Missing FRS for minor allele: {}, skipping!",
+                                                mutation
+                                            );
+                                        }
+                                    }
                                 }
                                 if alt.alt_type == AltType::DEL {
-                                    if alt.evidence.cov.is_some()
-                                        && alt.evidence.cov.unwrap() > minor_deleted_cov
-                                    {
-                                        minor_deleted_cov = alt.evidence.cov.unwrap();
+                                    if let Some(cov) = alt.evidence.cov {
+                                        if cov > minor_deleted_cov {
+                                            minor_deleted_cov = cov;
+                                        }
                                     }
-                                    if alt.evidence.frs.is_some()
-                                        && alt.evidence.frs.unwrap() > minor_deleted_frs
-                                    {
-                                        minor_deleted_frs = alt.evidence.frs.unwrap();
+                                    if let Some(frs) = alt.evidence.frs {
+                                        if frs > minor_deleted_frs {
+                                            minor_deleted_frs = frs;
+                                        }
                                     }
                                 }
                                 if alt.alt_type == AltType::DEL || alt.alt_type == AltType::INS {
