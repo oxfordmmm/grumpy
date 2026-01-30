@@ -5084,9 +5084,9 @@ mod tests {
         let sample_gene = sample.get_gene("INCOMPLETE_LK403_RS14635".to_string());
         // Getting to this point without error is the main test here, but check that the mutation is placed too
         let gene_diff = GeneDifference::new(ref_gene, sample_gene, MinorType::COV);
-        println!("Gene diff mutations: {:?}" , gene_diff.mutations);
+        println!("Gene diff mutations: {:?}", gene_diff.mutations);
         assert!(gene_diff.mutations.len() == 1);
-        assert!(gene_diff.minor_mutations.len() == 0);
-        assert!(gene_diff.mutations[0].mutation == "-6_del_ca".to_string());
+        assert!(gene_diff.minor_mutations.is_empty());
+        assert!(gene_diff.mutations[0].mutation == "-6_del_ca");
     }
 }
