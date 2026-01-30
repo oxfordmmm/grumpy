@@ -1,0 +1,20 @@
+##fileformat=VCFv4.2
+##source=minos, version 0.12.5
+##fileDate=2026-01-27
+##FORMAT=<ID=ALLELE_DP,Number=R,Type=Float,Description="Mean read depth of ref and each allele">
+##FORMAT=<ID=COV,Number=R,Type=Integer,Description="Number of reads on ref and alt alleles">
+##FORMAT=<ID=COV_TOTAL,Number=1,Type=Integer,Description="Total reads mapped at this site, from gramtools">
+##FORMAT=<ID=DP,Number=1,Type=Float,Description="Mean read depth of called allele (ie the ALLELE_DP of the called allele)">
+##FORMAT=<ID=FRS,Number=1,Type=Float,Description="Fraction of reads that support the genotype call">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=GT_CONF,Number=1,Type=Float,Description="Genotype confidence. Difference in log likelihood of most likely and next most likely genotype">
+##minosMeanReadDepth=24.34
+##minosReadDepthVariance=52.347
+##contig=<ID=CP015278.1,length=5865644>
+##FORMAT=<ID=GT_CONF_PERCENTILE,Number=1,Type=Float,Description="Percentile of GT_CONF">
+##FILTER=<ID=MIN_FRS,Description="Minimum FRS of 0.9">
+##FILTER=<ID=MIN_DP,Description="Minimum DP of 3">
+##FILTER=<ID=MIN_GCP,Description="Minimum GT_CONF_PERCENTILE of 0.5">
+##FILTER=<ID=MAX_DP,Description="Maximum DP of 46.0453679996447 (= 3.0 standard deviations from the mean read depth 24.34)">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	sample
+CP015278.1	3115422	.	CTG	C	.	PASS	.	GT:DP:ALLELE_DP:FRS:COV_TOTAL:COV:GT_CONF:GT_CONF_PERCENTILE	1/1:32:0,32:1.0:32:0,32:227.66:85.78

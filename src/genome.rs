@@ -90,6 +90,7 @@ pub struct Genome {
     pub vcf_records: Option<Vec<VCFRow>>,
 }
 
+#[allow(clippy::only_used_in_recursion)]
 /// Recursively parse a GenBank location into ranges
 /// Required as complement and join can be nested
 ///
@@ -259,13 +260,7 @@ impl Genome {
         for gene in self.gene_definitions.iter_mut() {
             // First pass to add gene names to all positions they exist in
             for (start, end) in gene.ranges.iter() {
-                let mut start_idx = *start;
-                let mut end_idx = *end;
-                // if gene.reverse_complement {
-                //     start_idx = *end;
-                //     end_idx = *start;
-                // }
-                for i in start_idx..end_idx {
+                for i in *start..*end {
                     self.genome_positions[i as usize]
                         .genes
                         .push(gene.name.clone());
@@ -369,72 +364,30 @@ impl Genome {
         let mut nucleotide_sequence = "".to_string();
         let mut nucleotide_index = Vec::new();
         let mut genome_positions: Vec<GenomePosition> = Vec::new();
-        if gene_def.reverse_complement {
-            // for (idx, (end, start)) in gene_def.ranges.iter().rev().enumerate() {
-            //     let mut last_idx: usize = if idx == 0 && gene_def.promoter_start != -1 {
-            //         gene_def.promoter_start as usize
-            //     } else {
-            //         *start as usize
-            //     };
-            //     if last_idx == self.genome_positions.len() {
-            //         last_idx -= 1;
-            //     }
-            //     for i in *end as usize..last_idx + 1 {
-            //         nucleotide_sequence.push(self.genome_positions[i].reference);
-            //         nucleotide_index.push(self.genome_positions[i].genome_idx);
-            //         genome_positions.push(self.genome_positions[i].clone());
-            //     }
-            // }
-            for (start, end) in gene_def.ranges.iter() {
-                for i in *start as usize..*end as usize {
-                    nucleotide_sequence.push(self.genome_positions[i].reference);
-                    nucleotide_index.push(self.genome_positions[i].genome_idx);
-                    genome_positions.push(self.genome_positions[i].clone());
-                }
+        if !gene_def.reverse_complement && gene_def.promoter_start != -1 {
+            for idx in
+                (gene_def.promoter_start as usize).saturating_sub(1)..gene_def.ranges[0].0 as usize
+            {
+                nucleotide_sequence.push(self.genome_positions[idx].reference);
+                nucleotide_index.push(self.genome_positions[idx].genome_idx);
+                genome_positions.push(self.genome_positions[idx].clone());
             }
+        }
+        for (start, end) in gene_def.ranges.iter() {
+            for i in *start as usize..*end as usize {
+                nucleotide_sequence.push(self.genome_positions[i].reference);
+                nucleotide_index.push(self.genome_positions[i].genome_idx);
+                genome_positions.push(self.genome_positions[i].clone());
+            }
+        }
+        if gene_def.reverse_complement && gene_def.promoter_start != -1 {
             for idx in gene_def.ranges.last().unwrap().1 as usize..=gene_def.promoter_start as usize
             {
                 nucleotide_sequence.push(self.genome_positions[idx].reference);
                 nucleotide_index.push(self.genome_positions[idx].genome_idx);
                 genome_positions.push(self.genome_positions[idx].clone());
             }
-        } else {
-            for (idx, (start, end)) in gene_def.ranges.iter().enumerate() {
-                let first_idx: usize;
-                if idx == 0 && gene_def.promoter_start != -1 {
-                    if gene_def.promoter_start == 0 {
-                        first_idx = 0;
-                    } else {
-                        first_idx = gene_def.promoter_start as usize - 1;
-                    }
-                } else {
-                    first_idx = *start as usize;
-                }
-                for i in first_idx..*end as usize {
-                    nucleotide_sequence.push(self.genome_positions[i].reference);
-                    nucleotide_index.push(self.genome_positions[i].genome_idx);
-                    genome_positions.push(self.genome_positions[i].clone());
-                }
-            }
         }
-        // if gene_def.name == "INCOMPLETE_LK403_RS14635" {
-        //     for pos in genome_positions.iter() {
-        //         if pos.alts.len() > 0 || pos.deleted_evidence.len() > 0 {
-        //             println!("-- Position from gene {:?} --", pos);
-        //         }
-        //     }
-        //     println!("{:?}", gene_def);
-        // }
-        // if gene_def.reverse_complement {
-        //     // Reverse the sequence
-        //     let revcomp_sequence: String = nucleotide_sequence
-        //         .chars()
-        //         .rev()
-        //         .collect();
-        //     nucleotide_sequence = revcomp_sequence;
-        //     nucleotide_index.reverse();
-        //     genome_positions.reverse();
-        // }
         // I hate implicit returns, but appease clippy
         Gene::new(
             gene_def,
@@ -5123,5 +5076,17 @@ mod tests {
         assert!(reference
             .gene_names
             .contains(&"INCOMPLETE_LK403_RS00005".to_string()));
+
+        // Check that a mutation is correctly placed (rather than erroring)
+        let vcf = VCFFile::new("test/intracellulare.vcf".to_string(), false, 3);
+        let mut sample = mutate(&reference, vcf);
+        let ref_gene = reference.get_gene("INCOMPLETE_LK403_RS14635".to_string());
+        let sample_gene = sample.get_gene("INCOMPLETE_LK403_RS14635".to_string());
+        // Getting to this point without error is the main test here, but check that the mutation is placed too
+        let gene_diff = GeneDifference::new(ref_gene, sample_gene, MinorType::COV);
+        println!("Gene diff mutations: {:?}" , gene_diff.mutations);
+        assert!(gene_diff.mutations.len() == 1);
+        assert!(gene_diff.minor_mutations.len() == 0);
+        assert!(gene_diff.mutations[0].mutation == "-6_del_ca".to_string());
     }
 }
