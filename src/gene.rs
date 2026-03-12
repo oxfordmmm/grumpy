@@ -586,16 +586,26 @@ impl Gene {
         genome_positions[0] = first_pos;
 
         let last_pos = genome_positions[genome_positions.len() - 1].genome_idx;
+        let first_pos = genome_positions[0].genome_idx;
+        let max_pos = genome_positions.iter().map(|x| x.genome_idx).max().unwrap();
+        let crosses_genome_boundary = last_pos < first_pos;
 
         // Iter all positions, double checking that the deletions don't pass end of gene
         // truncating those which do
         for position in genome_positions.iter_mut() {
+            let offset = if crosses_genome_boundary && position.genome_idx < first_pos {
+                // This position is at the start of the genome, having started at the end,
+                // so we need to check if the deletion crosses the boundary here
+                last_pos
+            } else {
+                max_pos
+            };
             for alt in position.alts.iter_mut() {
                 if alt.alt_type == AltType::DEL
-                    && position.genome_idx + (alt.base.len() as i64) > last_pos
+                    && position.genome_idx + (alt.base.len() as i64) > offset
                 {
                     let bases_to_trim =
-                        (position.genome_idx + alt.base.len() as i64 - last_pos - 1) as usize;
+                        (position.genome_idx + alt.base.len() as i64 - offset - 1) as usize;
                     if bases_to_trim == 0 {
                         continue;
                     }

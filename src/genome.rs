@@ -5082,11 +5082,19 @@ mod tests {
         let mut sample = mutate(&reference, vcf);
         let ref_gene = reference.get_gene("INCOMPLETE_LK403_RS14635".to_string());
         let sample_gene = sample.get_gene("INCOMPLETE_LK403_RS14635".to_string());
+
         // Getting to this point without error is the main test here, but check that the mutation is placed too
         let gene_diff = GeneDifference::new(ref_gene, sample_gene, MinorType::COV);
-        println!("Gene diff mutations: {:?}", gene_diff.mutations);
         assert!(gene_diff.mutations.len() == 1);
         assert!(gene_diff.minor_mutations.is_empty());
         assert!(gene_diff.mutations[0].mutation == "-6_del_ca");
+
+        // Similarly with the LK403_RS00005 gene which crosses the genome boundary
+        let ref_gene = reference.get_gene("INCOMPLETE_LK403_RS00005".to_string());
+        let sample_gene = sample.get_gene("INCOMPLETE_LK403_RS00005".to_string());
+        let gene_diff = GeneDifference::new(ref_gene, sample_gene, MinorType::COV);
+        assert!(gene_diff.mutations.is_empty());
+        assert!(gene_diff.minor_mutations.len() == 1);
+        assert!(gene_diff.minor_mutations[0].mutation == "783_del_gccgcgccgcgcggcgcg:3");
     }
 }

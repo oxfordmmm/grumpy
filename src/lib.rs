@@ -67,6 +67,7 @@ fn grumpy(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add_function(wrap_pyfunction!(genome::mutate, m)?)?;
     m.add_function(wrap_pyfunction!(common::thread_setup, m)?)?;
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
 
     Ok(())
 }
