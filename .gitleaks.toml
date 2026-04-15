@@ -16,7 +16,7 @@ useDefault = true
 
 [[allowlists]]
 description = "Allow GBK translation sequence false positive for Square access token"
-targetRules = ["square-access-token`"]
+targetRules = ["square-access-token"]
 paths = [
   '''^grumpy/reference/NC_000962\.3\.gbk''',
   '''^reference/NZ_CP085945\.1\.gbk'''
