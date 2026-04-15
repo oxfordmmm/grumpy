@@ -22,6 +22,7 @@ paths = [
   '''^reference/NZ_CP085945\.1\.gbk'''
 ]
 
+[[allowlists]]
 description = "Allow GBK translation sequence false positive for alibaba access key ids"
 targetRules = ["alibaba-access-key-id"]
 paths = [
