@@ -10,6 +10,11 @@ Re-implementation of [gumpy](https://github.com/oxfordmmm/gumpy) in Rust for spe
 cargo add grumpy
 ```
 
+### CLI
+```
+cargo install grumpy
+```
+
 ### Python package
 ```
 pip install bio-grumpy
