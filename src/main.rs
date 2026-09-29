@@ -71,35 +71,35 @@ fn main() {
     let mut gene_start = SystemTime::now();
     let mut gene_end = SystemTime::now();
     for target_gene in target_genes.iter() {
-        for variant in difference.variants.iter_mut() {
-            if variant.gene_name.clone().is_none()
-                || (variant.gene_name.clone().is_some()
-                    && variant.gene_name.clone().unwrap() != *target_gene)
-            {
-                continue;
-            }
-            println!(
-                "{:?}@{:?} --> {:?}",
-                variant.gene_name,
-                variant.gene_position,
-                variant.variant.clone()
-            );
-        }
-        for variant in difference.minor_variants.iter_mut() {
-            if variant.gene_name.clone().is_none()
-                || (variant.gene_name.clone().is_some()
-                    && variant.gene_name.clone().unwrap() != *target_gene)
-            {
-                continue;
-            }
-            println!(
-                "{:?}@{:?} --> {:?}",
-                variant.gene_name,
-                variant.gene_position,
-                variant.variant.clone()
-            );
-        }
         if is_first {
+            for variant in difference.variants.iter_mut() {
+                if variant.gene_name.clone().is_none()
+                    || (variant.gene_name.clone().is_some()
+                        && variant.gene_name.clone().unwrap() != *target_gene)
+                {
+                    continue;
+                }
+                println!(
+                    "{:?}@{:?} --> {:?}",
+                    variant.gene_name,
+                    variant.gene_position,
+                    variant.variant.clone()
+                );
+            }
+            for variant in difference.minor_variants.iter_mut() {
+                if variant.gene_name.clone().is_none()
+                    || (variant.gene_name.clone().is_some()
+                        && variant.gene_name.clone().unwrap() != *target_gene)
+                {
+                    continue;
+                }
+                println!(
+                    "{:?}@{:?} --> {:?}",
+                    variant.gene_name,
+                    variant.gene_position,
+                    variant.variant.clone()
+                );
+            }
             gene_start = SystemTime::now();
         }
         for gene_name in sample.genes_with_mutations.clone().iter() {
