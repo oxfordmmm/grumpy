@@ -395,10 +395,16 @@ impl Genome {
 
     /// Build all genes in the genome, storing them in the genes hashmap
     pub fn build_all_genes(&mut self) {
-        for (k, v) in self.gene_names.par_iter().map(|gene_name| {
-            let gene = self.build_gene(gene_name.clone());
-            (gene_name.clone(), gene)
-        }).collect::<Vec<(String, Gene)>>().into_iter(){
+        for (k, v) in self
+            .gene_names
+            .par_iter()
+            .map(|gene_name| {
+                let gene = self.build_gene(gene_name.clone());
+                (gene_name.clone(), gene)
+            })
+            .collect::<Vec<(String, Gene)>>()
+            .into_iter()
+        {
             self.genes.insert(k, v);
         }
     }
