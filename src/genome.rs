@@ -1,5 +1,6 @@
 //! Module for handling genome data
 use pyo3::prelude::*;
+use rayon::prelude::*;
 
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -56,10 +57,6 @@ pub struct Genome {
     #[pyo3(get, set)]
     /// Name of the genome
     pub name: String,
-
-    #[pyo3(get, set)]
-    /// Nucleotide sequence which comprises this genome
-    pub nucleotide_sequence: String,
 
     #[pyo3(get, set)]
     /// Definitions for each gene in the genome
@@ -235,7 +232,6 @@ impl Genome {
         }
         let mut genome = Genome {
             name: genome_name,
-            nucleotide_sequence: _nucleotide_sequence,
             gene_definitions: _gene_definitions,
             genome_positions,
             genes: HashMap::new(),
@@ -399,9 +395,17 @@ impl Genome {
 
     /// Build all genes in the genome, storing them in the genes hashmap
     pub fn build_all_genes(&mut self) {
-        for gene_name in self.gene_names.iter() {
-            let gene = self.build_gene(gene_name.clone());
-            self.genes.insert(gene_name.clone(), gene);
+        for (k, v) in self
+            .gene_names
+            .par_iter()
+            .map(|gene_name| {
+                let gene = self.build_gene(gene_name.clone());
+                (gene_name.clone(), gene)
+            })
+            .collect::<Vec<(String, Gene)>>()
+            .into_iter()
+        {
+            self.genes.insert(k, v);
         }
     }
 
@@ -573,9 +577,6 @@ pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome {
                 {
                     // Update nucleotide for SNP/het/null
                     position.reference = base;
-                    new_genome
-                        .nucleotide_sequence
-                        .replace_range(idx..idx + 1, &base.to_string());
                 }
             }
         }
@@ -655,7 +656,7 @@ mod tests {
     fn test_tb_genome() {
         let mut genome = Genome::new("reference/NC_000962.3.gbk");
         assert_eq!(genome.name, "NC_000962");
-        assert_eq!(genome.nucleotide_sequence.len(), 4411532);
+        assert_eq!(genome.genome_positions.len(), 4411532);
         assert_eq!(genome.gene_definitions.len(), 3909);
         assert_eq!(genome.gene_names.len(), 3909);
 
@@ -858,7 +859,7 @@ mod tests {
     fn test_covid_genome() {
         let mut genome = Genome::new("reference/MN908947.3.gb");
         assert_eq!(genome.name, "MN908947");
-        assert_eq!(genome.nucleotide_sequence.len(), 29903);
+        assert_eq!(genome.genome_positions.len(), 29903);
         assert_eq!(genome.gene_definitions.len(), 10);
         assert_eq!(genome.gene_names.len(), 10);
 
@@ -881,7 +882,6 @@ mod tests {
         // Dummy DNA genbank file, used as it's short enough to know the expected values
         let genome = Genome::new("reference/TEST-DNA.gbk");
         assert_eq!(genome.name, "TEST_DNA");
-        assert_eq!(genome.nucleotide_sequence, "aaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccc");
         let mut offset = 0;
         for (idx, pos) in genome.genome_positions.iter().enumerate() {
             if idx - offset < 10 {
