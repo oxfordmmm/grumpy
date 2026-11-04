@@ -110,7 +110,9 @@ impl VCFFile {
                 // Check if calls are already in the map,
                 // if they are, warn the user about multiple calls at the same position and add to vector
                 // if they aren't, add to the map
-                if let hash_map::Entry::Vacant(e) = calls_map.entry((record.chrom.clone(), call.genome_index)) {
+                if let hash_map::Entry::Vacant(e) =
+                    calls_map.entry((record.chrom.clone(), call.genome_index))
+                {
                     if added {
                         e.insert(vec![call.clone()]);
                     }
@@ -118,7 +120,9 @@ impl VCFFile {
                     println!(
                         "Multiple calls at genome position {}! {:?}\n",
                         call.genome_index,
-                        calls_map.get(&(record.chrom.clone(), call.genome_index)).unwrap()
+                        calls_map
+                            .get(&(record.chrom.clone(), call.genome_index))
+                            .unwrap()
                     );
                     if added {
                         calls_map
@@ -163,7 +167,9 @@ impl VCFFile {
             }
             if valid_filters {
                 for call in record_minor_calls.iter() {
-                    if let hash_map::Entry::Vacant(e) = minor_calls_map.entry((record.chrom.clone(), call.genome_index)) {
+                    if let hash_map::Entry::Vacant(e) =
+                        minor_calls_map.entry((record.chrom.clone(), call.genome_index))
+                    {
                         e.insert(vec![call.clone()]);
                     } else {
                         minor_calls_map
@@ -1504,7 +1510,10 @@ mod tests {
         ];
 
         for calls in expected_calls.iter() {
-            let actual = vcf.calls.get(&("MN908947.3".to_string(), calls[0].genome_index)).unwrap();
+            let actual = vcf
+                .calls
+                .get(&("MN908947.3".to_string(), calls[0].genome_index))
+                .unwrap();
             for (idx, call) in calls.iter().enumerate() {
                 assert_eq!(call.cov, actual[idx].cov);
                 assert_eq!(call.frs, actual[idx].frs);
@@ -1548,7 +1557,10 @@ mod tests {
         ]];
 
         for calls in expected_minor_calls.iter() {
-            let actual = vcf.minor_calls.get(&("MN908947.3".to_string(), calls[0].genome_index)).unwrap();
+            let actual = vcf
+                .minor_calls
+                .get(&("MN908947.3".to_string(), calls[0].genome_index))
+                .unwrap();
             for (idx, call) in calls.iter().enumerate() {
                 assert_eq!(call.cov, actual[idx].cov);
                 assert_eq!(call.frs, actual[idx].frs);

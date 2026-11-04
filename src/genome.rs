@@ -540,8 +540,15 @@ pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome {
     let mut deleted_positions = HashSet::new();
     let mut deleted_evidence: HashMap<usize, Evidence> = HashMap::new();
     for (idx, position) in new_genome.genome_positions.iter_mut().enumerate() {
-        if vcf.calls.contains_key(&(reference.name.clone(), position.genome_idx)) {
-            for call in vcf.calls.get(&(reference.name.clone(), position.genome_idx)).unwrap() {
+        if vcf
+            .calls
+            .contains_key(&(reference.name.clone(), position.genome_idx))
+        {
+            for call in vcf
+                .calls
+                .get(&(reference.name.clone(), position.genome_idx))
+                .unwrap()
+            {
                 // Set the new base etc from the call
                 let c = call.clone();
                 position.alts.push(Alt {
@@ -582,8 +589,15 @@ pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome {
             }
         }
 
-        if vcf.minor_calls.contains_key(&(reference.name.clone(), position.genome_idx)) {
-            for call in vcf.minor_calls.get(&(reference.name.clone(), position.genome_idx)).unwrap() {
+        if vcf
+            .minor_calls
+            .contains_key(&(reference.name.clone(), position.genome_idx))
+        {
+            for call in vcf
+                .minor_calls
+                .get(&(reference.name.clone(), position.genome_idx))
+                .unwrap()
+            {
                 // Set the new base etc from the call
                 let c = call.clone();
                 position.alts.push(Alt {
