@@ -141,7 +141,7 @@ impl Genome {
                 Ok(s) => s.to_lowercase(),
                 Err(e) => panic!("Problem reading sequence data: {:?}", e),
             };
-            genome_name = seq.name.unwrap();
+            genome_name = seq.version.unwrap();
             for feature in seq.features {
                 let mut name: String = "".to_string();
                 let mut ranges: Vec<(i64, i64)> = Vec::new();
@@ -230,6 +230,7 @@ impl Genome {
                 deleted_evidence: Vec::new(),
             });
         }
+        println!("{}", genome_name);
         let mut genome = Genome {
             name: genome_name,
             gene_definitions: _gene_definitions,
@@ -539,8 +540,8 @@ pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome {
     let mut deleted_positions = HashSet::new();
     let mut deleted_evidence: HashMap<usize, Evidence> = HashMap::new();
     for (idx, position) in new_genome.genome_positions.iter_mut().enumerate() {
-        if vcf.calls.contains_key(&position.genome_idx) {
-            for call in vcf.calls.get(&position.genome_idx).unwrap() {
+        if vcf.calls.contains_key(&(reference.name.clone(), position.genome_idx)) {
+            for call in vcf.calls.get(&(reference.name.clone(), position.genome_idx)).unwrap() {
                 // Set the new base etc from the call
                 let c = call.clone();
                 position.alts.push(Alt {
@@ -581,8 +582,8 @@ pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome {
             }
         }
 
-        if vcf.minor_calls.contains_key(&position.genome_idx) {
-            for call in vcf.minor_calls.get(&position.genome_idx).unwrap() {
+        if vcf.minor_calls.contains_key(&(reference.name.clone(), position.genome_idx)) {
+            for call in vcf.minor_calls.get(&(reference.name.clone(), position.genome_idx)).unwrap() {
                 // Set the new base etc from the call
                 let c = call.clone();
                 position.alts.push(Alt {
@@ -655,7 +656,7 @@ mod tests {
     #[test]
     fn test_tb_genome() {
         let mut genome = Genome::new("reference/NC_000962.3.gbk");
-        assert_eq!(genome.name, "NC_000962");
+        assert_eq!(genome.name, "NC_000962.3");
         assert_eq!(genome.genome_positions.len(), 4411532);
         assert_eq!(genome.gene_definitions.len(), 3909);
         assert_eq!(genome.gene_names.len(), 3909);
@@ -858,7 +859,7 @@ mod tests {
     #[test]
     fn test_covid_genome() {
         let mut genome = Genome::new("reference/MN908947.3.gb");
-        assert_eq!(genome.name, "MN908947");
+        assert_eq!(genome.name, "MN908947.3");
         assert_eq!(genome.genome_positions.len(), 29903);
         assert_eq!(genome.gene_definitions.len(), 10);
         assert_eq!(genome.gene_names.len(), 10);
@@ -881,7 +882,7 @@ mod tests {
     fn test_dna_genome() {
         // Dummy DNA genbank file, used as it's short enough to know the expected values
         let genome = Genome::new("reference/TEST-DNA.gbk");
-        assert_eq!(genome.name, "TEST_DNA");
+        assert_eq!(genome.name, "TEST_DNA.1");
         let mut offset = 0;
         for (idx, pos) in genome.genome_positions.iter().enumerate() {
             if idx - offset < 10 {
@@ -959,6 +960,7 @@ mod tests {
         let expected_vcf_rows = [
             VCFRow {
                 // 0
+                chrom: "MN908947.3".to_string(),
                 position: 4687,
                 reference: "t".to_string(),
                 alternative: vec!["c".to_string()],
@@ -974,6 +976,7 @@ mod tests {
             },
             VCFRow {
                 // 1
+                chrom: "MN908947.3".to_string(),
                 position: 4725,
                 reference: "t".to_string(),
                 alternative: vec!["c".to_string()],
@@ -989,6 +992,7 @@ mod tests {
             },
             VCFRow {
                 // 2
+                chrom: "MN908947.3".to_string(),
                 position: 4730,
                 reference: "c".to_string(),
                 alternative: vec!["t".to_string(), "g".to_string()],
@@ -1007,6 +1011,7 @@ mod tests {
             },
             VCFRow {
                 // 3
+                chrom: "MN908947.3".to_string(),
                 position: 4735,
                 reference: "g".to_string(),
                 alternative: vec!["gcc".to_string()],
@@ -1022,6 +1027,7 @@ mod tests {
             },
             VCFRow {
                 // 4
+                chrom: "MN908947.3".to_string(),
                 position: 4740,
                 reference: "c".to_string(),
                 alternative: vec!["gtt".to_string()],
@@ -1037,6 +1043,7 @@ mod tests {
             },
             VCFRow {
                 // 5
+                chrom: "MN908947.3".to_string(),
                 position: 13148,
                 reference: "t".to_string(),
                 alternative: vec!["g".to_string()],
@@ -1052,6 +1059,7 @@ mod tests {
             },
             VCFRow {
                 // 6
+                chrom: "MN908947.3".to_string(),
                 position: 13149,
                 reference: "g".to_string(),
                 alternative: vec!["t".to_string()],
@@ -1067,6 +1075,7 @@ mod tests {
             },
             VCFRow {
                 // 7
+                chrom: "MN908947.3".to_string(),
                 position: 13150,
                 reference: "a".to_string(),
                 alternative: vec!["tcg".to_string()],
@@ -1083,6 +1092,7 @@ mod tests {
             VCFRow {
                 // 8
                 // Ambiguous filter fail (filter was null), so row is ignored for calls
+                chrom: "MN908947.3".to_string(),
                 position: 13333,
                 reference: "c".to_string(),
                 alternative: vec!["a".to_string(), "g".to_string()],
@@ -1103,6 +1113,7 @@ mod tests {
                 // 9
                 // Edge case of using `RO` and `AO` for coverage
                 // Fails on a nulling filter, so gets a null call
+                chrom: "MN908947.3".to_string(),
                 position: 13335,
                 reference: "t".to_string(),
                 alternative: vec!["a".to_string()],
@@ -1122,6 +1133,7 @@ mod tests {
                 // 10
                 // Odd edge case which is a valid VCF row where it's a het GT but single COV value
                 // Ambiguous filter fail (filter was null), so row is ignored for calls
+                chrom: "MN908947.3".to_string(),
                 position: 13336,
                 reference: "c".to_string(),
                 alternative: vec!["a".to_string()],
@@ -1138,6 +1150,7 @@ mod tests {
             VCFRow {
                 // 11
                 // Null call by virtue of failing specific filter. Gets null call
+                chrom: "MN908947.3".to_string(),
                 position: 14000,
                 reference: "c".to_string(),
                 alternative: vec!["a".to_string()],
@@ -1566,6 +1579,7 @@ mod tests {
         let expected_vcf_rows = [
             VCFRow {
                 // 0
+                chrom: "TEST_DNA".to_string(),
                 position: 2,
                 reference: "a".to_string(),
                 alternative: vec!["g".to_string()],
@@ -1581,6 +1595,7 @@ mod tests {
             },
             VCFRow {
                 // 1
+                chrom: "TEST_DNA".to_string(),
                 position: 4,
                 reference: "a".to_string(),
                 alternative: vec!["g".to_string(), "t".to_string()],
@@ -1603,6 +1618,7 @@ mod tests {
             },
             VCFRow {
                 // 2
+                chrom: "TEST_DNA".to_string(),
                 position: 6,
                 reference: "aaa".to_string(),
                 alternative: vec!["ggt".to_string(), "gta".to_string(), "ata".to_string()],
@@ -1626,6 +1642,7 @@ mod tests {
             },
             VCFRow {
                 // 3
+                chrom: "TEST_DNA".to_string(),
                 position: 12,
                 reference: "c".to_string(),
                 alternative: vec!["t".to_string()],
@@ -1641,6 +1658,7 @@ mod tests {
             },
             VCFRow {
                 // 4
+                chrom: "TEST_DNA".to_string(),
                 position: 14,
                 reference: "c".to_string(),
                 alternative: vec!["t".to_string(), "g".to_string()],
@@ -1659,6 +1677,7 @@ mod tests {
             },
             VCFRow {
                 // 5
+                chrom: "TEST_DNA".to_string(),
                 position: 16,
                 reference: "ccc".to_string(),
                 alternative: vec!["tgc".to_string(), "gtg".to_string()],
@@ -1677,6 +1696,7 @@ mod tests {
             },
             VCFRow {
                 // 6
+                chrom: "TEST_DNA".to_string(),
                 position: 22,
                 reference: "g".to_string(),
                 alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
@@ -1700,6 +1720,7 @@ mod tests {
             },
             VCFRow {
                 // 7
+                chrom: "TEST_DNA".to_string(),
                 position: 24,
                 reference: "g".to_string(),
                 alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
@@ -1723,6 +1744,7 @@ mod tests {
             },
             VCFRow {
                 // 8
+                chrom: "TEST_DNA".to_string(),
                 position: 26,
                 reference: "gg".to_string(),
                 alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
@@ -1746,6 +1768,7 @@ mod tests {
             },
             VCFRow {
                 // 9
+                chrom: "TEST_DNA".to_string(),
                 position: 28,
                 reference: "gg".to_string(),
                 alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
@@ -1769,6 +1792,7 @@ mod tests {
             },
             VCFRow {
                 // 10
+                chrom: "TEST_DNA".to_string(),
                 position: 33,
                 reference: "t".to_string(),
                 alternative: vec!["ttt".to_string()],
@@ -1784,6 +1808,7 @@ mod tests {
             },
             VCFRow {
                 // 11
+                chrom: "TEST_DNA".to_string(),
                 position: 36,
                 reference: "tt".to_string(),
                 alternative: vec!["t".to_string()],
@@ -1799,6 +1824,7 @@ mod tests {
             },
             VCFRow {
                 // 12
+                chrom: "TEST_DNA".to_string(),
                 position: 39,
                 reference: "tt".to_string(),
                 alternative: vec!["agt".to_string()],
@@ -1814,6 +1840,7 @@ mod tests {
             },
             VCFRow {
                 // 13
+                chrom: "TEST_DNA".to_string(),
                 position: 65,
                 reference: "gg".to_string(),
                 alternative: vec!["cagg".to_string()],
@@ -1829,6 +1856,7 @@ mod tests {
             },
             VCFRow {
                 // 14
+                chrom: "TEST_DNA".to_string(),
                 position: 69,
                 reference: "gg".to_string(),
                 alternative: vec!["gg".to_string()],
@@ -1844,6 +1872,7 @@ mod tests {
             },
             VCFRow {
                 // 15
+                chrom: "TEST_DNA".to_string(),
                 position: 73,
                 reference: "t".to_string(),
                 alternative: vec!["ta".to_string(), "at".to_string()],
@@ -3571,6 +3600,7 @@ mod tests {
 
         let expected_vcf_rows = [
             VCFRow {
+                chrom: "TEST_DNA".to_string(),
                 position: 2,
                 reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
                 alternative: vec!["a".to_string()],
@@ -3793,6 +3823,7 @@ mod tests {
 
         let expected_vcf_rows = [
             VCFRow {
+                chrom: "TEST_DNA".to_string(),
                 position: 2,
                 reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
                 alternative: vec!["a".to_string()],
@@ -4077,6 +4108,7 @@ mod tests {
         let expected_vcf_rows = [
             VCFRow {
                 // 0
+                chrom: "NC_000962.3".to_string(),
                 position: 2154397,
                 reference: "g".to_string(),
                 alternative: vec!["t".to_string(), "c".to_string()],
@@ -4102,6 +4134,7 @@ mod tests {
             },
             VCFRow {
                 // 1
+                chrom: "NC_000962.3".to_string(),
                 position: 2154400,
                 reference: "cgg".to_string(),
                 alternative: vec!["c".to_string()],
@@ -4223,6 +4256,7 @@ mod tests {
         let expected_vcf_rows = [
             VCFRow {
                 // 0
+                chrom: "NC_000962.3".to_string(),
                 position: 2154397,
                 reference: "g".to_string(),
                 alternative: vec!["t".to_string(), "c".to_string()],
@@ -4252,6 +4286,7 @@ mod tests {
             },
             VCFRow {
                 // 1
+                chrom: "NC_000962.3".to_string(),
                 position: 2154400,
                 reference: "cgg".to_string(),
                 alternative: vec!["c".to_string()],
@@ -4369,6 +4404,7 @@ mod tests {
         let expected_vcf_rows = [
             VCFRow {
                 // 0
+                chrom: "NC_000962.3".to_string(),
                 position: 2154397,
                 reference: "g".to_string(),
                 alternative: vec!["t".to_string(), "c".to_string()],
@@ -4394,6 +4430,7 @@ mod tests {
             },
             VCFRow {
                 // 1
+                chrom: "NC_000962.3".to_string(),
                 position: 2154400,
                 reference: "cgg".to_string(),
                 alternative: vec!["c".to_string()],
@@ -4604,6 +4641,7 @@ mod tests {
         let expected_vcf_rows = [
             VCFRow {
                 // 0
+                chrom: "TEST_DNA".to_string(),
                 position: 6,
                 reference: "a".to_string(),
                 alternative: vec!["aa".to_string(), "aaa".to_string()],
@@ -4622,6 +4660,7 @@ mod tests {
             },
             VCFRow {
                 // 1
+                chrom: "TEST_DNA".to_string(),
                 position: 8,
                 reference: "a".to_string(),
                 alternative: vec!["aa".to_string()],
@@ -4637,6 +4676,7 @@ mod tests {
             },
             VCFRow {
                 // 2
+                chrom: "TEST_DNA".to_string(),
                 position: 94,
                 reference: "c".to_string(),
                 alternative: vec!["cc".to_string()],

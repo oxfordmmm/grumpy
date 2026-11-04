@@ -24,35 +24,31 @@ pub enum MinorType {
     FRS,
 }
 
-#[pyclass(eq)]
+#[pyclass(eq, get_all, set_all)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Struct to hold the information from a VCF row
 pub struct VCFRow {
-    #[pyo3(get, set)]
+    /// Contig name this row refers to
+    pub chrom: String,
+
     /// Genome position specified in the VCF row
     pub position: i64,
 
-    #[pyo3(get, set)]
     /// Reference base
     pub reference: String,
 
-    #[pyo3(get, set)]
     /// Alt bases
     pub alternative: Vec<String>,
 
-    #[pyo3(get, set)]
     /// Items in the filter column
     pub filter: Vec<String>,
 
-    #[pyo3(get, set)]
     /// Mapping of FORMAT -> SAMPLE fields
     pub fields: HashMap<String, Vec<String>>,
 
-    #[pyo3(get, set)]
     /// True if the filter column passes
     pub is_filter_pass: bool,
 
-    #[pyo3(get, set)]
     /// Whether this VCF row is complex
     /// Complex VCF rows are edge cases where a row has a large (>1,000) bases for the ref as well as >1 alt
     /// This is used to flag when mutations' evidence isn't worth fetching due to size.
