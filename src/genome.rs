@@ -277,12 +277,12 @@ impl Genome {
                 start = gene.ranges[0].0;
             }
 
-            if self.genome_positions[start as usize].genes.len() > 1 {
-                continue;
-            } else if start == 0 {
-                // Catch edge case of gene starting at genome index 0
+            if start == 0 || start == self.genome_positions.len() as i64 {
+                // Catch edge case of gene starting at either genome start or end
                 // this couldn't have a promoter so mark as such
                 gene.promoter_start = -1;
+            } else if self.genome_positions[start as usize].genes.len() > 1 {
+                continue;
             } else if gene.reverse_complement {
                 gene.promoter_start = start - 1;
             } else {
