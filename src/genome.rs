@@ -1602,7 +1602,7 @@ mod tests {
         let expected_vcf_rows = [
             VCFRow {
                 // 0
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 2,
                 reference: "a".to_string(),
                 alternative: vec!["g".to_string()],
@@ -1618,7 +1618,7 @@ mod tests {
             },
             VCFRow {
                 // 1
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 4,
                 reference: "a".to_string(),
                 alternative: vec!["g".to_string(), "t".to_string()],
@@ -1641,7 +1641,7 @@ mod tests {
             },
             VCFRow {
                 // 2
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 6,
                 reference: "aaa".to_string(),
                 alternative: vec!["ggt".to_string(), "gta".to_string(), "ata".to_string()],
@@ -1665,7 +1665,7 @@ mod tests {
             },
             VCFRow {
                 // 3
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 12,
                 reference: "c".to_string(),
                 alternative: vec!["t".to_string()],
@@ -1681,7 +1681,7 @@ mod tests {
             },
             VCFRow {
                 // 4
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 14,
                 reference: "c".to_string(),
                 alternative: vec!["t".to_string(), "g".to_string()],
@@ -1700,7 +1700,7 @@ mod tests {
             },
             VCFRow {
                 // 5
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 16,
                 reference: "ccc".to_string(),
                 alternative: vec!["tgc".to_string(), "gtg".to_string()],
@@ -1719,7 +1719,7 @@ mod tests {
             },
             VCFRow {
                 // 6
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 22,
                 reference: "g".to_string(),
                 alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
@@ -1743,7 +1743,7 @@ mod tests {
             },
             VCFRow {
                 // 7
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 24,
                 reference: "g".to_string(),
                 alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
@@ -1767,7 +1767,7 @@ mod tests {
             },
             VCFRow {
                 // 8
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 26,
                 reference: "gg".to_string(),
                 alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
@@ -1791,7 +1791,7 @@ mod tests {
             },
             VCFRow {
                 // 9
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 28,
                 reference: "gg".to_string(),
                 alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
@@ -1815,7 +1815,7 @@ mod tests {
             },
             VCFRow {
                 // 10
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 33,
                 reference: "t".to_string(),
                 alternative: vec!["ttt".to_string()],
@@ -1831,7 +1831,7 @@ mod tests {
             },
             VCFRow {
                 // 11
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 36,
                 reference: "tt".to_string(),
                 alternative: vec!["t".to_string()],
@@ -1847,7 +1847,7 @@ mod tests {
             },
             VCFRow {
                 // 12
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 39,
                 reference: "tt".to_string(),
                 alternative: vec!["agt".to_string()],
@@ -1863,7 +1863,7 @@ mod tests {
             },
             VCFRow {
                 // 13
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 65,
                 reference: "gg".to_string(),
                 alternative: vec!["cagg".to_string()],
@@ -1879,7 +1879,7 @@ mod tests {
             },
             VCFRow {
                 // 14
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 69,
                 reference: "gg".to_string(),
                 alternative: vec!["gg".to_string()],
@@ -1895,7 +1895,7 @@ mod tests {
             },
             VCFRow {
                 // 15
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 73,
                 reference: "t".to_string(),
                 alternative: vec!["ta".to_string(), "at".to_string()],
@@ -1908,6 +1908,23 @@ mod tests {
                         vec!["1".to_string(), "198".to_string(), "1".to_string()],
                     ),
                     ("GT_CONF".to_string(), vec!["145.21".to_string()]),
+                ]),
+                is_filter_pass: true,
+                is_complex: false,
+            },
+            VCFRow {
+                // 16
+                // Duplicate of 3, just a different CHROM
+                chrom: "TEST_DNA.2".to_string(),
+                position: 12,
+                reference: "c".to_string(),
+                alternative: vec!["t".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["50".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "50".to_string()]),
+                    ("GT_CONF".to_string(), vec!["200.58".to_string()]),
                 ]),
                 is_filter_pass: true,
                 is_complex: false,
@@ -3625,7 +3642,7 @@ mod tests {
 
         let expected_vcf_rows = [
             VCFRow {
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 2,
                 reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
                 alternative: vec!["a".to_string()],
@@ -3850,7 +3867,7 @@ mod tests {
 
         let expected_vcf_rows = [
             VCFRow {
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 2,
                 reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
                 alternative: vec!["a".to_string()],
@@ -4676,7 +4693,7 @@ mod tests {
         let expected_vcf_rows = [
             VCFRow {
                 // 0
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 6,
                 reference: "a".to_string(),
                 alternative: vec!["aa".to_string(), "aaa".to_string()],
@@ -4695,7 +4712,7 @@ mod tests {
             },
             VCFRow {
                 // 1
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 8,
                 reference: "a".to_string(),
                 alternative: vec!["aa".to_string()],
@@ -4711,7 +4728,7 @@ mod tests {
             },
             VCFRow {
                 // 2
-                chrom: "TEST_DNA".to_string(),
+                chrom: "TEST_DNA.1".to_string(),
                 position: 94,
                 reference: "c".to_string(),
                 alternative: vec!["cc".to_string()],
@@ -5181,5 +5198,27 @@ mod tests {
         assert!(gene_diff.mutations.is_empty());
         assert!(gene_diff.minor_mutations.len() == 1);
         assert!(gene_diff.minor_mutations[0].mutation == "783_del_gccgcgccgcgcggcgcg:3");
+
+
+
+
+        // Double check that we can properly pick up multi genbank files
+        let genomes = parse_genbank("reference/TEST-DNA-double.gbk");
+        assert_eq!(genomes.len(), 2);
+        let vcf = VCFFile::new("test/TEST-DNA.vcf".to_string(), false, 3);
+        let sample1 = mutate(&genomes[0], vcf.clone());
+        let sample2 = mutate(&genomes[1], vcf);
+        println!("{}", sample1.name);
+        println!("{}", sample2.name);
+        
+        let diff1 = GenomeDifference::new(genomes[0].clone(), sample1, MinorType::COV);
+        let diff2 = GenomeDifference::new(genomes[1].clone(), sample2, MinorType::COV);
+        assert_eq!(diff2.variants.len(), 1);
+        assert_eq!(diff2.minor_variants.len(), 0);
+
+        assert_ne!(diff1.variants, diff2.variants);
+        assert!(diff1.variants.len() > diff2.variants.len());
+
+
     }
 }
