@@ -122,99 +122,94 @@ pub fn parse_genbank_location(
     false
 }
 
-#[pymethods]
-impl Genome {
-    #[new]
-    /// Create a new genome from a GenBank file
-    ///
-    /// # Arguments
-    /// - `filename` - A string reference to the GenBank file
-    pub fn new(filename: &str) -> Self {
-        let file = File::open(filename).unwrap();
+/// Create a new genome from a GenBank file
+///
+/// # Arguments
+/// - `filename` - A string reference to the GenBank file
+pub fn parse_genbank(filename: &str) -> Vec<Genome> {
+    let file = File::open(filename).unwrap();
+    let mut genomes = Vec::new();
+    for seq in SeqReader::new(file) {
         let mut _gene_definitions = Vec::new();
         let mut _nucleotide_sequence: String = "".to_string();
-        let mut genome_name: String = "".to_string();
         let mut gene_names: Vec<String> = Vec::new();
-        for seq in SeqReader::new(file) {
-            let seq = seq.unwrap();
-            _nucleotide_sequence = match String::from_utf8(seq.seq) {
-                Ok(s) => s.to_lowercase(),
-                Err(e) => panic!("Problem reading sequence data: {:?}", e),
-            };
-            genome_name = seq.version.unwrap();
-            for feature in seq.features {
-                let mut name: String = "".to_string();
-                let mut ranges: Vec<(i64, i64)> = Vec::new();
-                let mut coding: bool = false;
-                let reverse_complement: bool;
-                let mut skip = false;
-                if feature.kind == *"CDS" || feature.kind == *"rRNA" {
-                    if feature.kind != *"rRNA" {
-                        coding = true;
-                    }
-                    reverse_complement =
-                        parse_genbank_location(&feature.location, &mut ranges, false);
-                    for qual in feature.qualifiers.clone() {
-                        match qual.1 {
-                            Some(val) => {
-                                if qual.0 == *"gene" {
-                                    // Use gene name if it exists
-                                    name = val.clone();
-                                }
-                                if name.is_empty() && qual.0 == *"locus_tag" {
-                                    // Else default to locus tag
-                                    name = val.clone();
-                                }
+        let seq = seq.unwrap();
+        _nucleotide_sequence = match String::from_utf8(seq.seq) {
+            Ok(s) => s.to_lowercase(),
+            Err(e) => panic!("Problem reading sequence data: {:?}", e),
+        };
+        let genome_name = seq.version.unwrap();
+        for feature in seq.features {
+            let mut name: String = "".to_string();
+            let mut ranges: Vec<(i64, i64)> = Vec::new();
+            let mut coding: bool = false;
+            let reverse_complement: bool;
+            let mut skip = false;
+            if feature.kind == *"CDS" || feature.kind == *"rRNA" {
+                if feature.kind != *"rRNA" {
+                    coding = true;
+                }
+                reverse_complement = parse_genbank_location(&feature.location, &mut ranges, false);
+                for qual in feature.qualifiers.clone() {
+                    match qual.1 {
+                        Some(val) => {
+                            if qual.0 == *"gene" {
+                                // Use gene name if it exists
+                                name = val.clone();
                             }
-                            None => {
-                                if qual.0 == *"pseudo" {
-                                    skip = true;
-                                }
+                            if name.is_empty() && qual.0 == *"locus_tag" {
+                                // Else default to locus tag
+                                name = val.clone();
+                            }
+                        }
+                        None => {
+                            if qual.0 == *"pseudo" {
+                                skip = true;
                             }
                         }
                     }
-                    if !skip {
-                        while gene_names.contains(&name) {
-                            // Duplicate gene names can exist :(
-                            // Repeatedly add _2 to the end of the name until it is unique
-                            // not ideal but exact mirror of gumpy
-                            name += "_2";
-                        }
+                }
+                if !skip {
+                    while gene_names.contains(&name) {
+                        // Duplicate gene names can exist :(
+                        // Repeatedly add _2 to the end of the name until it is unique
+                        // not ideal but exact mirror of gumpy
+                        name += "_2";
+                    }
 
-                        // Catching where the gene is incomplete is a little difficult
-                        // Base case for non-revcomp single range genes is a simple range check for %3
-                        // For revcomp multiple range it needs an extra nudge
-                        if coding {
-                            if reverse_complement && ranges.len() > 1 {
-                                if (ranges.iter().map(|(s, e)| (s - e).abs() + 1).sum::<i64>()
-                                    - ranges.len() as i64
-                                    - 1)
-                                    % 3
-                                    != 0
-                                {
-                                    eprintln!("Warning: Gene {} has length not divisible by 3 (ranges {:?}), marking gene name", name, ranges);
-                                    name = "INCOMPLETE_".to_string() + &name;
-                                }
-                            } else if !(reverse_complement && ranges.len() != 1)
-                                && (ranges.iter().map(|(s, e)| (s - e).abs() + 1).sum::<i64>()
-                                    - ranges.len() as i64)
-                                    % 3
-                                    != 0
+                    // Catching where the gene is incomplete is a little difficult
+                    // Base case for non-revcomp single range genes is a simple range check for %3
+                    // For revcomp multiple range it needs an extra nudge
+                    if coding {
+                        if reverse_complement && ranges.len() > 1 {
+                            if (ranges.iter().map(|(s, e)| (s - e).abs() + 1).sum::<i64>()
+                                - ranges.len() as i64
+                                - 1)
+                                % 3
+                                != 0
                             {
                                 eprintln!("Warning: Gene {} has length not divisible by 3 (ranges {:?}), marking gene name", name, ranges);
                                 name = "INCOMPLETE_".to_string() + &name;
                             }
+                        } else if !(reverse_complement && ranges.len() != 1)
+                            && (ranges.iter().map(|(s, e)| (s - e).abs() + 1).sum::<i64>()
+                                - ranges.len() as i64)
+                                % 3
+                                != 0
+                        {
+                            eprintln!("Warning: Gene {} has length not divisible by 3 (ranges {:?}), marking gene name", name, ranges);
+                            name = "INCOMPLETE_".to_string() + &name;
                         }
-                        gene_names.push(name.clone());
-                        _gene_definitions.push(GeneDef {
-                            name,
-                            reverse_complement,
-                            coding,
-                            ranges,
-                            promoter_start: -1,
-                            promoter_size: 0,
-                        });
                     }
+                    gene_names.push(name.clone());
+                    _gene_definitions.push(GeneDef {
+                        name,
+                        reverse_complement,
+                        coding,
+                        ranges,
+                        promoter_start: -1,
+                        promoter_size: 0,
+                    });
                 }
             }
         }
@@ -230,7 +225,6 @@ impl Genome {
                 deleted_evidence: Vec::new(),
             });
         }
-        println!("{}", genome_name);
         let mut genome = Genome {
             name: genome_name,
             gene_definitions: _gene_definitions,
@@ -242,11 +236,13 @@ impl Genome {
             vcf_records: None,
         };
         genome.assign_promoters();
-
-        // I hate implicit returns, but appease clippy
-        genome
+        genomes.push(genome);
     }
+    genomes
+}
 
+#[pymethods]
+impl Genome {
     /// Assign promoters to genes
     fn assign_promoters(&mut self) {
         /*
@@ -669,7 +665,9 @@ mod tests {
 
     #[test]
     fn test_tb_genome() {
-        let mut genome = Genome::new("reference/NC_000962.3.gbk");
+        let mut genomes = parse_genbank("reference/NC_000962.3.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut genome = genomes.pop().unwrap();
         assert_eq!(genome.name, "NC_000962.3");
         assert_eq!(genome.genome_positions.len(), 4411532);
         assert_eq!(genome.gene_definitions.len(), 3909);
@@ -872,7 +870,9 @@ mod tests {
 
     #[test]
     fn test_covid_genome() {
-        let mut genome = Genome::new("reference/MN908947.3.gb");
+        let mut genomes = parse_genbank("reference/MN908947.3.gb");
+        assert_eq!(genomes.len(), 1);
+        let mut genome = genomes.pop().unwrap();
         assert_eq!(genome.name, "MN908947.3");
         assert_eq!(genome.genome_positions.len(), 29903);
         assert_eq!(genome.gene_definitions.len(), 10);
@@ -889,13 +889,15 @@ mod tests {
 
     #[test]
     fn test_invalid_args() {
-        assert_panics!(Genome::new("not/a/path"));
+        assert_panics!(parse_genbank("not/a/path"));
     }
 
     #[test]
     fn test_dna_genome() {
         // Dummy DNA genbank file, used as it's short enough to know the expected values
-        let genome = Genome::new("reference/TEST-DNA.gbk");
+        let mut genomes = parse_genbank("reference/TEST-DNA.gbk");
+        assert_eq!(genomes.len(), 1);
+        let genome = genomes.pop().unwrap();
         assert_eq!(genome.name, "TEST_DNA.1");
         let mut offset = 0;
         for (idx, pos) in genome.genome_positions.iter().enumerate() {
@@ -926,7 +928,9 @@ mod tests {
 
     #[test]
     fn test_dna_genes() {
-        let mut genome = Genome::new("reference/TEST-DNA.gbk");
+        let mut genomes = parse_genbank("reference/TEST-DNA.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut genome = genomes.pop().unwrap();
         let gene_a = genome.get_gene("A".to_string());
         assert_eq!(gene_a.name, "A");
         assert_eq!(gene_a.nucleotide_sequence, "aaaaaaaaaaccccccccccgggggggggg");
@@ -963,7 +967,9 @@ mod tests {
 
     #[test]
     fn test_mutate_genome() {
-        let mut reference = Genome::new("reference/MN908947.3.gb");
+        let mut genomes = parse_genbank("reference/MN908947.3.gb");
+        assert_eq!(genomes.len(), 1);
+        let mut reference = genomes.pop().unwrap();
         // Note that this VCF is completely dummy data
         // so variants aren't necessarily matching the reference in the VCF row
         let vcf = VCFFile::new("test/dummy.vcf".to_string(), false, 3);
@@ -1582,7 +1588,9 @@ mod tests {
 
     #[test]
     fn test_mutate_test_dna() {
-        let mut reference = Genome::new("reference/TEST-DNA.gbk");
+        let mut genomes = parse_genbank("reference/TEST-DNA.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut reference = genomes.pop().unwrap();
         // Note that this VCF is completely dummy data
         // so variants aren't necessarily matching the reference in the VCF row
         let vcf = VCFFile::new("test/TEST-DNA.vcf".to_string(), false, 3);
@@ -3605,7 +3613,9 @@ mod tests {
 
     #[test]
     fn test_large_deletions() {
-        let mut reference = Genome::new("reference/TEST-DNA.gbk");
+        let mut genomes = parse_genbank("reference/TEST-DNA.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut reference = genomes.pop().unwrap();
         let vcf = VCFFile::new("test/TEST-DNA-4.vcf".to_string(), false, 3);
 
         let mut sample = mutate(&reference, vcf);
@@ -3828,7 +3838,9 @@ mod tests {
     #[test]
     fn test_large_deletions_minor() {
         // Mirror of test_large_deletions, but with a VCF where the deletion is minor instead
-        let mut reference = Genome::new("reference/TEST-DNA.gbk");
+        let mut genomes = parse_genbank("reference/TEST-DNA.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut reference = genomes.pop().unwrap();
         let vcf = VCFFile::new("test/TEST-DNA-4-minor.vcf".to_string(), false, 1);
 
         let mut sample = mutate(&reference, vcf);
@@ -4108,7 +4120,9 @@ mod tests {
 
     #[test]
     fn test_revcomp_minor_population() {
-        let mut reference = Genome::new("reference/NC_000962.3.gbk");
+        let mut genomes = parse_genbank("reference/NC_000962.3.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut reference = genomes.pop().unwrap();
         let vcf = VCFFile::new("test/minor-populations-revcomp.vcf".to_string(), false, 3);
         let mut samples = mutate(&reference, vcf);
 
@@ -4252,7 +4266,9 @@ mod tests {
     #[test]
     fn test_revcomp_minor_population_ad() {
         // Exact mirror of the previous test, but with AD tag instead of COV
-        let mut reference = Genome::new("reference/NC_000962.3.gbk");
+        let mut genomes = parse_genbank("reference/NC_000962.3.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut reference = genomes.pop().unwrap();
         let vcf = VCFFile::new(
             "test/minor-populations-revcomp-AD.vcf".to_string(),
             false,
@@ -4404,7 +4420,9 @@ mod tests {
 
     #[test]
     fn test_revcomp_minor_population_non_coding() {
-        let mut reference = Genome::new("reference/NC_000962.3.gbk");
+        let mut genomes = parse_genbank("reference/NC_000962.3.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut reference = genomes.pop().unwrap();
         for gene in reference.gene_definitions.iter_mut() {
             if gene.name == "katG" {
                 gene.coding = false;
@@ -4648,7 +4666,9 @@ mod tests {
 
     #[test]
     fn test_misc_indel() {
-        let mut genome = Genome::new("reference/TEST-DNA.gbk");
+        let mut genomes = parse_genbank("reference/TEST-DNA.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut genome = genomes.pop().unwrap();
         let vcf = VCFFile::new("test/TEST-DNA-misc-indel.vcf".to_string(), false, 3);
         let mut sample = mutate(&genome, vcf);
 
@@ -4832,7 +4852,9 @@ mod tests {
         }
 
         // Hack A to make it non-coding to check that too
-        let mut genome = Genome::new("reference/TEST-DNA.gbk");
+        let mut genomes = parse_genbank("reference/TEST-DNA.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut genome = genomes.pop().unwrap();
         for gene in genome.gene_definitions.iter_mut() {
             if gene.name == "A" {
                 gene.coding = false;
@@ -4938,7 +4960,9 @@ mod tests {
         // Test misc edge cases within genome
 
         // Check `build_all_genes` populates genes as expected
-        let mut genome = Genome::new("reference/TEST-DNA.gbk");
+        let mut genomes = parse_genbank("reference/TEST-DNA.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut genome = genomes.pop().unwrap();
         let mut expected_genes = HashMap::new();
         for gene in genome.gene_names.iter() {
             expected_genes.insert(gene.clone(), genome.build_gene(gene.to_string()));
@@ -5023,7 +5047,9 @@ mod tests {
     #[test]
     fn test_revcomp_first_base_del() {
         // Test that a deletion of the first base is handled correctly
-        let mut genome = Genome::new("reference/NC_000962.3.gbk");
+        let mut genomes = parse_genbank("reference/NC_000962.3.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut genome = genomes.pop().unwrap();
         let vcf = VCFFile::new("test/revcomp-del-first-pos.vcf".to_string(), false, 3);
         let mut sample = mutate(&genome, vcf);
 
@@ -5066,7 +5092,9 @@ mod tests {
 
     #[test]
     fn test_snp_after_del() {
-        let mut genome = Genome::new("reference/NC_000962.3.gbk");
+        let mut genomes = parse_genbank("reference/NC_000962.3.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut genome = genomes.pop().unwrap();
         let vcf = VCFFile::new("test/tb-snp-after-del.vcf".to_string(), false, 3);
         let mut sample = mutate(&genome, vcf);
 
@@ -5119,7 +5147,9 @@ mod tests {
         // - Nested complement and join
 
         // Instanciating without error is the main test here
-        let mut reference = Genome::new("reference/NZ_CP085945.1.gbk");
+        let mut genomes = parse_genbank("reference/NZ_CP085945.1.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut reference = genomes.pop().unwrap();
 
         // Just check that genes are built correctly
         reference.build_all_genes();

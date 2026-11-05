@@ -8,12 +8,16 @@
 //!
 //! # Example
 //! ```
-//! use grumpy::genome::{Genome, mutate};
+//! use grumpy::genome::{Genome, mutate, parse_genbank};
 //! use grumpy::vcf::VCFFile;
 //! use grumpy::difference::{GenomeDifference, GeneDifference};
 //! use grumpy::common::MinorType;
 //!
-//! let mut reference = Genome::new("reference/MN908947.3.gb");
+//! // Genbank files can denote > 1 genome, so we parse them into a vector of genomes.
+//! // In this case, we only have 1 genome in the genbank file, so we can just take the first one.
+//! let mut genomes = parse_genbank("reference/MN908947.3.gb");
+//! let mut reference = genomes.pop().unwrap();
+//!
 //! let vcf = VCFFile::new("test/dummy.vcf".to_string(), false, 3);
 //! let mut sample = mutate(&reference, vcf);
 //!
