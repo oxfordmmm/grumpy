@@ -122,6 +122,7 @@ pub fn parse_genbank_location(
     false
 }
 
+#[pyfunction]
 /// Create a new genome from a GenBank file
 ///
 /// # Arguments
