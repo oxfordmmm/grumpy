@@ -5199,18 +5199,13 @@ mod tests {
         assert!(gene_diff.minor_mutations.len() == 1);
         assert!(gene_diff.minor_mutations[0].mutation == "783_del_gccgcgccgcgcggcgcg:3");
 
-
-
-
         // Double check that we can properly pick up multi genbank files
         let genomes = parse_genbank("reference/TEST-DNA-double.gbk");
         assert_eq!(genomes.len(), 2);
         let vcf = VCFFile::new("test/TEST-DNA.vcf".to_string(), false, 3);
         let sample1 = mutate(&genomes[0], vcf.clone());
         let sample2 = mutate(&genomes[1], vcf);
-        println!("{}", sample1.name);
-        println!("{}", sample2.name);
-        
+
         let diff1 = GenomeDifference::new(genomes[0].clone(), sample1, MinorType::COV);
         let diff2 = GenomeDifference::new(genomes[1].clone(), sample2, MinorType::COV);
         assert_eq!(diff2.variants.len(), 1);
@@ -5218,7 +5213,5 @@ mod tests {
 
         assert_ne!(diff1.variants, diff2.variants);
         assert!(diff1.variants.len() > diff2.variants.len());
-
-
     }
 }
