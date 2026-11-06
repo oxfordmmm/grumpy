@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use ordered_float::OrderedFloat;
 
+/// Enum for the types alts can take
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[pyclass(eq, eq_int, from_py_object)]
 pub enum AltType {
