@@ -4,9 +4,9 @@ use std::collections::HashMap;
 
 use ordered_float::OrderedFloat;
 
-#[pyclass(eq, eq_int)]
-#[derive(Debug, Clone, PartialEq, Eq)]
 /// Enum for the types alts can take
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[pyclass(eq, eq_int, from_py_object)]
 pub enum AltType {
     SNP,
     REF,
@@ -16,15 +16,15 @@ pub enum AltType {
     DEL,
 }
 
-#[pyclass(eq, eq_int)]
-#[derive(Debug, Clone, PartialEq, Eq)]
 /// Enum for the types of minor evidence
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[pyclass(eq, eq_int, from_py_object)]
 pub enum MinorType {
     COV,
     FRS,
 }
 
-#[pyclass(eq, get_all, set_all)]
+#[pyclass(eq, get_all, set_all, from_py_object)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Struct to hold the information from a VCF row
 pub struct VCFRow {
@@ -55,8 +55,8 @@ pub struct VCFRow {
     pub is_complex: bool,
 }
 
-#[pyclass(eq)]
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[pyclass(eq, from_py_object)]
 /// Struct to hold the information parsed for a call
 pub struct Evidence {
     #[pyo3(get, set)]
@@ -114,7 +114,7 @@ impl Evidence {
     }
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 /// Struct to hold the information to construct a gene
 pub struct GeneDef {
@@ -143,7 +143,7 @@ pub struct GeneDef {
     pub promoter_size: i64,
 }
 
-#[pyclass(eq)]
+#[pyclass(eq, from_py_object)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Struct to hold the information of a call
 pub struct Alt {
