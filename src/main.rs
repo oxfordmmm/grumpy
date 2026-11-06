@@ -12,7 +12,7 @@ use common::MinorType;
 use difference::GeneDifference;
 use difference::GenomeDifference;
 use genome::mutate;
-use genome::Genome;
+use genome::parse_genbank;
 use vcf::VCFFile;
 
 #[derive(Parser, Debug)]
@@ -48,111 +48,112 @@ fn main() {
     let vcf_end = SystemTime::now();
 
     let reference_start = SystemTime::now();
-    let mut reference = Genome::new(&reference_path);
+    let mut genomes = parse_genbank(&reference_path);
     let reference_end = SystemTime::now();
+    for reference in genomes.iter_mut() {
+        let sample_start = SystemTime::now();
+        let mut sample = mutate(reference, vcf.clone());
+        let sample_end = SystemTime::now();
 
-    let sample_start = SystemTime::now();
-    let mut sample = mutate(&reference, vcf);
-    let sample_end = SystemTime::now();
+        // If given a gene name, pull out the genome and gene level differences
+        let target_genes;
+        if let Some(target_gene) = args.gene.clone() {
+            target_genes = vec![target_gene];
+        } else {
+            target_genes = reference.gene_names.clone();
+        }
 
-    // If given a gene name, pull out the genome and gene level differences
-    let target_genes;
-    if let Some(target_gene) = args.gene {
-        target_genes = vec![target_gene];
-    } else {
-        target_genes = reference.gene_names.clone();
-    }
+        let genome_start = SystemTime::now();
+        let mut difference =
+            GenomeDifference::new(reference.clone(), sample.clone(), MinorType::COV);
+        let genome_end = SystemTime::now();
 
-    let genome_start = SystemTime::now();
-    let mut difference = GenomeDifference::new(reference.clone(), sample.clone(), MinorType::COV);
-    let genome_end = SystemTime::now();
-
-    let mut is_first = true;
-    let mut gene_start = SystemTime::now();
-    let mut gene_end = SystemTime::now();
-    for target_gene in target_genes.iter() {
-        if is_first {
-            for variant in difference.variants.iter_mut() {
-                if variant.gene_name.clone().is_none()
-                    || (variant.gene_name.clone().is_some()
-                        && variant.gene_name.clone().unwrap() != *target_gene)
-                {
+        let mut is_first = true;
+        let mut gene_start = SystemTime::now();
+        let mut gene_end = SystemTime::now();
+        for target_gene in target_genes.iter() {
+            if is_first {
+                for variant in difference.variants.iter_mut() {
+                    if variant.gene_name.clone().is_none()
+                        || (variant.gene_name.clone().is_some()
+                            && variant.gene_name.clone().unwrap() != *target_gene)
+                    {
+                        continue;
+                    }
+                    println!(
+                        "{:?}@{:?} --> {:?}",
+                        variant.gene_name,
+                        variant.gene_position,
+                        variant.variant.clone()
+                    );
+                }
+                for variant in difference.minor_variants.iter_mut() {
+                    if variant.gene_name.clone().is_none()
+                        || (variant.gene_name.clone().is_some()
+                            && variant.gene_name.clone().unwrap() != *target_gene)
+                    {
+                        continue;
+                    }
+                    println!(
+                        "{:?}@{:?} --> {:?}",
+                        variant.gene_name,
+                        variant.gene_position,
+                        variant.variant.clone()
+                    );
+                }
+                gene_start = SystemTime::now();
+            }
+            for gene_name in sample.genes_with_mutations.clone().iter() {
+                if gene_name != target_gene {
                     continue;
                 }
+                println!("{}", gene_name);
+                let gene_diff = GeneDifference::new(
+                    reference.get_gene(gene_name.clone()),
+                    sample.get_gene(gene_name.clone()),
+                    MinorType::COV,
+                );
                 println!(
-                    "{:?}@{:?} --> {:?}",
-                    variant.gene_name,
-                    variant.gene_position,
-                    variant.variant.clone()
+                    "{:?}",
+                    gene_diff
+                        .mutations
+                        .iter()
+                        .map(|mutation| mutation.mutation.clone())
+                        .collect::<Vec<String>>()
+                );
+                println!(
+                    "{:?}\n",
+                    gene_diff
+                        .minor_mutations
+                        .iter()
+                        .map(|mutation| mutation.mutation.clone())
+                        .collect::<Vec<String>>()
                 );
             }
-            for variant in difference.minor_variants.iter_mut() {
-                if variant.gene_name.clone().is_none()
-                    || (variant.gene_name.clone().is_some()
-                        && variant.gene_name.clone().unwrap() != *target_gene)
-                {
-                    continue;
-                }
-                println!(
-                    "{:?}@{:?} --> {:?}",
-                    variant.gene_name,
-                    variant.gene_position,
-                    variant.variant.clone()
-                );
-            }
-            gene_start = SystemTime::now();
+            gene_end = SystemTime::now();
+            is_first = false;
         }
-        for gene_name in sample.genes_with_mutations.clone().iter() {
-            if gene_name != target_gene {
-                continue;
-            }
-            println!("{}", gene_name);
-            let gene_diff = GeneDifference::new(
-                reference.get_gene(gene_name.clone()),
-                sample.get_gene(gene_name.clone()),
-                MinorType::COV,
-            );
-            println!(
-                "{:?}",
-                gene_diff
-                    .mutations
-                    .iter()
-                    .map(|mutation| mutation.mutation.clone())
-                    .collect::<Vec<String>>()
-            );
-            println!(
-                "{:?}\n",
-                gene_diff
-                    .minor_mutations
-                    .iter()
-                    .map(|mutation| mutation.mutation.clone())
-                    .collect::<Vec<String>>()
-            );
+        println!("\n-----------------------------------\n");
+        println!("VCF took {:?}", vcf_end.duration_since(vcf_start).unwrap());
+        println!(
+            "Reference took {:?}",
+            reference_end.duration_since(reference_start).unwrap()
+        );
+        println!(
+            "Sample took {:?}",
+            sample_end.duration_since(sample_start).unwrap()
+        );
+        println!(
+            "Genome diff took {:?}",
+            genome_end.duration_since(genome_start).unwrap()
+        );
+        println!(
+            "Gene diff took {:?}",
+            gene_end.duration_since(gene_start).unwrap()
+        );
+        // If a FASTA path is provided, write the sample genome to it
+        if let Some(fasta_path) = args.fasta.clone() {
+            sample.write_fasta(&fasta_path);
         }
-        gene_end = SystemTime::now();
-        is_first = false;
-    }
-    println!("\n-----------------------------------\n");
-    println!("VCF took {:?}", vcf_end.duration_since(vcf_start).unwrap());
-    println!(
-        "Reference took {:?}",
-        reference_end.duration_since(reference_start).unwrap()
-    );
-    println!(
-        "Sample took {:?}",
-        sample_end.duration_since(sample_start).unwrap()
-    );
-    println!(
-        "Genome diff took {:?}",
-        genome_end.duration_since(genome_start).unwrap()
-    );
-    println!(
-        "Gene diff took {:?}",
-        gene_end.duration_since(gene_start).unwrap()
-    );
-
-    // If a FASTA path is provided, write the sample genome to it
-    if let Some(fasta_path) = args.fasta {
-        sample.write_fasta(&fasta_path);
     }
 }

@@ -45,12 +45,12 @@ pub struct VCFFile {
     pub records: Vec<VCFRow>,
 
     #[pyo3(get, set)]
-    /// Calls from the VCF file, indexed by genome index
-    pub calls: HashMap<i64, Vec<Evidence>>,
+    /// Calls from the VCF file, indexed by contig name and genome index
+    pub calls: HashMap<(String, i64), Vec<Evidence>>,
 
     #[pyo3(get, set)]
-    /// Minor calls from the VCF file, indexed by genome index
-    pub minor_calls: HashMap<i64, Vec<Evidence>>,
+    /// Minor calls from the VCF file, indexed by contig name and genome index
+    pub minor_calls: HashMap<(String, i64), Vec<Evidence>>,
 }
 
 #[pymethods]
@@ -92,8 +92,8 @@ impl VCFFile {
             })
             .collect::<Vec<(VCFRow, Vec<Evidence>, Vec<Evidence>)>>();
         // For ease of access, we'll store the calls in a hashmap indexed on genome index
-        let mut calls_map: HashMap<i64, Vec<Evidence>> = HashMap::new();
-        let mut minor_calls_map: HashMap<i64, Vec<Evidence>> = HashMap::new();
+        let mut calls_map: HashMap<(String, i64), Vec<Evidence>> = HashMap::new();
+        let mut minor_calls_map: HashMap<(String, i64), Vec<Evidence>> = HashMap::new();
         let mut records = Vec::new();
 
         // Fetch data
@@ -110,7 +110,9 @@ impl VCFFile {
                 // Check if calls are already in the map,
                 // if they are, warn the user about multiple calls at the same position and add to vector
                 // if they aren't, add to the map
-                if let hash_map::Entry::Vacant(e) = calls_map.entry(call.genome_index) {
+                if let hash_map::Entry::Vacant(e) =
+                    calls_map.entry((record.chrom.clone(), call.genome_index))
+                {
                     if added {
                         e.insert(vec![call.clone()]);
                     }
@@ -118,11 +120,13 @@ impl VCFFile {
                     println!(
                         "Multiple calls at genome position {}! {:?}\n",
                         call.genome_index,
-                        calls_map.get(&call.genome_index).unwrap()
+                        calls_map
+                            .get(&(record.chrom.clone(), call.genome_index))
+                            .unwrap()
                     );
                     if added {
                         calls_map
-                            .get_mut(&call.genome_index)
+                            .get_mut(&(record.chrom.clone(), call.genome_index))
                             .unwrap()
                             .push(call.clone());
                     }
@@ -163,11 +167,13 @@ impl VCFFile {
             }
             if valid_filters {
                 for call in record_minor_calls.iter() {
-                    if let hash_map::Entry::Vacant(e) = minor_calls_map.entry(call.genome_index) {
+                    if let hash_map::Entry::Vacant(e) =
+                        minor_calls_map.entry((record.chrom.clone(), call.genome_index))
+                    {
                         e.insert(vec![call.clone()]);
                     } else {
                         minor_calls_map
-                            .get_mut(&call.genome_index)
+                            .get_mut(&(record.chrom.clone(), call.genome_index))
                             .unwrap()
                             .push(call.clone());
                     }
@@ -187,6 +193,7 @@ impl VCFFile {
     #[staticmethod]
     fn parse_record(rec: VCFRecordToParse) -> (VCFRow, Vec<Evidence>, Vec<Evidence>) {
         let record = rec.record;
+        let chrom = String::from_utf8_lossy(&record.chromosome).to_string();
         let min_dp = rec.min_dp;
         let required_fields = rec.required_fields;
         let vcf_row_index = rec.vcf_row_index;
@@ -269,6 +276,7 @@ impl VCFFile {
         let is_complex = record.reference.len() > 1000 && alts.len() > 1;
 
         let row = VCFRow {
+            chrom,
             position: record.position as i64,
             reference: String::from_utf8_lossy(&record.reference)
                 .to_string()
@@ -832,6 +840,7 @@ mod tests {
         // Ref call
         {
             let record = VCFRow {
+                chrom: "chr1".to_string(),
                 position: 1,
                 reference: "A".to_string(),
                 alternative: vec!["T".to_string()],
@@ -860,6 +869,7 @@ mod tests {
         // Alt call
         {
             let record = VCFRow {
+                chrom: "chr1".to_string(),
                 position: 1,
                 reference: "A".to_string(),
                 alternative: vec!["T".to_string()],
@@ -888,6 +898,7 @@ mod tests {
         // Het call (including minor call)
         {
             let record = VCFRow {
+                chrom: "chr1".to_string(),
                 position: 1,
                 reference: "A".to_string(),
                 alternative: vec!["T".to_string()],
@@ -928,6 +939,7 @@ mod tests {
         // Null call due to low coverage
         {
             let record = VCFRow {
+                chrom: "chr1".to_string(),
                 position: 1,
                 reference: "A".to_string(),
                 alternative: vec!["T".to_string()],
@@ -956,6 +968,7 @@ mod tests {
         // Null call due calling null
         {
             let record = VCFRow {
+                chrom: "chr1".to_string(),
                 position: 1,
                 reference: "A".to_string(),
                 alternative: vec!["T".to_string()],
@@ -984,6 +997,7 @@ mod tests {
         // Null call due to low coverage and filter fail (should still make it)
         {
             let record = VCFRow {
+                chrom: "chr1".to_string(),
                 position: 1,
                 reference: "A".to_string(),
                 alternative: vec!["T".to_string()],
@@ -1012,6 +1026,7 @@ mod tests {
         // Ins call
         {
             let record = VCFRow {
+                chrom: "chr1".to_string(),
                 position: 1,
                 reference: "A".to_string(),
                 alternative: vec!["AT".to_string()],
@@ -1040,6 +1055,7 @@ mod tests {
         // Del call
         {
             let record = VCFRow {
+                chrom: "chr1".to_string(),
                 position: 1,
                 reference: "AT".to_string(),
                 alternative: vec!["A".to_string()],
@@ -1068,6 +1084,7 @@ mod tests {
         // Del call with SNP
         {
             let record = VCFRow {
+                chrom: "chr1".to_string(),
                 position: 1,
                 reference: "AT".to_string(),
                 alternative: vec!["C".to_string()],
@@ -1105,6 +1122,7 @@ mod tests {
         // More complex mix of SNP and indel minors
         {
             let record = VCFRow {
+                chrom: "chr1".to_string(),
                 position: 1,
                 reference: "AT".to_string(),
                 alternative: vec!["C".to_string(), "GCC".to_string()],
@@ -1189,6 +1207,7 @@ mod tests {
         let vcf = VCFFile::new("test/dummy.vcf".to_string(), false, 3);
         let expected_records = vec![
             VCFRow {
+                chrom: "MN908947.3".to_string(),
                 position: 4687,
                 reference: "t".to_string(),
                 alternative: vec!["c".to_string()],
@@ -1203,6 +1222,7 @@ mod tests {
                 is_complex: false,
             },
             VCFRow {
+                chrom: "MN908947.3".to_string(),
                 position: 4725,
                 reference: "t".to_string(),
                 alternative: vec!["c".to_string()],
@@ -1217,6 +1237,7 @@ mod tests {
                 is_complex: false,
             },
             VCFRow {
+                chrom: "MN908947.3".to_string(),
                 position: 4730,
                 reference: "c".to_string(),
                 alternative: vec!["t".to_string(), "g".to_string()],
@@ -1234,6 +1255,7 @@ mod tests {
                 is_complex: false,
             },
             VCFRow {
+                chrom: "MN908947.3".to_string(),
                 position: 4735,
                 reference: "g".to_string(),
                 alternative: vec!["gcc".to_string()],
@@ -1248,6 +1270,7 @@ mod tests {
                 is_complex: false,
             },
             VCFRow {
+                chrom: "MN908947.3".to_string(),
                 position: 4740,
                 reference: "c".to_string(),
                 alternative: vec!["gtt".to_string()],
@@ -1262,6 +1285,7 @@ mod tests {
                 is_complex: false,
             },
             VCFRow {
+                chrom: "MN908947.3".to_string(),
                 position: 13148,
                 reference: "t".to_string(),
                 alternative: vec!["g".to_string()],
@@ -1276,6 +1300,7 @@ mod tests {
                 is_complex: false,
             },
             VCFRow {
+                chrom: "MN908947.3".to_string(),
                 position: 13149,
                 reference: "g".to_string(),
                 alternative: vec!["t".to_string()],
@@ -1290,6 +1315,7 @@ mod tests {
                 is_complex: false,
             },
             VCFRow {
+                chrom: "MN908947.3".to_string(),
                 position: 13150,
                 reference: "a".to_string(),
                 alternative: vec!["tcg".to_string()],
@@ -1304,6 +1330,7 @@ mod tests {
                 is_complex: false,
             },
             VCFRow {
+                chrom: "MN908947.3".to_string(),
                 position: 13333,
                 reference: "c".to_string(),
                 alternative: vec!["a".to_string(), "g".to_string()],
@@ -1322,6 +1349,7 @@ mod tests {
             },
             VCFRow {
                 // Edge case of using `RO` and `AO` for coverage
+                chrom: "MN908947.3".to_string(),
                 position: 13335,
                 reference: "t".to_string(),
                 alternative: vec!["a".to_string()],
@@ -1339,6 +1367,7 @@ mod tests {
             },
             VCFRow {
                 // Odd edge case which is a valid VCF row where it's a het GT but single COV value
+                chrom: "MN908947.3".to_string(),
                 position: 13336,
                 reference: "c".to_string(),
                 alternative: vec!["a".to_string()],
@@ -1354,6 +1383,7 @@ mod tests {
             },
             VCFRow {
                 // Null call by virtue of failing specific filter
+                chrom: "MN908947.3".to_string(),
                 position: 14000,
                 reference: "c".to_string(),
                 alternative: vec!["a".to_string()],
@@ -1369,6 +1399,7 @@ mod tests {
             },
         ];
         for (idx, record) in expected_records.iter().enumerate() {
+            assert_eq!(record.chrom, vcf.records[idx].chrom);
             assert_eq!(record.position, vcf.records[idx].position);
             assert_eq!(record.reference, vcf.records[idx].reference);
             assert_eq!(record.alternative, vcf.records[idx].alternative);
@@ -1479,7 +1510,10 @@ mod tests {
         ];
 
         for calls in expected_calls.iter() {
-            let actual = vcf.calls.get(&calls[0].genome_index).unwrap();
+            let actual = vcf
+                .calls
+                .get(&("MN908947.3".to_string(), calls[0].genome_index))
+                .unwrap();
             for (idx, call) in calls.iter().enumerate() {
                 assert_eq!(call.cov, actual[idx].cov);
                 assert_eq!(call.frs, actual[idx].frs);
@@ -1523,7 +1557,10 @@ mod tests {
         ]];
 
         for calls in expected_minor_calls.iter() {
-            let actual = vcf.minor_calls.get(&calls[0].genome_index).unwrap();
+            let actual = vcf
+                .minor_calls
+                .get(&("MN908947.3".to_string(), calls[0].genome_index))
+                .unwrap();
             for (idx, call) in calls.iter().enumerate() {
                 assert_eq!(call.cov, actual[idx].cov);
                 assert_eq!(call.frs, actual[idx].frs);
@@ -1551,6 +1588,7 @@ mod tests {
         let vcf = VCFFile::new("test/complex.vcf".to_string(), false, 3);
 
         let expected_records = [VCFRow {
+                chrom: "MN908947.3".to_string(),
                 position: 4687,
                 reference: "t".to_string(),
                 alternative: vec!["c".to_string()],
@@ -1564,6 +1602,7 @@ mod tests {
                 is_filter_pass: true,is_complex: false,
             },
             VCFRow {
+                chrom: "MN908947.3".to_string(),
                 position: 4730,
                 reference: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
                 alternative: vec!["t".to_string(), "g".to_string()],
@@ -1577,6 +1616,7 @@ mod tests {
                 is_filter_pass: true,is_complex: false,
             },
             VCFRow {
+                chrom: "MN908947.3".to_string(),
                 position: 5730,
                 reference: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
                 alternative: vec!["t".to_string()],
@@ -1590,6 +1630,7 @@ mod tests {
                 is_filter_pass: true,is_complex: false,
             },
             VCFRow {
+                chrom: "MN908947.3".to_string(),
                 position: 7030,
                 reference: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
                 alternative: vec!["t".to_string(), "g".to_string()],
@@ -1604,6 +1645,7 @@ mod tests {
             }];
 
         for (idx, record) in expected_records.iter().enumerate() {
+            assert_eq!(record.chrom, vcf.records[idx].chrom);
             assert_eq!(record.position, vcf.records[idx].position);
             assert_eq!(record.reference, vcf.records[idx].reference);
             assert_eq!(record.alternative, vcf.records[idx].alternative);

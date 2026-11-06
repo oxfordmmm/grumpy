@@ -122,99 +122,95 @@ pub fn parse_genbank_location(
     false
 }
 
-#[pymethods]
-impl Genome {
-    #[new]
-    /// Create a new genome from a GenBank file
-    ///
-    /// # Arguments
-    /// - `filename` - A string reference to the GenBank file
-    pub fn new(filename: &str) -> Self {
-        let file = File::open(filename).unwrap();
+#[pyfunction]
+/// Create a new genome from a GenBank file
+///
+/// # Arguments
+/// - `filename` - A string reference to the GenBank file
+pub fn parse_genbank(filename: &str) -> Vec<Genome> {
+    let file = File::open(filename).unwrap();
+    let mut genomes = Vec::new();
+    for seq in SeqReader::new(file) {
         let mut _gene_definitions = Vec::new();
         let mut _nucleotide_sequence: String = "".to_string();
-        let mut genome_name: String = "".to_string();
         let mut gene_names: Vec<String> = Vec::new();
-        for seq in SeqReader::new(file) {
-            let seq = seq.unwrap();
-            _nucleotide_sequence = match String::from_utf8(seq.seq) {
-                Ok(s) => s.to_lowercase(),
-                Err(e) => panic!("Problem reading sequence data: {:?}", e),
-            };
-            genome_name = seq.name.unwrap();
-            for feature in seq.features {
-                let mut name: String = "".to_string();
-                let mut ranges: Vec<(i64, i64)> = Vec::new();
-                let mut coding: bool = false;
-                let reverse_complement: bool;
-                let mut skip = false;
-                if feature.kind == *"CDS" || feature.kind == *"rRNA" {
-                    if feature.kind != *"rRNA" {
-                        coding = true;
-                    }
-                    reverse_complement =
-                        parse_genbank_location(&feature.location, &mut ranges, false);
-                    for qual in feature.qualifiers.clone() {
-                        match qual.1 {
-                            Some(val) => {
-                                if qual.0 == *"gene" {
-                                    // Use gene name if it exists
-                                    name = val.clone();
-                                }
-                                if name.is_empty() && qual.0 == *"locus_tag" {
-                                    // Else default to locus tag
-                                    name = val.clone();
-                                }
+        let seq = seq.unwrap();
+        _nucleotide_sequence = match String::from_utf8(seq.seq) {
+            Ok(s) => s.to_lowercase(),
+            Err(e) => panic!("Problem reading sequence data: {:?}", e),
+        };
+        let genome_name = seq.version.unwrap();
+        for feature in seq.features {
+            let mut name: String = "".to_string();
+            let mut ranges: Vec<(i64, i64)> = Vec::new();
+            let mut coding: bool = false;
+            let reverse_complement: bool;
+            let mut skip = false;
+            if feature.kind == *"CDS" || feature.kind == *"rRNA" {
+                if feature.kind != *"rRNA" {
+                    coding = true;
+                }
+                reverse_complement = parse_genbank_location(&feature.location, &mut ranges, false);
+                for qual in feature.qualifiers.clone() {
+                    match qual.1 {
+                        Some(val) => {
+                            if qual.0 == *"gene" {
+                                // Use gene name if it exists
+                                name = val.clone();
                             }
-                            None => {
-                                if qual.0 == *"pseudo" {
-                                    skip = true;
-                                }
+                            if name.is_empty() && qual.0 == *"locus_tag" {
+                                // Else default to locus tag
+                                name = val.clone();
+                            }
+                        }
+                        None => {
+                            if qual.0 == *"pseudo" {
+                                skip = true;
                             }
                         }
                     }
-                    if !skip {
-                        while gene_names.contains(&name) {
-                            // Duplicate gene names can exist :(
-                            // Repeatedly add _2 to the end of the name until it is unique
-                            // not ideal but exact mirror of gumpy
-                            name += "_2";
-                        }
+                }
+                if !skip {
+                    while gene_names.contains(&name) {
+                        // Duplicate gene names can exist :(
+                        // Repeatedly add _2 to the end of the name until it is unique
+                        // not ideal but exact mirror of gumpy
+                        name += "_2";
+                    }
 
-                        // Catching where the gene is incomplete is a little difficult
-                        // Base case for non-revcomp single range genes is a simple range check for %3
-                        // For revcomp multiple range it needs an extra nudge
-                        if coding {
-                            if reverse_complement && ranges.len() > 1 {
-                                if (ranges.iter().map(|(s, e)| (s - e).abs() + 1).sum::<i64>()
-                                    - ranges.len() as i64
-                                    - 1)
-                                    % 3
-                                    != 0
-                                {
-                                    eprintln!("Warning: Gene {} has length not divisible by 3 (ranges {:?}), marking gene name", name, ranges);
-                                    name = "INCOMPLETE_".to_string() + &name;
-                                }
-                            } else if !(reverse_complement && ranges.len() != 1)
-                                && (ranges.iter().map(|(s, e)| (s - e).abs() + 1).sum::<i64>()
-                                    - ranges.len() as i64)
-                                    % 3
-                                    != 0
+                    // Catching where the gene is incomplete is a little difficult
+                    // Base case for non-revcomp single range genes is a simple range check for %3
+                    // For revcomp multiple range it needs an extra nudge
+                    if coding {
+                        if reverse_complement && ranges.len() > 1 {
+                            if (ranges.iter().map(|(s, e)| (s - e).abs() + 1).sum::<i64>()
+                                - ranges.len() as i64
+                                - 1)
+                                % 3
+                                != 0
                             {
                                 eprintln!("Warning: Gene {} has length not divisible by 3 (ranges {:?}), marking gene name", name, ranges);
                                 name = "INCOMPLETE_".to_string() + &name;
                             }
+                        } else if !(reverse_complement && ranges.len() != 1)
+                            && (ranges.iter().map(|(s, e)| (s - e).abs() + 1).sum::<i64>()
+                                - ranges.len() as i64)
+                                % 3
+                                != 0
+                        {
+                            eprintln!("Warning: Gene {} has length not divisible by 3 (ranges {:?}), marking gene name", name, ranges);
+                            name = "INCOMPLETE_".to_string() + &name;
                         }
-                        gene_names.push(name.clone());
-                        _gene_definitions.push(GeneDef {
-                            name,
-                            reverse_complement,
-                            coding,
-                            ranges,
-                            promoter_start: -1,
-                            promoter_size: 0,
-                        });
                     }
+                    gene_names.push(name.clone());
+                    _gene_definitions.push(GeneDef {
+                        name,
+                        reverse_complement,
+                        coding,
+                        ranges,
+                        promoter_start: -1,
+                        promoter_size: 0,
+                    });
                 }
             }
         }
@@ -241,11 +237,13 @@ impl Genome {
             vcf_records: None,
         };
         genome.assign_promoters();
-
-        // I hate implicit returns, but appease clippy
-        genome
+        genomes.push(genome);
     }
+    genomes
+}
 
+#[pymethods]
+impl Genome {
     /// Assign promoters to genes
     fn assign_promoters(&mut self) {
         /*
@@ -279,12 +277,12 @@ impl Genome {
                 start = gene.ranges[0].0;
             }
 
-            if self.genome_positions[start as usize].genes.len() > 1 {
-                continue;
-            } else if start == 0 {
-                // Catch edge case of gene starting at genome index 0
+            if start == 0 || start == self.genome_positions.len() as i64 {
+                // Catch edge case of gene starting at either genome start or end
                 // this couldn't have a promoter so mark as such
                 gene.promoter_start = -1;
+            } else if self.genome_positions[start as usize].genes.len() > 1 {
+                continue;
             } else if gene.reverse_complement {
                 gene.promoter_start = start - 1;
             } else {
@@ -539,8 +537,15 @@ pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome {
     let mut deleted_positions = HashSet::new();
     let mut deleted_evidence: HashMap<usize, Evidence> = HashMap::new();
     for (idx, position) in new_genome.genome_positions.iter_mut().enumerate() {
-        if vcf.calls.contains_key(&position.genome_idx) {
-            for call in vcf.calls.get(&position.genome_idx).unwrap() {
+        if vcf
+            .calls
+            .contains_key(&(reference.name.clone(), position.genome_idx))
+        {
+            for call in vcf
+                .calls
+                .get(&(reference.name.clone(), position.genome_idx))
+                .unwrap()
+            {
                 // Set the new base etc from the call
                 let c = call.clone();
                 position.alts.push(Alt {
@@ -581,8 +586,15 @@ pub fn mutate(reference: &Genome, vcf: VCFFile) -> Genome {
             }
         }
 
-        if vcf.minor_calls.contains_key(&position.genome_idx) {
-            for call in vcf.minor_calls.get(&position.genome_idx).unwrap() {
+        if vcf
+            .minor_calls
+            .contains_key(&(reference.name.clone(), position.genome_idx))
+        {
+            for call in vcf
+                .minor_calls
+                .get(&(reference.name.clone(), position.genome_idx))
+                .unwrap()
+            {
                 // Set the new base etc from the call
                 let c = call.clone();
                 position.alts.push(Alt {
@@ -654,8 +666,10 @@ mod tests {
 
     #[test]
     fn test_tb_genome() {
-        let mut genome = Genome::new("reference/NC_000962.3.gbk");
-        assert_eq!(genome.name, "NC_000962");
+        let mut genomes = parse_genbank("reference/NC_000962.3.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut genome = genomes.pop().unwrap();
+        assert_eq!(genome.name, "NC_000962.3");
         assert_eq!(genome.genome_positions.len(), 4411532);
         assert_eq!(genome.gene_definitions.len(), 3909);
         assert_eq!(genome.gene_names.len(), 3909);
@@ -857,8 +871,10 @@ mod tests {
 
     #[test]
     fn test_covid_genome() {
-        let mut genome = Genome::new("reference/MN908947.3.gb");
-        assert_eq!(genome.name, "MN908947");
+        let mut genomes = parse_genbank("reference/MN908947.3.gb");
+        assert_eq!(genomes.len(), 1);
+        let mut genome = genomes.pop().unwrap();
+        assert_eq!(genome.name, "MN908947.3");
         assert_eq!(genome.genome_positions.len(), 29903);
         assert_eq!(genome.gene_definitions.len(), 10);
         assert_eq!(genome.gene_names.len(), 10);
@@ -874,14 +890,16 @@ mod tests {
 
     #[test]
     fn test_invalid_args() {
-        assert_panics!(Genome::new("not/a/path"));
+        assert_panics!(parse_genbank("not/a/path"));
     }
 
     #[test]
     fn test_dna_genome() {
         // Dummy DNA genbank file, used as it's short enough to know the expected values
-        let genome = Genome::new("reference/TEST-DNA.gbk");
-        assert_eq!(genome.name, "TEST_DNA");
+        let mut genomes = parse_genbank("reference/TEST-DNA.gbk");
+        assert_eq!(genomes.len(), 1);
+        let genome = genomes.pop().unwrap();
+        assert_eq!(genome.name, "TEST_DNA.1");
         let mut offset = 0;
         for (idx, pos) in genome.genome_positions.iter().enumerate() {
             if idx - offset < 10 {
@@ -911,7 +929,9 @@ mod tests {
 
     #[test]
     fn test_dna_genes() {
-        let mut genome = Genome::new("reference/TEST-DNA.gbk");
+        let mut genomes = parse_genbank("reference/TEST-DNA.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut genome = genomes.pop().unwrap();
         let gene_a = genome.get_gene("A".to_string());
         assert_eq!(gene_a.name, "A");
         assert_eq!(gene_a.nucleotide_sequence, "aaaaaaaaaaccccccccccgggggggggg");
@@ -948,7 +968,9 @@ mod tests {
 
     #[test]
     fn test_mutate_genome() {
-        let mut reference = Genome::new("reference/MN908947.3.gb");
+        let mut genomes = parse_genbank("reference/MN908947.3.gb");
+        assert_eq!(genomes.len(), 1);
+        let mut reference = genomes.pop().unwrap();
         // Note that this VCF is completely dummy data
         // so variants aren't necessarily matching the reference in the VCF row
         let vcf = VCFFile::new("test/dummy.vcf".to_string(), false, 3);
@@ -959,6 +981,7 @@ mod tests {
         let expected_vcf_rows = [
             VCFRow {
                 // 0
+                chrom: "MN908947.3".to_string(),
                 position: 4687,
                 reference: "t".to_string(),
                 alternative: vec!["c".to_string()],
@@ -974,6 +997,7 @@ mod tests {
             },
             VCFRow {
                 // 1
+                chrom: "MN908947.3".to_string(),
                 position: 4725,
                 reference: "t".to_string(),
                 alternative: vec!["c".to_string()],
@@ -989,6 +1013,7 @@ mod tests {
             },
             VCFRow {
                 // 2
+                chrom: "MN908947.3".to_string(),
                 position: 4730,
                 reference: "c".to_string(),
                 alternative: vec!["t".to_string(), "g".to_string()],
@@ -1007,6 +1032,7 @@ mod tests {
             },
             VCFRow {
                 // 3
+                chrom: "MN908947.3".to_string(),
                 position: 4735,
                 reference: "g".to_string(),
                 alternative: vec!["gcc".to_string()],
@@ -1022,6 +1048,7 @@ mod tests {
             },
             VCFRow {
                 // 4
+                chrom: "MN908947.3".to_string(),
                 position: 4740,
                 reference: "c".to_string(),
                 alternative: vec!["gtt".to_string()],
@@ -1037,6 +1064,7 @@ mod tests {
             },
             VCFRow {
                 // 5
+                chrom: "MN908947.3".to_string(),
                 position: 13148,
                 reference: "t".to_string(),
                 alternative: vec!["g".to_string()],
@@ -1052,6 +1080,7 @@ mod tests {
             },
             VCFRow {
                 // 6
+                chrom: "MN908947.3".to_string(),
                 position: 13149,
                 reference: "g".to_string(),
                 alternative: vec!["t".to_string()],
@@ -1067,6 +1096,7 @@ mod tests {
             },
             VCFRow {
                 // 7
+                chrom: "MN908947.3".to_string(),
                 position: 13150,
                 reference: "a".to_string(),
                 alternative: vec!["tcg".to_string()],
@@ -1083,6 +1113,7 @@ mod tests {
             VCFRow {
                 // 8
                 // Ambiguous filter fail (filter was null), so row is ignored for calls
+                chrom: "MN908947.3".to_string(),
                 position: 13333,
                 reference: "c".to_string(),
                 alternative: vec!["a".to_string(), "g".to_string()],
@@ -1103,6 +1134,7 @@ mod tests {
                 // 9
                 // Edge case of using `RO` and `AO` for coverage
                 // Fails on a nulling filter, so gets a null call
+                chrom: "MN908947.3".to_string(),
                 position: 13335,
                 reference: "t".to_string(),
                 alternative: vec!["a".to_string()],
@@ -1122,6 +1154,7 @@ mod tests {
                 // 10
                 // Odd edge case which is a valid VCF row where it's a het GT but single COV value
                 // Ambiguous filter fail (filter was null), so row is ignored for calls
+                chrom: "MN908947.3".to_string(),
                 position: 13336,
                 reference: "c".to_string(),
                 alternative: vec!["a".to_string()],
@@ -1138,6 +1171,7 @@ mod tests {
             VCFRow {
                 // 11
                 // Null call by virtue of failing specific filter. Gets null call
+                chrom: "MN908947.3".to_string(),
                 position: 14000,
                 reference: "c".to_string(),
                 alternative: vec!["a".to_string()],
@@ -1555,7 +1589,9 @@ mod tests {
 
     #[test]
     fn test_mutate_test_dna() {
-        let mut reference = Genome::new("reference/TEST-DNA.gbk");
+        let mut genomes = parse_genbank("reference/TEST-DNA.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut reference = genomes.pop().unwrap();
         // Note that this VCF is completely dummy data
         // so variants aren't necessarily matching the reference in the VCF row
         let vcf = VCFFile::new("test/TEST-DNA.vcf".to_string(), false, 3);
@@ -1566,6 +1602,7 @@ mod tests {
         let expected_vcf_rows = [
             VCFRow {
                 // 0
+                chrom: "TEST_DNA.1".to_string(),
                 position: 2,
                 reference: "a".to_string(),
                 alternative: vec!["g".to_string()],
@@ -1581,6 +1618,7 @@ mod tests {
             },
             VCFRow {
                 // 1
+                chrom: "TEST_DNA.1".to_string(),
                 position: 4,
                 reference: "a".to_string(),
                 alternative: vec!["g".to_string(), "t".to_string()],
@@ -1603,6 +1641,7 @@ mod tests {
             },
             VCFRow {
                 // 2
+                chrom: "TEST_DNA.1".to_string(),
                 position: 6,
                 reference: "aaa".to_string(),
                 alternative: vec!["ggt".to_string(), "gta".to_string(), "ata".to_string()],
@@ -1626,6 +1665,7 @@ mod tests {
             },
             VCFRow {
                 // 3
+                chrom: "TEST_DNA.1".to_string(),
                 position: 12,
                 reference: "c".to_string(),
                 alternative: vec!["t".to_string()],
@@ -1641,6 +1681,7 @@ mod tests {
             },
             VCFRow {
                 // 4
+                chrom: "TEST_DNA.1".to_string(),
                 position: 14,
                 reference: "c".to_string(),
                 alternative: vec!["t".to_string(), "g".to_string()],
@@ -1659,6 +1700,7 @@ mod tests {
             },
             VCFRow {
                 // 5
+                chrom: "TEST_DNA.1".to_string(),
                 position: 16,
                 reference: "ccc".to_string(),
                 alternative: vec!["tgc".to_string(), "gtg".to_string()],
@@ -1677,6 +1719,7 @@ mod tests {
             },
             VCFRow {
                 // 6
+                chrom: "TEST_DNA.1".to_string(),
                 position: 22,
                 reference: "g".to_string(),
                 alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
@@ -1700,6 +1743,7 @@ mod tests {
             },
             VCFRow {
                 // 7
+                chrom: "TEST_DNA.1".to_string(),
                 position: 24,
                 reference: "g".to_string(),
                 alternative: vec!["t".to_string(), "c".to_string(), "a".to_string()],
@@ -1723,6 +1767,7 @@ mod tests {
             },
             VCFRow {
                 // 8
+                chrom: "TEST_DNA.1".to_string(),
                 position: 26,
                 reference: "gg".to_string(),
                 alternative: vec!["aa".to_string(), "ct".to_string(), "at".to_string()],
@@ -1746,6 +1791,7 @@ mod tests {
             },
             VCFRow {
                 // 9
+                chrom: "TEST_DNA.1".to_string(),
                 position: 28,
                 reference: "gg".to_string(),
                 alternative: vec!["aa".to_string(), "t".to_string(), "a".to_string()],
@@ -1769,6 +1815,7 @@ mod tests {
             },
             VCFRow {
                 // 10
+                chrom: "TEST_DNA.1".to_string(),
                 position: 33,
                 reference: "t".to_string(),
                 alternative: vec!["ttt".to_string()],
@@ -1784,6 +1831,7 @@ mod tests {
             },
             VCFRow {
                 // 11
+                chrom: "TEST_DNA.1".to_string(),
                 position: 36,
                 reference: "tt".to_string(),
                 alternative: vec!["t".to_string()],
@@ -1799,6 +1847,7 @@ mod tests {
             },
             VCFRow {
                 // 12
+                chrom: "TEST_DNA.1".to_string(),
                 position: 39,
                 reference: "tt".to_string(),
                 alternative: vec!["agt".to_string()],
@@ -1814,6 +1863,7 @@ mod tests {
             },
             VCFRow {
                 // 13
+                chrom: "TEST_DNA.1".to_string(),
                 position: 65,
                 reference: "gg".to_string(),
                 alternative: vec!["cagg".to_string()],
@@ -1829,6 +1879,7 @@ mod tests {
             },
             VCFRow {
                 // 14
+                chrom: "TEST_DNA.1".to_string(),
                 position: 69,
                 reference: "gg".to_string(),
                 alternative: vec!["gg".to_string()],
@@ -1844,6 +1895,7 @@ mod tests {
             },
             VCFRow {
                 // 15
+                chrom: "TEST_DNA.1".to_string(),
                 position: 73,
                 reference: "t".to_string(),
                 alternative: vec!["ta".to_string(), "at".to_string()],
@@ -1856,6 +1908,23 @@ mod tests {
                         vec!["1".to_string(), "198".to_string(), "1".to_string()],
                     ),
                     ("GT_CONF".to_string(), vec!["145.21".to_string()]),
+                ]),
+                is_filter_pass: true,
+                is_complex: false,
+            },
+            VCFRow {
+                // 16
+                // Duplicate of 3, just a different CHROM
+                chrom: "TEST_DNA.2".to_string(),
+                position: 12,
+                reference: "c".to_string(),
+                alternative: vec!["t".to_string()],
+                filter: vec!["PASS".to_string()],
+                fields: HashMap::from([
+                    ("GT".to_string(), vec!["1/1".to_string()]),
+                    ("DP".to_string(), vec!["50".to_string()]),
+                    ("COV".to_string(), vec!["0".to_string(), "50".to_string()]),
+                    ("GT_CONF".to_string(), vec!["200.58".to_string()]),
                 ]),
                 is_filter_pass: true,
                 is_complex: false,
@@ -3562,7 +3631,9 @@ mod tests {
 
     #[test]
     fn test_large_deletions() {
-        let mut reference = Genome::new("reference/TEST-DNA.gbk");
+        let mut genomes = parse_genbank("reference/TEST-DNA.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut reference = genomes.pop().unwrap();
         let vcf = VCFFile::new("test/TEST-DNA-4.vcf".to_string(), false, 3);
 
         let mut sample = mutate(&reference, vcf);
@@ -3571,6 +3642,7 @@ mod tests {
 
         let expected_vcf_rows = [
             VCFRow {
+                chrom: "TEST_DNA.1".to_string(),
                 position: 2,
                 reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
                 alternative: vec!["a".to_string()],
@@ -3784,7 +3856,9 @@ mod tests {
     #[test]
     fn test_large_deletions_minor() {
         // Mirror of test_large_deletions, but with a VCF where the deletion is minor instead
-        let mut reference = Genome::new("reference/TEST-DNA.gbk");
+        let mut genomes = parse_genbank("reference/TEST-DNA.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut reference = genomes.pop().unwrap();
         let vcf = VCFFile::new("test/TEST-DNA-4-minor.vcf".to_string(), false, 1);
 
         let mut sample = mutate(&reference, vcf);
@@ -3793,6 +3867,7 @@ mod tests {
 
         let expected_vcf_rows = [
             VCFRow {
+                chrom: "TEST_DNA.1".to_string(),
                 position: 2,
                 reference: "aaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccccccccccggggggggggttttttttttaaaaaaaaaaccc".to_string(),
                 alternative: vec!["a".to_string()],
@@ -4063,7 +4138,9 @@ mod tests {
 
     #[test]
     fn test_revcomp_minor_population() {
-        let mut reference = Genome::new("reference/NC_000962.3.gbk");
+        let mut genomes = parse_genbank("reference/NC_000962.3.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut reference = genomes.pop().unwrap();
         let vcf = VCFFile::new("test/minor-populations-revcomp.vcf".to_string(), false, 3);
         let mut samples = mutate(&reference, vcf);
 
@@ -4077,6 +4154,7 @@ mod tests {
         let expected_vcf_rows = [
             VCFRow {
                 // 0
+                chrom: "NC_000962.3".to_string(),
                 position: 2154397,
                 reference: "g".to_string(),
                 alternative: vec!["t".to_string(), "c".to_string()],
@@ -4102,6 +4180,7 @@ mod tests {
             },
             VCFRow {
                 // 1
+                chrom: "NC_000962.3".to_string(),
                 position: 2154400,
                 reference: "cgg".to_string(),
                 alternative: vec!["c".to_string()],
@@ -4205,7 +4284,9 @@ mod tests {
     #[test]
     fn test_revcomp_minor_population_ad() {
         // Exact mirror of the previous test, but with AD tag instead of COV
-        let mut reference = Genome::new("reference/NC_000962.3.gbk");
+        let mut genomes = parse_genbank("reference/NC_000962.3.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut reference = genomes.pop().unwrap();
         let vcf = VCFFile::new(
             "test/minor-populations-revcomp-AD.vcf".to_string(),
             false,
@@ -4223,6 +4304,7 @@ mod tests {
         let expected_vcf_rows = [
             VCFRow {
                 // 0
+                chrom: "NC_000962.3".to_string(),
                 position: 2154397,
                 reference: "g".to_string(),
                 alternative: vec!["t".to_string(), "c".to_string()],
@@ -4252,6 +4334,7 @@ mod tests {
             },
             VCFRow {
                 // 1
+                chrom: "NC_000962.3".to_string(),
                 position: 2154400,
                 reference: "cgg".to_string(),
                 alternative: vec!["c".to_string()],
@@ -4355,7 +4438,9 @@ mod tests {
 
     #[test]
     fn test_revcomp_minor_population_non_coding() {
-        let mut reference = Genome::new("reference/NC_000962.3.gbk");
+        let mut genomes = parse_genbank("reference/NC_000962.3.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut reference = genomes.pop().unwrap();
         for gene in reference.gene_definitions.iter_mut() {
             if gene.name == "katG" {
                 gene.coding = false;
@@ -4369,6 +4454,7 @@ mod tests {
         let expected_vcf_rows = [
             VCFRow {
                 // 0
+                chrom: "NC_000962.3".to_string(),
                 position: 2154397,
                 reference: "g".to_string(),
                 alternative: vec!["t".to_string(), "c".to_string()],
@@ -4394,6 +4480,7 @@ mod tests {
             },
             VCFRow {
                 // 1
+                chrom: "NC_000962.3".to_string(),
                 position: 2154400,
                 reference: "cgg".to_string(),
                 alternative: vec!["c".to_string()],
@@ -4597,13 +4684,16 @@ mod tests {
 
     #[test]
     fn test_misc_indel() {
-        let mut genome = Genome::new("reference/TEST-DNA.gbk");
+        let mut genomes = parse_genbank("reference/TEST-DNA.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut genome = genomes.pop().unwrap();
         let vcf = VCFFile::new("test/TEST-DNA-misc-indel.vcf".to_string(), false, 3);
         let mut sample = mutate(&genome, vcf);
 
         let expected_vcf_rows = [
             VCFRow {
                 // 0
+                chrom: "TEST_DNA.1".to_string(),
                 position: 6,
                 reference: "a".to_string(),
                 alternative: vec!["aa".to_string(), "aaa".to_string()],
@@ -4622,6 +4712,7 @@ mod tests {
             },
             VCFRow {
                 // 1
+                chrom: "TEST_DNA.1".to_string(),
                 position: 8,
                 reference: "a".to_string(),
                 alternative: vec!["aa".to_string()],
@@ -4637,6 +4728,7 @@ mod tests {
             },
             VCFRow {
                 // 2
+                chrom: "TEST_DNA.1".to_string(),
                 position: 94,
                 reference: "c".to_string(),
                 alternative: vec!["cc".to_string()],
@@ -4778,7 +4870,9 @@ mod tests {
         }
 
         // Hack A to make it non-coding to check that too
-        let mut genome = Genome::new("reference/TEST-DNA.gbk");
+        let mut genomes = parse_genbank("reference/TEST-DNA.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut genome = genomes.pop().unwrap();
         for gene in genome.gene_definitions.iter_mut() {
             if gene.name == "A" {
                 gene.coding = false;
@@ -4884,7 +4978,9 @@ mod tests {
         // Test misc edge cases within genome
 
         // Check `build_all_genes` populates genes as expected
-        let mut genome = Genome::new("reference/TEST-DNA.gbk");
+        let mut genomes = parse_genbank("reference/TEST-DNA.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut genome = genomes.pop().unwrap();
         let mut expected_genes = HashMap::new();
         for gene in genome.gene_names.iter() {
             expected_genes.insert(gene.clone(), genome.build_gene(gene.to_string()));
@@ -4969,7 +5065,9 @@ mod tests {
     #[test]
     fn test_revcomp_first_base_del() {
         // Test that a deletion of the first base is handled correctly
-        let mut genome = Genome::new("reference/NC_000962.3.gbk");
+        let mut genomes = parse_genbank("reference/NC_000962.3.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut genome = genomes.pop().unwrap();
         let vcf = VCFFile::new("test/revcomp-del-first-pos.vcf".to_string(), false, 3);
         let mut sample = mutate(&genome, vcf);
 
@@ -5012,7 +5110,9 @@ mod tests {
 
     #[test]
     fn test_snp_after_del() {
-        let mut genome = Genome::new("reference/NC_000962.3.gbk");
+        let mut genomes = parse_genbank("reference/NC_000962.3.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut genome = genomes.pop().unwrap();
         let vcf = VCFFile::new("test/tb-snp-after-del.vcf".to_string(), false, 3);
         let mut sample = mutate(&genome, vcf);
 
@@ -5065,7 +5165,9 @@ mod tests {
         // - Nested complement and join
 
         // Instanciating without error is the main test here
-        let mut reference = Genome::new("reference/NZ_CP085945.1.gbk");
+        let mut genomes = parse_genbank("reference/NZ_CP085945.1.gbk");
+        assert_eq!(genomes.len(), 1);
+        let mut reference = genomes.pop().unwrap();
 
         // Just check that genes are built correctly
         reference.build_all_genes();
@@ -5096,5 +5198,20 @@ mod tests {
         assert!(gene_diff.mutations.is_empty());
         assert!(gene_diff.minor_mutations.len() == 1);
         assert!(gene_diff.minor_mutations[0].mutation == "783_del_gccgcgccgcgcggcgcg:3");
+
+        // Double check that we can properly pick up multi genbank files
+        let genomes = parse_genbank("reference/TEST-DNA-double.gbk");
+        assert_eq!(genomes.len(), 2);
+        let vcf = VCFFile::new("test/TEST-DNA.vcf".to_string(), false, 3);
+        let sample1 = mutate(&genomes[0], vcf.clone());
+        let sample2 = mutate(&genomes[1], vcf);
+
+        let diff1 = GenomeDifference::new(genomes[0].clone(), sample1, MinorType::COV);
+        let diff2 = GenomeDifference::new(genomes[1].clone(), sample2, MinorType::COV);
+        assert_eq!(diff2.variants.len(), 1);
+        assert_eq!(diff2.minor_variants.len(), 0);
+
+        assert_ne!(diff1.variants, diff2.variants);
+        assert!(diff1.variants.len() > diff2.variants.len());
     }
 }
