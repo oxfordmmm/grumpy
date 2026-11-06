@@ -20,7 +20,7 @@ const NULL_FILTERS: [&str; 7] = [
     "SNP_SUPPORT_IN_VCF",
 ];
 
-#[pyclass]
+#[pyclass(from_py_object)]
 /// Dummy struct for wrapping VCFRecord
 ///
 /// Required to make a valid pyclass to use as a function argument
@@ -32,7 +32,7 @@ pub struct VCFRecordToParse {
     pub vcf_row_index: usize,
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 /// Struct to hold the information from a VCF file
 pub struct VCFFile {
