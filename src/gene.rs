@@ -7,7 +7,7 @@ use std::vec::Vec;
 use crate::common::{Alt, AltType, Evidence, GeneDef};
 use crate::genome::GenomePosition;
 
-#[pyclass(eq)]
+#[pyclass(eq, from_py_object)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Each position of a gene can either be a nucleotde or a codon
 pub enum GenePos {
@@ -18,7 +18,7 @@ pub enum GenePos {
     Codon(CodonType),
 }
 
-#[pyclass(eq)]
+#[pyclass(eq, from_py_object)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Tracks each constituent nucleotide in the codon, along with the amino acid it codes for
 pub struct CodonType {
@@ -31,7 +31,7 @@ pub struct CodonType {
     pub codon: Vec<NucleotideType>,
 }
 
-#[pyclass(eq)]
+#[pyclass(eq, from_py_object)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Stores information about a single nucleotide in a gene
 pub struct NucleotideType {
@@ -60,7 +60,7 @@ pub struct NucleotideType {
     pub is_deleted_minor: bool,
 }
 
-#[pyclass(eq)]
+#[pyclass(eq, from_py_object)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// A position of a gene is some position in the gene, along with the data at that position
 pub struct GenePosition {
@@ -73,7 +73,7 @@ pub struct GenePosition {
     pub gene_position_data: GenePos,
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// A gene is a collection of gene positions, along with some metadata
 pub struct Gene {

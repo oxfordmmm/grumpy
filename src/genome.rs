@@ -15,7 +15,7 @@ use crate::common::{Alt, AltType, Evidence, GeneDef, VCFRow};
 use crate::gene::Gene;
 use crate::vcf::VCFFile;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Struct to hold the information of a genome position
 pub struct GenomePosition {
@@ -50,7 +50,7 @@ pub struct GenomePosition {
     pub genes: Vec<String>,
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 /// Struct to hold the information about a genome
 pub struct Genome {

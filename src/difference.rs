@@ -9,7 +9,7 @@ use crate::common::{Alt, AltType, Evidence, MinorType};
 use crate::gene::{codon_to_aa, Gene, GenePos};
 use crate::genome::Genome;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Genome level variant
 pub struct Variant {
@@ -50,7 +50,7 @@ pub struct Variant {
     pub codon_idx: Option<i64>,
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Gene level mutation
 pub struct Mutation {
