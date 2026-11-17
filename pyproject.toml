@@ -18,7 +18,7 @@ classifiers = [
 description = "gumpy re-implemented in Rust"
 readme = "README-python.md"
 license = "University of Oxford, see license file for details."
-license-files = ["LICENSE"]
+license-file = "LICENSE"
 dynamic = ["version"]
 authors = [
     { name = "Jeremy Westhead", email = "jeremy.westhead@ndm.ox.ac.uk" }
