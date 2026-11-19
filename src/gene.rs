@@ -18,6 +18,40 @@ pub enum GenePos {
     Codon(CodonType),
 }
 
+#[pymethods]
+impl GenePos {
+    pub fn __repr__(&self) -> String {
+        match self {
+            GenePos::Nucleotide(nuc) => format!("GenePos::Nucleotide({:?})", nuc),
+            GenePos::Codon(codon) => format!("GenePos::Codon({:?})", codon),
+        }
+    }
+    pub fn get_bases(&self) -> Vec<char> {
+        match self {
+            GenePos::Nucleotide(nuc) => vec![nuc.reference],
+            GenePos::Codon(codon) => codon.codon.iter().map(|n| n.reference).collect(),
+        }
+    }
+    pub fn get_aa(&self) -> Option<char> {
+        match self {
+            GenePos::Nucleotide(_) => None,
+            GenePos::Codon(codon) => Some(codon.amino_acid),
+        }
+    }
+    pub fn get_start_index(&self) -> i64 {
+        match self {
+            GenePos::Nucleotide(nuc) => nuc.nucleotide_index,
+            GenePos::Codon(codon) => codon.codon[0].nucleotide_index,
+        }
+    }
+    pub fn get_end_index(&self) -> i64 {
+        match self {
+            GenePos::Nucleotide(nuc) => nuc.nucleotide_index,
+            GenePos::Codon(codon) => codon.codon[2].nucleotide_index,
+        }
+    }
+}
+
 #[pyclass(eq, from_py_object)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Tracks each constituent nucleotide in the codon, along with the amino acid it codes for

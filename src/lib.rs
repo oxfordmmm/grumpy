@@ -63,6 +63,10 @@ fn grumpy(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<genome::Genome>()?;
 
     m.add_class::<gene::Gene>()?;
+    m.add_class::<gene::GenePosition>()?;
+    m.add_class::<gene::GenePos>()?;
+    m.add_class::<gene::CodonType>()?;
+    m.add_class::<gene::NucleotideType>()?;
 
     m.add_class::<vcf::VCFFile>()?;
 

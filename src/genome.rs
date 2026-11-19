@@ -359,27 +359,39 @@ impl Genome {
         let mut nucleotide_index = Vec::new();
         let mut genome_positions: Vec<GenomePosition> = Vec::new();
         if !gene_def.reverse_complement && gene_def.promoter_start != -1 {
-            for idx in
-                (gene_def.promoter_start as usize).saturating_sub(1)..gene_def.ranges[0].0 as usize
+            for position in self
+                .genome_positions
+                .iter()
+                .take(gene_def.ranges[0].0 as usize)
+                .skip((gene_def.promoter_start as usize).saturating_sub(1))
             {
-                nucleotide_sequence.push(self.genome_positions[idx].reference);
-                nucleotide_index.push(self.genome_positions[idx].genome_idx);
-                genome_positions.push(self.genome_positions[idx].clone());
+                nucleotide_sequence.push(position.reference);
+                nucleotide_index.push(position.genome_idx);
+                genome_positions.push(position.clone());
             }
         }
         for (start, end) in gene_def.ranges.iter() {
-            for i in *start as usize..*end as usize {
-                nucleotide_sequence.push(self.genome_positions[i].reference);
-                nucleotide_index.push(self.genome_positions[i].genome_idx);
-                genome_positions.push(self.genome_positions[i].clone());
+            for position in self
+                .genome_positions
+                .iter()
+                .take(*end as usize)
+                .skip(*start as usize)
+            {
+                nucleotide_sequence.push(position.reference);
+                nucleotide_index.push(position.genome_idx);
+                genome_positions.push(position.clone());
             }
         }
         if gene_def.reverse_complement && gene_def.promoter_start != -1 {
-            for idx in gene_def.ranges.last().unwrap().1 as usize..=gene_def.promoter_start as usize
+            for position in self
+                .genome_positions
+                .iter()
+                .take(gene_def.promoter_start as usize + 1)
+                .skip(gene_def.ranges.last().unwrap().1 as usize)
             {
-                nucleotide_sequence.push(self.genome_positions[idx].reference);
-                nucleotide_index.push(self.genome_positions[idx].genome_idx);
-                genome_positions.push(self.genome_positions[idx].clone());
+                nucleotide_sequence.push(position.reference);
+                nucleotide_index.push(position.genome_idx);
+                genome_positions.push(position.clone());
             }
         }
         // I hate implicit returns, but appease clippy
