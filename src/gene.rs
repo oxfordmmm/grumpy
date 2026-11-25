@@ -740,12 +740,16 @@ impl Gene {
 /// # Returns
 /// - Amino acid the codon codes for
 pub fn codon_to_aa(codon: String) -> char {
-    if codon.contains("x") {
+    // Nulls can be parsed from VCF as `x` or
+    // genbanks can denote `n`
+    if codon.contains("x") || codon.contains("n") {
         return 'X';
     }
+    // Het calls
     if codon.contains("z") {
         return 'Z';
     }
+    // Real codons
     match codon.as_str() {
         "ttt" | "ttc" => 'F',
         "tta" | "ttg" | "ctt" | "ctc" | "cta" | "ctg" => 'L',
@@ -782,6 +786,7 @@ pub fn complement_base(base: char) -> char {
         // Het and null don't get complements
         'z' => 'z',
         'x' => 'x',
+        'n' => 'n',
         _ => base,
     }
 }
